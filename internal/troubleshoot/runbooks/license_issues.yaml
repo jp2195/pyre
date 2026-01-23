@@ -1,0 +1,132 @@
+id: license_issues
+name: License Status Check
+description: Diagnose licensing issues including expiration and feature availability
+category: licensing
+tags:
+  - license
+  - support
+  - subscription
+requires_ssh: true
+
+steps:
+  - id: check_system_info
+    name: Check System Info
+    description: Get device serial number and basic info
+    type: api
+    api_call: system_info
+    required: true
+    patterns: []
+
+  - id: check_license_info
+    name: Check License Status
+    description: Display current license status and expiration dates
+    type: ssh
+    command: request license info
+    required: true
+    patterns:
+      - id: license_valid
+        name: License Valid
+        regex: "Expired:\\s*no"
+        severity: info
+        message: License is valid and active
+        remediation: No action needed
+        kb_articles: []
+
+      - id: license_expired
+        name: License Expired
+        regex: "Expired:\\s*yes"
+        severity: critical
+        message: License has expired - features may be disabled
+        remediation: Renew license through Palo Alto Networks support portal
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJ5
+
+      - id: license_expiring_soon
+        name: License Expiring Soon
+        regex: "Expires:\\s*202[5-6]-(?:0[1-3]|01)"
+        severity: warning
+        message: License expiring within 90 days
+        remediation: Plan license renewal to avoid service interruption
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJ5
+
+      - id: no_license
+        name: No License Found
+        regex: "(?i)no.*license|license.*not.*found"
+        severity: critical
+        message: No license installed on the device
+        remediation: Install license using 'request license fetch' or install authcode
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJ5
+
+  - id: check_support_license
+    name: Check Support License
+    description: Verify support contract status
+    type: ssh
+    command: show system info | match -i support
+    required: false
+    patterns:
+      - id: support_active
+        name: Support Active
+        regex: "(?i)support.*active|support.*valid"
+        severity: info
+        message: Support contract is active
+        remediation: No action needed
+        kb_articles: []
+
+      - id: support_expired
+        name: Support Expired
+        regex: "(?i)support.*expired|no.*support"
+        severity: warning
+        message: Support contract has expired
+        remediation: Renew support contract for software updates and TAC access
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJ5
+
+  - id: test_license_server
+    name: Test License Server Connectivity
+    description: Verify connectivity to Palo Alto licensing servers
+    type: ssh
+    command: ping host updates.paloaltonetworks.com count 3
+    required: false
+    patterns:
+      - id: license_server_reachable
+        name: License Server Reachable
+        regex: "0\\.0%.*packet.*loss|[1-3].*received"
+        severity: info
+        message: License server is reachable
+        remediation: No action needed
+        kb_articles: []
+
+      - id: license_server_unreachable
+        name: License Server Unreachable
+        regex: "100%.*packet.*loss|0.*received|unknown host"
+        severity: error
+        message: Cannot reach license server - automatic updates will fail
+        remediation: Check DNS resolution, proxy settings, and firewall rules for outbound HTTPS
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJ5
+
+  - id: check_threat_prevention
+    name: Check Threat Prevention License
+    description: Verify threat prevention subscription status
+    type: ssh
+    command: request license info | match -i threat
+    required: false
+    patterns:
+      - id: threat_licensed
+        name: Threat Prevention Licensed
+        regex: "Threat.*Prevention.*Expired:\\s*no"
+        severity: info
+        message: Threat Prevention license is active
+        remediation: No action needed
+        kb_articles: []
+
+      - id: threat_expired
+        name: Threat Prevention Expired
+        regex: "Threat.*Prevention.*Expired:\\s*yes"
+        severity: error
+        message: Threat Prevention license has expired - signatures may be outdated
+        remediation: Renew Threat Prevention subscription
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJ5

@@ -1,0 +1,149 @@
+id: commit_failures
+name: Commit Failure Analysis
+description: Diagnose commit failures and configuration validation errors
+category: configuration
+tags:
+  - commit
+  - config
+  - validation
+requires_ssh: true
+
+steps:
+  - id: check_resources
+    name: Check System Resources
+    description: Verify system has adequate resources for commit
+    type: api
+    api_call: system_resources
+    required: true
+    patterns:
+      - id: high_cpu
+        name: High CPU Usage
+        regex: "CPU:\\s*([89]\\d|100)"
+        severity: warning
+        message: High CPU utilization may slow commit operations
+        remediation: Wait for CPU to normalize or investigate high CPU cause
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJK
+
+      - id: high_memory
+        name: High Memory Usage
+        regex: "Memory:\\s*([89]\\d|100)"
+        severity: warning
+        message: High memory utilization - commit may fail due to low memory
+        remediation: Review and optimize configuration or upgrade device
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJK
+
+  - id: check_commit_history
+    name: Check Commit History
+    description: Review recent commit job history
+    type: ssh
+    command: show jobs all
+    required: true
+    patterns:
+      - id: commit_failed
+        name: Commit Failed
+        regex: "Commit.*FIN.*FAIL|Result:.*FAIL"
+        severity: error
+        message: Recent commit job failed
+        remediation: Check commit error details with 'show jobs id <job_id>'
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClIa
+
+      - id: commit_pending
+        name: Commit Pending
+        regex: "Commit.*PEND|Commit.*ACT"
+        severity: warning
+        message: Commit job is currently pending or active
+        remediation: Wait for the current commit to complete
+        kb_articles: []
+
+  - id: check_config_lock
+    name: Check Config Lock
+    description: Check if configuration is locked
+    type: ssh
+    command: show config-lock all
+    required: true
+    patterns:
+      - id: config_locked
+        name: Configuration Locked
+        regex: "(?i)locked.*by|config.*lock.*set"
+        severity: error
+        message: Configuration is locked by another administrator
+        remediation: "Contact the locking admin or use 'request config-lock remove <lock>' if authorized"
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClIa
+
+      - id: config_not_locked
+        name: Configuration Not Locked
+        regex: "(?i)lock.*not.*set|no.*lock"
+        severity: info
+        message: Configuration is not locked
+        remediation: No action needed
+        kb_articles: []
+
+  - id: check_pending_changes
+    name: Check Pending Changes
+    description: Show pending configuration changes
+    type: ssh
+    command: show config diff
+    required: false
+    patterns:
+      - id: no_changes
+        name: No Pending Changes
+        regex: "^$|no.*difference|identical"
+        severity: info
+        message: No pending configuration changes
+        remediation: No commit needed
+        kb_articles: []
+
+      - id: has_changes
+        name: Pending Changes
+        regex: "[+-]"
+        severity: info
+        message: Pending configuration changes detected
+        remediation: Review changes before committing
+        kb_articles: []
+
+  - id: check_config_audit
+    name: Check Config Audit Log
+    description: Review configuration audit log for errors
+    type: ssh
+    command: less mp-log configd.log | tail 50
+    required: false
+    patterns:
+      - id: validation_error
+        name: Validation Error
+        regex: "(?i)validation.*error|invalid.*config"
+        severity: error
+        message: Configuration validation error detected
+        remediation: Review the validation error message and correct the configuration
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClIa
+
+      - id: object_not_found
+        name: Object Reference Error
+        regex: "(?i)object.*not.*found|undefined.*reference"
+        severity: error
+        message: Referenced object does not exist
+        remediation: Create the missing object or remove the invalid reference
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClIa
+
+      - id: license_restriction
+        name: License Restriction
+        regex: "(?i)license.*required|feature.*not.*licensed"
+        severity: error
+        message: Feature requires a license that is not active
+        remediation: Install the required license or remove the unlicensed feature
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJ5
+
+      - id: syntax_error
+        name: Syntax Error
+        regex: "(?i)syntax.*error|parse.*error|malformed"
+        severity: error
+        message: Configuration syntax error detected
+        remediation: Correct the syntax error in the configuration
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClIa

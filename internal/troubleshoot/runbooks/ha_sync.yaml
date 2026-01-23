@@ -1,0 +1,158 @@
+id: ha_sync
+name: HA Sync Check
+description: Diagnose High Availability synchronization issues between firewall peers
+category: high_availability
+tags:
+  - ha
+  - sync
+  - failover
+requires_ssh: true
+
+steps:
+  - id: check_ha_api
+    name: Check HA Status via API
+    description: Get basic HA status through API
+    type: api
+    api_call: ha_status
+    required: true
+    patterns:
+      - id: ha_disabled
+        name: HA Not Enabled
+        regex: "HA not enabled"
+        severity: info
+        message: High Availability is not configured on this device
+        remediation: Configure HA if redundancy is required
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClH4
+
+  - id: check_ha_state
+    name: Check Detailed HA State
+    description: Get detailed HA state information
+    type: ssh
+    command: show high-availability state
+    required: true
+    patterns:
+      - id: ha_active
+        name: HA Active State
+        regex: "State:\\s*active"
+        severity: info
+        message: Local device is in active state
+        remediation: No action needed
+        kb_articles: []
+
+      - id: ha_passive
+        name: HA Passive State
+        regex: "State:\\s*passive"
+        severity: info
+        message: Local device is in passive state
+        remediation: No action needed - device will become active on failover
+        kb_articles: []
+
+      - id: ha_suspended
+        name: HA Suspended State
+        regex: "State:\\s*suspended"
+        severity: critical
+        message: HA is in suspended state - device will not participate in failover
+        remediation: "Use 'request high-availability state functional' to resume HA"
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClH4
+
+      - id: ha_non_functional
+        name: HA Non-Functional State
+        regex: "State:\\s*(non-functional|initial)"
+        severity: critical
+        message: HA is not functional - failover will not work
+        remediation: Check peer connectivity, HA1/HA2 links, and configuration sync
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClH4
+
+      - id: peer_unreachable
+        name: Peer Unreachable
+        regex: "(?i)peer.*unreachable|cannot.*reach.*peer"
+        severity: critical
+        message: HA peer is unreachable
+        remediation: Check HA link connectivity, peer power status, and network path
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClH4
+
+  - id: check_ha_sync
+    name: Check HA Sync Status
+    description: Verify configuration synchronization status
+    type: ssh
+    command: show high-availability state-synchronization
+    required: false
+    patterns:
+      - id: sync_running
+        name: Sync In Progress
+        regex: "(?i)running|in.*progress"
+        severity: warning
+        message: Configuration sync is in progress
+        remediation: Wait for sync to complete before making changes
+        kb_articles: []
+
+      - id: sync_failed
+        name: Sync Failed
+        regex: "(?i)sync.*(fail|error)|synchronization.*(fail|error)"
+        severity: error
+        message: Configuration synchronization has failed
+        remediation: Check logs and try 'request high-availability sync-to-remote running-config'
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClHE
+
+  - id: check_ha_link
+    name: Check HA Link Status
+    description: Verify HA control and data link status
+    type: ssh
+    command: show high-availability link-monitoring
+    required: false
+    patterns:
+      - id: ha1_down
+        name: HA1 Link Down
+        regex: "(?i)ha1.*down|control.*link.*down"
+        severity: critical
+        message: HA1 control link is down - heartbeat monitoring affected
+        remediation: Check physical connectivity of HA1 interface
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClH4
+
+      - id: ha2_down
+        name: HA2 Link Down
+        regex: "(?i)ha2.*down|data.*link.*down"
+        severity: critical
+        message: HA2 data link is down - session sync affected
+        remediation: Check physical connectivity of HA2 interface
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClH4
+
+      - id: link_monitoring_failed
+        name: Link Monitoring Failed
+        regex: "(?i)monitoring.*failed|link.*group.*down"
+        severity: warning
+        message: Link monitoring group has failed links
+        remediation: Check monitored interfaces and connected network equipment
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClH4
+
+  - id: check_ha_logs
+    name: Check HA Logs
+    description: Check recent HA-related log entries
+    type: ssh
+    command: less mp-log ha_agent.log | tail 50
+    required: false
+    patterns:
+      - id: failover_event
+        name: Failover Event
+        regex: "(?i)failover|state.*change"
+        severity: warning
+        message: Recent failover or state change detected
+        remediation: Review logs to understand the cause of the state change
+        kb_articles: []
+
+      - id: split_brain
+        name: Split Brain Detection
+        regex: "(?i)split.*brain|both.*active"
+        severity: critical
+        message: Split brain condition detected or occurred
+        remediation: Immediately check and correct HA configuration and connectivity
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClH4

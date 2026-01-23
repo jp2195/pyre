@@ -1,0 +1,115 @@
+id: panorama_connectivity
+name: Panorama Connectivity Check
+description: Diagnose connectivity issues between the firewall and Panorama management server
+category: connectivity
+tags:
+  - panorama
+  - connectivity
+  - management
+requires_ssh: true
+
+steps:
+  - id: check_system_info
+    name: Check System Info
+    description: Retrieve system information to verify device state
+    type: api
+    api_call: system_info
+    required: true
+    patterns: []
+
+  - id: check_panorama_status
+    name: Check Panorama Status
+    description: Check the connection status to Panorama
+    type: ssh
+    command: show panorama-status
+    required: true
+    patterns:
+      - id: panorama_connected
+        name: Panorama Connected
+        regex: "Connected\\s*:\\s*yes"
+        severity: info
+        message: Panorama connection is established
+        remediation: No action needed
+        kb_articles: []
+
+      - id: panorama_disconnected
+        name: Panorama Disconnected
+        regex: "Connected\\s*:\\s*no"
+        severity: error
+        message: Firewall is not connected to Panorama
+        remediation: Check network connectivity and Panorama server status
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClVr
+
+  - id: check_ms_log
+    name: Check MS Log
+    description: Check mp-log ms.log for SSL and connection errors
+    type: ssh
+    command: less mp-log ms.log | tail 100
+    required: false
+    patterns:
+      - id: ssl_handshake_error
+        name: SSL Handshake Error
+        regex: "(?i)ssl.*handshake.*(fail|error)|tls.*error"
+        severity: error
+        message: SSL/TLS handshake errors detected - may indicate certificate issues
+        remediation: Verify SSL certificates are valid and properly configured. Check system time synchronization.
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClGo
+
+      - id: connection_refused
+        name: Connection Refused
+        regex: "(?i)connection.*refused|connect.*failed"
+        severity: error
+        message: Connection to Panorama was refused
+        remediation: Verify Panorama IP address, port 3978 is open, and firewall rules allow management traffic
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClVr
+
+      - id: auth_failure
+        name: Authentication Failure
+        regex: "(?i)auth.*fail|authentication.*error"
+        severity: error
+        message: Authentication to Panorama failed
+        remediation: Re-register the firewall with Panorama using 'request registration-status'
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClVr
+
+  - id: check_clock
+    name: Check System Clock
+    description: Verify system time is accurate for certificate validation
+    type: ssh
+    command: show clock
+    required: false
+    patterns:
+      - id: time_info
+        name: System Time
+        regex: ".*"
+        severity: info
+        message: System clock retrieved - verify time is accurate for SSL certificate validation
+        remediation: If time is incorrect, configure NTP using 'set deviceconfig system ntp-servers'
+        kb_articles: []
+
+  - id: test_connectivity
+    name: Test Panorama Connectivity
+    description: Ping Panorama server to verify network connectivity
+    type: ssh
+    command: ping host panorama count 3
+    required: false
+    patterns:
+      - id: ping_success
+        name: Ping Success
+        regex: "0\\.0%.*packet.*loss|3.*received"
+        severity: info
+        message: Network connectivity to Panorama is working
+        remediation: No action needed
+        kb_articles: []
+
+      - id: ping_failure
+        name: Ping Failure
+        regex: "100%.*packet.*loss|0.*received|unknown host"
+        severity: error
+        message: Cannot reach Panorama server - network connectivity issue
+        remediation: Check routing, firewall rules, and verify Panorama IP/hostname is correct
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClVr

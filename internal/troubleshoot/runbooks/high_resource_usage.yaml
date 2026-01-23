@@ -1,0 +1,177 @@
+id: high_resource_usage
+name: High Resource Usage Analysis
+description: Diagnose high CPU, memory, and session table utilization issues
+category: performance
+tags:
+  - performance
+  - cpu
+  - memory
+  - sessions
+requires_ssh: true
+
+steps:
+  - id: check_resources_api
+    name: Check Resources via API
+    description: Get current resource utilization metrics
+    type: api
+    api_call: system_resources
+    required: true
+    patterns:
+      - id: critical_cpu
+        name: Critical CPU Usage
+        regex: "CPU:\\s*(9[5-9]|100)"
+        severity: critical
+        message: CPU utilization is critically high (95%+)
+        remediation: Immediately investigate top processes and consider emergency maintenance
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJK
+
+      - id: high_cpu
+        name: High CPU Usage
+        regex: "CPU:\\s*([89]\\d)"
+        severity: warning
+        message: CPU utilization is elevated (80-94%)
+        remediation: Monitor trend and identify resource-intensive processes
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJK
+
+      - id: critical_memory
+        name: Critical Memory Usage
+        regex: "Memory:\\s*(9[5-9]|100)"
+        severity: critical
+        message: Memory utilization is critically high (95%+)
+        remediation: Review configuration size, consider clearing caches or restarting processes
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJK
+
+      - id: high_memory
+        name: High Memory Usage
+        regex: "Memory:\\s*([89]\\d)"
+        severity: warning
+        message: Memory utilization is elevated (80-94%)
+        remediation: Monitor trend and review configuration complexity
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJK
+
+  - id: check_top_processes
+    name: Check Top Processes
+    description: Identify resource-consuming processes
+    type: ssh
+    command: show system resources
+    required: true
+    patterns:
+      - id: mgmt_high_cpu
+        name: Management Daemon High CPU
+        regex: "mgmtsrvr.*([5-9]\\d|100)\\s*%"
+        severity: warning
+        message: Management server process using high CPU
+        remediation: Check for configuration changes, API requests, or commit operations
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJK
+
+      - id: pan_comm_high
+        name: Pan_comm High CPU
+        regex: "pan_comm.*([5-9]\\d|100)\\s*%"
+        severity: warning
+        message: Panorama communication process using high CPU
+        remediation: Check Panorama connectivity and template push operations
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJK
+
+      - id: devsrvr_high
+        name: Device Server High CPU
+        regex: "devsrvr.*([5-9]\\d|100)\\s*%"
+        severity: warning
+        message: Device server process using high CPU
+        remediation: Check for logging issues or log forwarding problems
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJK
+
+  - id: check_session_info
+    name: Check Session Table
+    description: Verify session table utilization
+    type: api
+    api_call: session_info
+    required: true
+    patterns:
+      - id: high_session_util
+        name: High Session Utilization
+        regex: "Active:\\s*(\\d+).*Max:\\s*(\\d+)"
+        severity: info
+        message: Session table metrics retrieved
+        remediation: Review if session count is appropriate for traffic load
+        kb_articles: []
+
+  - id: check_session_detail
+    name: Check Session Details
+    description: Get detailed session statistics
+    type: ssh
+    command: show session info
+    required: false
+    patterns:
+      - id: session_table_full
+        name: Session Table Full
+        regex: "(?i)table.*full|utilization.*100|no.*free.*sessions"
+        severity: critical
+        message: Session table is full - new connections will be dropped
+        remediation: Review timeout settings, investigate DDoS, or consider hardware upgrade
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJK
+
+      - id: high_cps
+        name: High Connection Rate
+        regex: "CPS:\\s*([5-9]\\d{4}|\\d{5,})"
+        severity: warning
+        message: High connection rate detected
+        remediation: Verify traffic is legitimate and not a DDoS attack
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJK
+
+  - id: check_dataplane
+    name: Check Dataplane Stats
+    description: Check dataplane resource utilization
+    type: ssh
+    command: show running resource-monitor
+    required: false
+    patterns:
+      - id: dp_high_cpu
+        name: Dataplane High CPU
+        regex: "(?i)dataplane.*cpu.*([89]\\d|100)|cpu.*utilization.*([89]\\d|100)"
+        severity: critical
+        message: Dataplane CPU is critically high - may cause packet drops
+        remediation: Review security policy complexity, consider hardware upgrade
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJK
+
+      - id: packet_drops
+        name: Packet Drops
+        regex: "(?i)packet.*drop|buffer.*overflow"
+        severity: warning
+        message: Packet drops detected
+        remediation: Review interface queues and consider traffic shaping
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJK
+
+  - id: check_mp_logs
+    name: Check MP Logs for OOM
+    description: Check management plane logs for out-of-memory events
+    type: ssh
+    command: less mp-log messages | grep -i "oom\|out of memory\|memory exhausted" | tail 20
+    required: false
+    patterns:
+      - id: oom_detected
+        name: OOM Event Detected
+        regex: "(?i)oom.*kill|out.*of.*memory|memory.*exhausted|killed.*process"
+        severity: critical
+        message: Out of memory events detected - processes may have been killed
+        remediation: Identify memory-intensive processes, consider memory upgrade or configuration optimization
+        kb_articles:
+          - https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJK
+
+      - id: no_oom
+        name: No OOM Events
+        regex: "^$"
+        severity: info
+        message: No recent out-of-memory events found
+        remediation: No action needed
+        kb_articles: []
