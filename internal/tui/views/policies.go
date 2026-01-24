@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/joshuamontgomery/pyre/internal/models"
+	"github.com/jp2195/pyre/internal/models"
+	"github.com/jp2195/pyre/internal/tui/theme"
 )
 
 type PolicySortField int
@@ -23,59 +23,44 @@ const (
 )
 
 type PoliciesModel struct {
-	policies   []models.SecurityRule
-	filtered   []models.SecurityRule
-	err        error
-	cursor     int
-	offset     int
-	filterMode bool
-	filter     textinput.Model
-	expanded   bool
-	width      int
-	height     int
-	sortBy     PolicySortField
-	sortAsc    bool
-	loading    bool
+	TableBase
+	policies []models.SecurityRule
+	filtered []models.SecurityRule
+	sortBy   PolicySortField
 }
 
 func NewPoliciesModel() PoliciesModel {
-	f := textinput.New()
-	f.Placeholder = "Filter rules..."
-	f.CharLimit = 100
-	f.Width = 40
-
 	return PoliciesModel{
-		filter: f,
+		TableBase: NewTableBase("Filter rules..."),
 	}
 }
 
 func (m PoliciesModel) SetSize(width, height int) PoliciesModel {
-	m.width = width
-	m.height = height
+	m.TableBase = m.TableBase.SetSize(width, height)
 	return m
 }
 
 func (m PoliciesModel) SetLoading(loading bool) PoliciesModel {
-	m.loading = loading
+	m.TableBase = m.TableBase.SetLoading(loading)
 	return m
 }
 
 func (m PoliciesModel) SetPolicies(policies []models.SecurityRule, err error) PoliciesModel {
 	m.policies = policies
-	m.err = err
-	m.loading = false
-	m.cursor = 0
-	m.offset = 0
+	m.Err = err
+	m.Loading = false
+	m.Cursor = 0
+	m.Offset = 0
 	m.applyFilter()
 	return m
 }
 
 func (m *PoliciesModel) applyFilter() {
-	if m.filter.Value() == "" {
+	if m.FilterValue() == "" {
 		m.filtered = make([]models.SecurityRule, len(m.policies))
 		copy(m.filtered, m.policies)
 	} else {
-		query := strings.ToLower(m.filter.Value())
+		query := strings.ToLower(m.FilterValue())
 		m.filtered = nil
 
 		for _, p := range m.policies {
@@ -108,7 +93,7 @@ func (m *PoliciesModel) applySort() {
 		default: // PolicySortPosition
 			less = m.filtered[i].Position < m.filtered[j].Position
 		}
-		if m.sortAsc {
+		if m.SortAsc {
 			return less
 		}
 		return !less
@@ -117,13 +102,13 @@ func (m *PoliciesModel) applySort() {
 
 func (m *PoliciesModel) cycleSort() {
 	m.sortBy = (m.sortBy + 1) % 4
-	m.sortAsc = m.sortBy == PolicySortPosition || m.sortBy == PolicySortName
+	m.SortAsc = m.sortBy == PolicySortPosition || m.sortBy == PolicySortName
 	m.applySort()
 }
 
 func (m PoliciesModel) sortLabel() string {
 	dir := "↓"
-	if m.sortAsc {
+	if m.SortAsc {
 		dir = "↑"
 	}
 	switch m.sortBy {
@@ -148,57 +133,35 @@ func containsAny(items []string, query string) bool {
 }
 
 func (m PoliciesModel) Update(msg tea.Msg) (PoliciesModel, tea.Cmd) {
-	if m.filterMode {
+	if m.FilterMode {
 		return m.updateFilter(msg)
 	}
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// Handle policy-specific keys first
 		switch msg.String() {
-		case "j", "down":
-			if m.cursor < len(m.filtered)-1 {
-				m.cursor++
-				m.ensureVisible()
-			}
-		case "k", "up":
-			if m.cursor > 0 {
-				m.cursor--
-				m.ensureVisible()
-			}
-		case "g", "home":
-			m.cursor = 0
-			m.offset = 0
-		case "G", "end":
-			m.cursor = len(m.filtered) - 1
-			m.ensureVisible()
-		case "ctrl+d", "pgdown":
-			m.cursor += 10
-			if m.cursor >= len(m.filtered) {
-				m.cursor = len(m.filtered) - 1
-			}
-			m.ensureVisible()
-		case "ctrl+u", "pgup":
-			m.cursor -= 10
-			if m.cursor < 0 {
-				m.cursor = 0
-			}
-			m.ensureVisible()
-		case "/":
-			m.filterMode = true
-			m.filter.Focus()
-		case "enter":
-			m.expanded = !m.expanded
 		case "esc":
-			if m.expanded {
-				m.expanded = false
-			} else if m.filter.Value() != "" {
-				m.filter.SetValue("")
+			if m.HandleCollapseIfExpanded() {
+				return m, nil
+			}
+			if m.HandleClearFilter() {
 				m.applyFilter()
 			}
+			return m, nil
 		case "s":
 			m.cycleSort()
-			m.cursor = 0
-			m.offset = 0
+			m.Cursor = 0
+			m.Offset = 0
+			return m, nil
+		}
+
+		// Delegate to TableBase for common navigation
+		visible := m.visibleRows()
+		base, handled, cmd := m.TableBase.HandleNavigation(msg, len(m.filtered), visible)
+		if handled {
+			m.TableBase = base
+			return m, cmd
 		}
 	}
 
@@ -206,36 +169,17 @@ func (m PoliciesModel) Update(msg tea.Msg) (PoliciesModel, tea.Cmd) {
 }
 
 func (m PoliciesModel) updateFilter(msg tea.Msg) (PoliciesModel, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "enter", "esc":
-			m.filterMode = false
-			m.filter.Blur()
-			m.applyFilter()
-			m.cursor = 0
-			m.offset = 0
-			return m, nil
-		}
+	base, exited, cmd := m.TableBase.HandleFilterMode(msg)
+	m.TableBase = base
+	if exited {
+		m.applyFilter()
 	}
-
-	var cmd tea.Cmd
-	m.filter, cmd = m.filter.Update(msg)
 	return m, cmd
 }
 
-func (m *PoliciesModel) ensureVisible() {
-	visibleRows := m.visibleRows()
-	if m.cursor < m.offset {
-		m.offset = m.cursor
-	} else if m.cursor >= m.offset+visibleRows {
-		m.offset = m.cursor - visibleRows + 1
-	}
-}
-
 func (m PoliciesModel) visibleRows() int {
-	rows := m.height - 8
-	if m.expanded {
+	rows := m.Height - 8
+	if m.Expanded {
 		rows -= 14
 	}
 	if rows < 1 {
@@ -245,106 +189,67 @@ func (m PoliciesModel) visibleRows() int {
 }
 
 func (m PoliciesModel) View() string {
-	if m.width == 0 {
+	if m.Width == 0 {
 		return "Loading..."
 	}
 
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#7C3AED")).
-		MarginBottom(1)
-
-	panelStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#374151")).
-		Padding(1, 2).
-		Width(m.width - 4)
+	titleStyle := ViewTitleStyle.MarginBottom(1)
+	panelStyle := ViewPanelStyle.Width(m.Width - 4)
 
 	var b strings.Builder
 	title := fmt.Sprintf("Security Policies (%d rules)", len(m.filtered))
-	sortInfo := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280")).
-		Render(fmt.Sprintf("  [Sort: %s | s: change | /: filter | enter: details]", m.sortLabel()))
+	sortInfo := BannerInfoStyle.Render(fmt.Sprintf("  [Sort: %s | s: change | /: filter | enter: details]", m.sortLabel()))
 	b.WriteString(titleStyle.Render(title) + sortInfo)
 	b.WriteString("\n")
 
-	if m.filterMode {
-		filterStyle := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#7C3AED")).
-			Padding(0, 1)
-		b.WriteString(filterStyle.Render(m.filter.View()))
+	if m.FilterMode {
+		b.WriteString(FilterBorderStyle.Render(m.Filter.View()))
 		b.WriteString("\n\n")
-	} else if m.filter.Value() != "" {
-		filterInfo := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#A78BFA")).
-			Render(fmt.Sprintf("Filtered: \"%s\"", m.filter.Value()))
-		clearHint := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6B7280")).
-			Render(" (esc to clear)")
+	} else if m.IsFiltered() {
+		filterInfo := FilterActiveStyle.Render(fmt.Sprintf("Filtered: \"%s\"", m.FilterValue()))
+		clearHint := FilterClearHintStyle.Render(" (esc to clear)")
 		b.WriteString(filterInfo + clearHint)
 		b.WriteString("\n\n")
 	}
 
-	if m.err != nil {
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444")).Render("Error: " + m.err.Error()))
+	if m.Err != nil {
+		b.WriteString(ErrorMsgStyle.Render("Error: " + m.Err.Error()))
 		return panelStyle.Render(b.String())
 	}
 
-	if m.loading || m.policies == nil {
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Render("Loading policies..."))
+	if m.Loading || m.policies == nil {
+		b.WriteString(LoadingMsgStyle.Render("Loading policies..."))
 		return panelStyle.Render(b.String())
 	}
 
 	if len(m.filtered) == 0 {
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Render("No policies found"))
+		b.WriteString(EmptyMsgStyle.Render("No policies found"))
 		return panelStyle.Render(b.String())
 	}
 
 	b.WriteString(m.renderTable())
 
-	if m.expanded && m.cursor < len(m.filtered) {
+	if m.Expanded && m.Cursor < len(m.filtered) {
 		b.WriteString("\n")
-		b.WriteString(m.renderDetail(m.filtered[m.cursor]))
+		b.WriteString(m.renderDetail(m.filtered[m.Cursor]))
 	}
 
 	return panelStyle.Render(b.String())
 }
 
 func (m PoliciesModel) renderTable() string {
-	// Styles
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#9CA3AF"))
-
-	selectedStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("#3730A3")).
-		Foreground(lipgloss.Color("#FFFFFF")).
-		Bold(true)
-
-	normalStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#E5E7EB"))
-
-	disabledStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#4B5563")).
-		Strikethrough(true)
-
-	dimStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280"))
-
-	allowStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#10B981")).
-		Bold(true)
-
-	denyStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#EF4444")).
-		Bold(true)
-
-	tagStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#60A5FA"))
+	// Styles from centralized definitions
+	headerStyle := DetailLabelStyle.Bold(true)
+	selectedStyle := TableRowSelectedStyle.Bold(true)
+	normalStyle := DetailValueStyle
+	disabledStyle := TableRowDisabledStyle
+	dimStyle := DetailDimStyle
+	allowStyle := ActionAllowStyle
+	denyStyle := ActionDenyStyle
+	tagStyle := TagStyle
 
 	// Calculate available width
-	availableWidth := m.width - 12 // Account for padding and borders
+	availableWidth := m.Width - 12 // Account for padding and borders
 
 	var b strings.Builder
 
@@ -356,14 +261,14 @@ func (m PoliciesModel) renderTable() string {
 	b.WriteString("\n")
 
 	visibleRows := m.visibleRows()
-	end := m.offset + visibleRows
+	end := m.Offset + visibleRows
 	if end > len(m.filtered) {
 		end = len(m.filtered)
 	}
 
-	for i := m.offset; i < end; i++ {
+	for i := m.Offset; i < end; i++ {
 		p := m.filtered[i]
-		isSelected := i == m.cursor
+		isSelected := i == m.Cursor
 
 		row := m.formatRuleRow(p, availableWidth, allowStyle, denyStyle, tagStyle, dimStyle)
 
@@ -379,7 +284,7 @@ func (m PoliciesModel) renderTable() string {
 
 	// Show scroll indicator if needed
 	if len(m.filtered) > visibleRows {
-		scrollInfo := fmt.Sprintf("  Showing %d-%d of %d", m.offset+1, end, len(m.filtered))
+		scrollInfo := fmt.Sprintf("  Showing %d-%d of %d", m.Offset+1, end, len(m.filtered))
 		b.WriteString(dimStyle.Render(scrollInfo))
 	}
 
@@ -447,33 +352,17 @@ func (m PoliciesModel) formatRuleRow(p models.SecurityRule, width int, allowStyl
 }
 
 func (m PoliciesModel) renderDetail(p models.SecurityRule) string {
-	boxStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#4C1D95")).
-		Padding(1, 2).
-		Width(m.width - 10)
+	c := theme.Colors()
+	boxStyle := ViewPanelStyle.
+		BorderForeground(c.Primary).
+		Width(m.Width - 10)
 
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#A78BFA"))
-
-	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#9CA3AF")).
-		Width(16)
-
-	valueStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#E5E7EB"))
-
-	dimValueStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280"))
-
-	tagStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#60A5FA"))
-
-	sectionStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#7C3AED")).
-		Bold(true).
-		MarginTop(1)
+	titleStyle := ViewTitleStyle
+	labelStyle := DetailLabelStyle.Width(16)
+	valueStyle := DetailValueStyle
+	dimValueStyle := DetailDimStyle
+	tagStyle := TagStyle
+	sectionStyle := DetailSectionStyle.Foreground(c.Primary)
 
 	var b strings.Builder
 
@@ -524,12 +413,7 @@ func (m PoliciesModel) renderDetail(p models.SecurityRule) string {
 	b.WriteString("\n")
 	b.WriteString(sectionStyle.Render("Action & Profiles"))
 	b.WriteString("\n")
-	actionStyle := valueStyle
-	if p.Action == "allow" {
-		actionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981")).Bold(true)
-	} else if p.Action == "deny" || p.Action == "drop" {
-		actionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444")).Bold(true)
-	}
+	actionStyle := ActionStyle(p.Action)
 	b.WriteString(labelStyle.Render("Action:") + " " + actionStyle.Render(strings.ToUpper(p.Action)) + "\n")
 
 	// Security profiles

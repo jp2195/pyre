@@ -11,11 +11,13 @@ import (
 	"time"
 )
 
+// Client represents a PAN-OS API client.
+// Fields are ordered for optimal memory alignment on 64-bit systems.
 type Client struct {
-	baseURL      string
-	apiKey       string
-	httpClient   *http.Client
-	targetSerial string // For Panorama: routes API calls to specific device
+	baseURL      string       // 16 bytes (string header)
+	apiKey       string       // 16 bytes (string header)
+	targetSerial string       // 16 bytes (string header) - For Panorama: routes API calls to specific device
+	httpClient   *http.Client // 8 bytes (pointer)
 }
 
 type ClientOption func(*Client)
@@ -53,6 +55,15 @@ func NewClient(host, apiKey string, opts ...ClientOption) *Client {
 	}
 
 	return c
+}
+
+// Close releases resources associated with the client.
+// It closes idle HTTP connections to free up system resources.
+func (c *Client) Close() error {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
+	}
+	return nil
 }
 
 type XMLResponse struct {

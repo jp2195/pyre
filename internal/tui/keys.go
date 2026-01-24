@@ -10,6 +10,12 @@ type KeyMap struct {
 	Refresh      key.Binding
 	OpenPalette  key.Binding
 
+	// Navigation groups (1-4 for top-level groups)
+	NavGroup1 key.Binding
+	NavGroup2 key.Binding
+	NavGroup3 key.Binding
+	NavGroup4 key.Binding
+
 	// Navigation
 	Up       key.Binding
 	Down     key.Binding
@@ -45,7 +51,25 @@ func DefaultKeyMap() KeyMap {
 		),
 		OpenPalette: key.NewBinding(
 			key.WithKeys("ctrl+p"),
-			key.WithHelp("ctrl+p", "navigate"),
+			key.WithHelp("ctrl+p", "search"),
+		),
+
+		// Navigation groups
+		NavGroup1: key.NewBinding(
+			key.WithKeys("1"),
+			key.WithHelp("1", "Monitor"),
+		),
+		NavGroup2: key.NewBinding(
+			key.WithKeys("2"),
+			key.WithHelp("2", "Analyze"),
+		),
+		NavGroup3: key.NewBinding(
+			key.WithKeys("3"),
+			key.WithHelp("3", "Tools"),
+		),
+		NavGroup4: key.NewBinding(
+			key.WithKeys("4"),
+			key.WithHelp("4", "Connections"),
 		),
 
 		Up: key.NewBinding(
@@ -94,13 +118,14 @@ func DefaultKeyMap() KeyMap {
 
 func (k KeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
-		k.OpenPalette, k.Refresh, k.Help, k.Quit,
+		k.NavGroup1, k.NavGroup2, k.NavGroup3, k.NavGroup4, k.Refresh, k.Help, k.Quit,
 	}
 }
 
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.OpenPalette, k.Refresh, k.Help, k.Quit},
+		{k.NavGroup1, k.NavGroup2, k.NavGroup3, k.NavGroup4},
+		{k.Refresh, k.OpenPalette, k.Help, k.Quit},
 		{k.Up, k.Down, k.PageUp, k.PageDown},
 		{k.Filter, k.Enter, k.Escape},
 	}

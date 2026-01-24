@@ -7,16 +7,16 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/joshuamontgomery/pyre/internal/models"
+	"github.com/jp2195/pyre/internal/models"
 )
 
 type DevicePickerModel struct {
-	devices       []models.ManagedDevice
-	targetSerial  string // Currently targeted device (empty = Panorama)
-	cursor        int    // 0 = Panorama, 1+ = devices
-	width         int
-	height        int
-	panoramaName  string
+	devices      []models.ManagedDevice
+	targetSerial string // Currently targeted device (empty = Panorama)
+	cursor       int    // 0 = Panorama, 1+ = devices
+	width        int
+	height       int
+	panoramaName string
 }
 
 func NewDevicePickerModel() DevicePickerModel {
@@ -101,39 +101,15 @@ func (m DevicePickerModel) View() string {
 		return "Loading..."
 	}
 
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#7C3AED")).
-		MarginBottom(1)
-
-	panelStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#374151")).
-		Padding(1, 2)
-
-	rowStyle := lipgloss.NewStyle().
-		Padding(0, 1)
-
-	selectedStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("#1F2937")).
-		Foreground(lipgloss.Color("#FFFFFF")).
-		Padding(0, 1)
-
-	activeStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#10B981"))
-
-	dimStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280"))
-
-	connectedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#10B981"))
-
-	disconnectedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#EF4444"))
-
-	helpStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280")).
-		MarginTop(1)
+	titleStyle := ViewTitleStyle.MarginBottom(1)
+	panelStyle := ViewPanelStyle
+	rowStyle := TableRowNormalStyle
+	selectedStyle := TableRowSelectedStyle
+	activeStyle := StatusActiveStyle
+	dimStyle := DetailDimStyle
+	connectedStyle := StatusActiveStyle
+	disconnectedStyle := StatusInactiveStyle
+	helpStyle := HelpDescStyle.MarginTop(1)
 
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("Select Target Device"))

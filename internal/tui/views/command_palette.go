@@ -6,6 +6,8 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/jp2195/pyre/internal/tui/theme"
 )
 
 // Command represents a command in the palette
@@ -14,22 +16,22 @@ type Command struct {
 	Label       string
 	Description string
 	Category    string
-	Shortcut    string     // Display only (e.g., "1", "r", "Tab")
+	Shortcut    string // Display only (e.g., "1", "r", "Tab")
 	Action      func() tea.Msg
 	Available   func() bool // Context-aware availability
 }
 
 // CommandPaletteModel represents the command palette modal
 type CommandPaletteModel struct {
-	commands    []Command
-	filtered    []Command
-	query       string
-	cursor      int
-	width       int
-	height      int
-	textInput   textinput.Model
-	focused     bool
-	prefilter   string // Category to pre-filter (e.g., "Connections" for ":")
+	commands  []Command
+	filtered  []Command
+	query     string
+	cursor    int
+	width     int
+	height    int
+	textInput textinput.Model
+	focused   bool
+	prefilter string // Category to pre-filter (e.g., "Connections" for ":")
 }
 
 // NewCommandPaletteModel creates a new command palette model
@@ -210,44 +212,10 @@ func (m CommandPaletteModel) View() string {
 	}
 
 	// Styles
-	modalStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#7C3AED")).
-		Padding(0, 1)
-
-	inputStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderBottom(true).
-		BorderForeground(lipgloss.Color("#7C3AED")).
-		Padding(0, 0).
-		MarginBottom(1)
-
-	categoryStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280")).
-		Bold(true).
-		MarginTop(1)
-
-	itemStyle := lipgloss.NewStyle().
-		Padding(0, 1)
-
-	selectedStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("#7C3AED")).
-		Foreground(lipgloss.Color("#FFFFFF")).
-		Padding(0, 1)
-
-	shortcutStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#9CA3AF"))
-
-	descStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280"))
-
-	helpStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280")).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderTop(true).
-		BorderForeground(lipgloss.Color("#374151")).
-		Padding(0, 1).
-		MarginTop(1)
+	categoryStyle := DetailDimStyle.Bold(true).MarginTop(1)
+	itemStyle := TableRowNormalStyle
+	shortcutStyle := DetailLabelStyle
+	descStyle := DetailDimStyle
 
 	// Calculate modal width
 	modalWidth := 60
@@ -263,7 +231,7 @@ func (m CommandPaletteModel) View() string {
 
 	// Input field
 	m.textInput.Width = modalWidth - 4
-	b.WriteString(inputStyle.Render(m.textInput.View()))
+	b.WriteString(ModalInputStyle.Render(m.textInput.View()))
 	b.WriteString("\n")
 
 	// Group commands by category
@@ -328,7 +296,7 @@ func (m CommandPaletteModel) View() string {
 
 			if currentIdx == m.cursor {
 				indicator = "> "
-				style = selectedStyle
+				style = ModalSelectedStyle
 			}
 
 			// Shortcut display
@@ -365,8 +333,7 @@ func (m CommandPaletteModel) View() string {
 
 	// Show scroll indicator if needed
 	if len(m.filtered) > maxVisible {
-		scrollInfo := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6B7280")).
+		scrollInfo := StatusMutedStyle.
 			Align(lipgloss.Right).
 			Width(modalWidth - 4).
 			Render(strings.Repeat(" ", modalWidth-20) +
@@ -376,13 +343,14 @@ func (m CommandPaletteModel) View() string {
 
 	// Help text
 	helpText := "Up/Down navigate  Enter select  Esc close  Type to filter"
-	b.WriteString(helpStyle.Width(modalWidth - 4).Render(helpText))
+	b.WriteString(ModalHelpStyle.Width(modalWidth - 4).Render(helpText))
 
 	// Wrap in modal
 	content := b.String()
-	modal := modalStyle.Width(modalWidth).Render(content)
+	modal := ModalStyle.Width(modalWidth).Render(content)
 
 	// Center in terminal
+	c := theme.Colors()
 	return lipgloss.Place(
 		m.width,
 		m.height,
@@ -390,7 +358,7 @@ func (m CommandPaletteModel) View() string {
 		lipgloss.Center,
 		modal,
 		lipgloss.WithWhitespaceChars(" "),
-		lipgloss.WithWhitespaceForeground(lipgloss.Color("#000000")),
+		lipgloss.WithWhitespaceForeground(c.Overlay),
 	)
 }
 

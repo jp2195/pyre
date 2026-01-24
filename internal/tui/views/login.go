@@ -7,7 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/joshuamontgomery/pyre/internal/auth"
+	"github.com/jp2195/pyre/internal/auth"
 )
 
 type loginField int
@@ -128,35 +128,14 @@ func (m LoginModel) Update(msg tea.Msg) (LoginModel, tea.Cmd) {
 }
 
 func (m LoginModel) View() string {
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#7C3AED")).
-		MarginBottom(2)
+	titleStyle := ViewTitleStyle.MarginBottom(2)
+	labelStyle := DetailLabelStyle.MarginBottom(1)
 
-	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280")).
-		MarginBottom(1)
+	inputStyle := InputStyle
+	focusedInputStyle := InputFocusedStyle
 
-	inputStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#374151")).
-		Padding(0, 1).
-		MarginBottom(1)
-
-	focusedInputStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#7C3AED")).
-		Padding(0, 1).
-		MarginBottom(1)
-
-	errorStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#EF4444")).
-		Bold(true).
-		MarginTop(1)
-
-	helpStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280")).
-		MarginTop(2)
+	errorStyle := ErrorMsgStyle.Bold(true).MarginTop(1)
+	helpStyle := HelpDescStyle.MarginTop(2)
 
 	var b strings.Builder
 
@@ -199,10 +178,7 @@ func (m LoginModel) View() string {
 
 	content := b.String()
 
-	boxStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#374151")).
-		Padding(2, 4)
+	boxStyle := ViewPanelStyle.Padding(2, 4)
 
 	box := boxStyle.Render(content)
 

@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/joshuamontgomery/pyre/internal/api"
-	"github.com/joshuamontgomery/pyre/internal/testutil"
+	"github.com/jp2195/pyre/internal/api"
+	"github.com/jp2195/pyre/internal/testutil"
 )
 
 func TestGetSystemInfo(t *testing.T) {

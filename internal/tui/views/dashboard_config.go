@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/joshuamontgomery/pyre/internal/models"
+	"github.com/jp2195/pyre/internal/models"
 )
 
 // ConfigDashboardModel represents the configuration-focused dashboard
@@ -97,21 +97,21 @@ func (m ConfigDashboardModel) renderSingleColumn(width int) string {
 
 func (m ConfigDashboardModel) renderPolicyStats(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Policy Statistics"))
+	b.WriteString(titleStyle().Render("Policy Statistics"))
 	b.WriteString("\n")
 
 	if m.policyErr != nil {
-		b.WriteString(dimStyle.Render("Not available"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.policies == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	if len(m.policies) == 0 {
-		b.WriteString(dimStyle.Render("No security rules"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("No security rules"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Count stats
@@ -138,60 +138,60 @@ func (m ConfigDashboardModel) renderPolicyStats(width int) string {
 	}
 
 	// Summary
-	b.WriteString(valueStyle.Render(fmt.Sprintf("%d", totalRules)))
-	b.WriteString(dimStyle.Render(" total rules ("))
-	b.WriteString(highlightStyle.Render(fmt.Sprintf("%d", enabledRules)))
-	b.WriteString(dimStyle.Render(" enabled)"))
+	b.WriteString(valueStyle().Render(fmt.Sprintf("%d", totalRules)))
+	b.WriteString(dimStyle().Render(" total rules ("))
+	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", enabledRules)))
+	b.WriteString(dimStyle().Render(" enabled)"))
 	b.WriteString("\n\n")
 
 	// Breakdown
 	labelWidth := 12
-	b.WriteString(labelStyle.Render(fmt.Sprintf("%-*s", labelWidth, "Allow:")))
-	b.WriteString(highlightStyle.Render(fmt.Sprintf("%d", allowRules)))
+	b.WriteString(labelStyle().Render(fmt.Sprintf("%-*s", labelWidth, "Allow:")))
+	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", allowRules)))
 	b.WriteString("\n")
 
-	b.WriteString(labelStyle.Render(fmt.Sprintf("%-*s", labelWidth, "Deny/Drop:")))
-	b.WriteString(errorStyle.Render(fmt.Sprintf("%d", denyRules)))
+	b.WriteString(labelStyle().Render(fmt.Sprintf("%-*s", labelWidth, "Deny/Drop:")))
+	b.WriteString(errorStyle().Render(fmt.Sprintf("%d", denyRules)))
 	b.WriteString("\n")
 
-	b.WriteString(labelStyle.Render(fmt.Sprintf("%-*s", labelWidth, "Zero-hit:")))
+	b.WriteString(labelStyle().Render(fmt.Sprintf("%-*s", labelWidth, "Zero-hit:")))
 	if zeroHitRules > 0 {
-		b.WriteString(warningStyle.Render(fmt.Sprintf("%d", zeroHitRules)))
+		b.WriteString(warningStyle().Render(fmt.Sprintf("%d", zeroHitRules)))
 	} else {
-		b.WriteString(highlightStyle.Render("0"))
+		b.WriteString(highlightStyle().Render("0"))
 	}
 	b.WriteString("\n")
 
-	b.WriteString(labelStyle.Render(fmt.Sprintf("%-*s", labelWidth, "Total hits:")))
-	b.WriteString(accentStyle.Render(formatNumber(totalHits)))
+	b.WriteString(labelStyle().Render(fmt.Sprintf("%-*s", labelWidth, "Total hits:")))
+	b.WriteString(accentStyle().Render(formatNumber(totalHits)))
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m ConfigDashboardModel) renderPendingChanges(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Pending Changes"))
+	b.WriteString(titleStyle().Render("Pending Changes"))
 	b.WriteString("\n")
 
 	if m.changesErr != nil {
-		b.WriteString(dimStyle.Render("Not available"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.pendingChanges == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	if len(m.pendingChanges) == 0 {
-		b.WriteString(highlightStyle.Render("No pending changes"))
+		b.WriteString(highlightStyle().Render("No pending changes"))
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render("Configuration is committed"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Configuration is committed"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Count
-	b.WriteString(warningStyle.Render(fmt.Sprintf("%d", len(m.pendingChanges))))
-	b.WriteString(dimStyle.Render(" uncommitted changes"))
+	b.WriteString(warningStyle().Render(fmt.Sprintf("%d", len(m.pendingChanges))))
+	b.WriteString(dimStyle().Render(" uncommitted changes"))
 	b.WriteString("\n\n")
 
 	// Group by user
@@ -205,12 +205,12 @@ func (m ConfigDashboardModel) renderPendingChanges(width int) string {
 	}
 
 	if len(userChanges) > 1 {
-		b.WriteString(subtitleStyle.Render("By User:"))
+		b.WriteString(subtitleStyle().Render("By User:"))
 		b.WriteString("\n")
 		for user, count := range userChanges {
 			userName := truncateEllipsis(user, 15)
-			b.WriteString(labelStyle.Render(fmt.Sprintf("  %-15s ", userName)))
-			b.WriteString(valueStyle.Render(fmt.Sprintf("%d", count)))
+			b.WriteString(labelStyle().Render(fmt.Sprintf("  %-15s ", userName)))
+			b.WriteString(valueStyle().Render(fmt.Sprintf("%d", count)))
 			b.WriteString("\n")
 		}
 	}
@@ -223,20 +223,20 @@ func (m ConfigDashboardModel) renderPendingChanges(width int) string {
 
 	if maxShow > 0 {
 		b.WriteString("\n")
-		b.WriteString(subtitleStyle.Render("Recent:"))
+		b.WriteString(subtitleStyle().Render("Recent:"))
 		b.WriteString("\n")
 
 		for i := 0; i < maxShow; i++ {
 			change := m.pendingChanges[i]
 
-			typeStyle := dimStyle
+			typeStyle := dimStyle()
 			switch change.Type {
 			case "add":
-				typeStyle = highlightStyle
+				typeStyle = highlightStyle()
 			case "edit":
-				typeStyle = accentStyle
+				typeStyle = accentStyle()
 			case "delete":
-				typeStyle = errorStyle
+				typeStyle = errorStyle()
 			}
 
 			desc := change.Description
@@ -246,28 +246,28 @@ func (m ConfigDashboardModel) renderPendingChanges(width int) string {
 			desc = truncateEllipsis(desc, width-15)
 
 			b.WriteString(typeStyle.Render(fmt.Sprintf("  %-6s ", change.Type)))
-			b.WriteString(labelStyle.Render(desc))
+			b.WriteString(labelStyle().Render(desc))
 			if i < maxShow-1 {
 				b.WriteString("\n")
 			}
 		}
 	}
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m ConfigDashboardModel) renderZeroHitRules(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Zero-Hit Rules"))
+	b.WriteString(titleStyle().Render("Zero-Hit Rules"))
 	b.WriteString("\n")
 
 	if m.policyErr != nil {
-		b.WriteString(dimStyle.Render("Not available"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.policies == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Find zero-hit rules
@@ -279,8 +279,8 @@ func (m ConfigDashboardModel) renderZeroHitRules(width int) string {
 	}
 
 	if len(zeroHitRules) == 0 {
-		b.WriteString(highlightStyle.Render("All active rules have hits"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(highlightStyle().Render("All active rules have hits"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Summary
@@ -292,8 +292,8 @@ func (m ConfigDashboardModel) renderZeroHitRules(width int) string {
 	}
 
 	pct := float64(len(zeroHitRules)) / float64(totalActive) * 100
-	b.WriteString(warningStyle.Render(fmt.Sprintf("%d", len(zeroHitRules))))
-	b.WriteString(dimStyle.Render(fmt.Sprintf(" of %d rules (%.0f%%)", totalActive, pct)))
+	b.WriteString(warningStyle().Render(fmt.Sprintf("%d", len(zeroHitRules))))
+	b.WriteString(dimStyle().Render(fmt.Sprintf(" of %d rules (%.0f%%)", totalActive, pct)))
 	b.WriteString("\n\n")
 
 	// List rules
@@ -311,15 +311,15 @@ func (m ConfigDashboardModel) renderZeroHitRules(width int) string {
 		rule := zeroHitRules[i]
 		name := truncateEllipsis(rule.Name, nameWidth)
 
-		actionStyle := dimStyle
+		actionStyle := dimStyle()
 		if rule.Action == "allow" {
-			actionStyle = highlightStyle
+			actionStyle = highlightStyle()
 		} else if rule.Action == "deny" || rule.Action == "drop" {
-			actionStyle = errorStyle
+			actionStyle = errorStyle()
 		}
 
-		b.WriteString(labelStyle.Render(fmt.Sprintf("%3d. ", rule.Position)))
-		b.WriteString(valueStyle.Render(fmt.Sprintf("%-*s ", nameWidth, name)))
+		b.WriteString(labelStyle().Render(fmt.Sprintf("%3d. ", rule.Position)))
+		b.WriteString(valueStyle().Render(fmt.Sprintf("%-*s ", nameWidth, name)))
 		b.WriteString(actionStyle.Render(rule.Action))
 		if i < maxShow-1 {
 			b.WriteString("\n")
@@ -328,29 +328,29 @@ func (m ConfigDashboardModel) renderZeroHitRules(width int) string {
 
 	if len(zeroHitRules) > maxShow {
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("... and %d more", len(zeroHitRules)-maxShow)))
+		b.WriteString(dimStyle().Render(fmt.Sprintf("... and %d more", len(zeroHitRules)-maxShow)))
 	}
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m ConfigDashboardModel) renderMostHitRules(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Most-Hit Rules"))
+	b.WriteString(titleStyle().Render("Most-Hit Rules"))
 	b.WriteString("\n")
 
 	if m.policyErr != nil {
-		b.WriteString(dimStyle.Render("Not available"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.policies == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	if len(m.policies) == 0 {
-		b.WriteString(dimStyle.Render("No rules"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("No rules"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Sort by hit count
@@ -378,23 +378,23 @@ func (m ConfigDashboardModel) renderMostHitRules(width int) string {
 
 		name := truncateEllipsis(rule.Name, nameWidth)
 
-		actionStyle := dimStyle
+		actionStyle := dimStyle()
 		if rule.Action == "allow" {
-			actionStyle = highlightStyle
+			actionStyle = highlightStyle()
 		} else if rule.Action == "deny" || rule.Action == "drop" {
-			actionStyle = errorStyle
+			actionStyle = errorStyle()
 		}
 
-		b.WriteString(valueStyle.Render(fmt.Sprintf("%-*s ", nameWidth, name)))
+		b.WriteString(valueStyle().Render(fmt.Sprintf("%-*s ", nameWidth, name)))
 		b.WriteString(actionStyle.Render(fmt.Sprintf("%-5s ", rule.Action)))
-		b.WriteString(accentStyle.Render(formatNumber(rule.HitCount)))
+		b.WriteString(accentStyle().Render(formatNumber(rule.HitCount)))
 		b.WriteString("\n")
 		shown++
 	}
 
 	if shown == 0 {
-		b.WriteString(dimStyle.Render("No rules have been hit"))
+		b.WriteString(dimStyle().Render("No rules have been hit"))
 	}
 
-	return panelStyle.Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
 }

@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/joshuamontgomery/pyre/internal/auth"
-	"github.com/joshuamontgomery/pyre/internal/testutil"
+	"github.com/jp2195/pyre/internal/auth"
+	"github.com/jp2195/pyre/internal/testutil"
 )
 
 func TestGenerateAPIKey_Success(t *testing.T) {

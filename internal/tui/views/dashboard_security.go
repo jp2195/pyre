@@ -8,7 +8,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/joshuamontgomery/pyre/internal/models"
+	"github.com/jp2195/pyre/internal/models"
+	"github.com/jp2195/pyre/internal/tui/theme"
 )
 
 // SecurityDashboardModel represents the security-focused dashboard
@@ -97,34 +98,34 @@ func (m SecurityDashboardModel) renderSingleColumn(width int) string {
 
 func (m SecurityDashboardModel) renderThreatBreakdown(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Threat Summary"))
+	b.WriteString(titleStyle().Render("Threat Summary"))
 	b.WriteString("\n")
 
 	if m.threatErr != nil {
-		b.WriteString(dimStyle.Render("Not available"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.threatSummary == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	ts := m.threatSummary
 
 	if ts.TotalThreats == 0 {
-		b.WriteString(highlightStyle.Render("No threats detected"))
+		b.WriteString(highlightStyle().Render("No threats detected"))
 		b.WriteString("\n\n")
-		b.WriteString(dimStyle.Render("System is operating normally"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("System is operating normally"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Total count
-	b.WriteString(dimStyle.Render("Total: "))
-	b.WriteString(valueStyle.Render(fmt.Sprintf("%d", ts.TotalThreats)))
+	b.WriteString(dimStyle().Render("Total: "))
+	b.WriteString(valueStyle().Render(fmt.Sprintf("%d", ts.TotalThreats)))
 	b.WriteString("\n\n")
 
 	// Action breakdown
-	b.WriteString(subtitleStyle.Render("Actions:"))
+	b.WriteString(subtitleStyle().Render("Actions:"))
 	b.WriteString("\n")
 
 	barWidth := width - 20
@@ -132,47 +133,50 @@ func (m SecurityDashboardModel) renderThreatBreakdown(width int) string {
 		barWidth = 10
 	}
 
+	c := theme.Colors()
+
 	// Blocked
 	if ts.BlockedCount > 0 {
 		blockedPct := float64(ts.BlockedCount) / float64(ts.TotalThreats) * 100
-		b.WriteString(labelStyle.Render("Blocked  "))
-		b.WriteString(renderBar(blockedPct, barWidth, "#10B981"))
-		b.WriteString(highlightStyle.Render(fmt.Sprintf(" %d", ts.BlockedCount)))
+		b.WriteString(labelStyle().Render("Blocked  "))
+		b.WriteString(renderBar(blockedPct, barWidth, string(c.Success)))
+		b.WriteString(highlightStyle().Render(fmt.Sprintf(" %d", ts.BlockedCount)))
 		b.WriteString("\n")
 	}
 
 	// Alerted
 	if ts.AlertedCount > 0 {
 		alertedPct := float64(ts.AlertedCount) / float64(ts.TotalThreats) * 100
-		b.WriteString(labelStyle.Render("Alerted  "))
-		b.WriteString(renderBar(alertedPct, barWidth, "#F59E0B"))
-		b.WriteString(warningStyle.Render(fmt.Sprintf(" %d", ts.AlertedCount)))
+		b.WriteString(labelStyle().Render("Alerted  "))
+		b.WriteString(renderBar(alertedPct, barWidth, string(c.Warning)))
+		b.WriteString(warningStyle().Render(fmt.Sprintf(" %d", ts.AlertedCount)))
 	}
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m SecurityDashboardModel) renderThreatSeverity(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Threats by Severity"))
+	b.WriteString(titleStyle().Render("Threats by Severity"))
 	b.WriteString("\n")
 
 	if m.threatErr != nil || m.threatSummary == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	ts := m.threatSummary
 
 	if ts.TotalThreats == 0 {
-		b.WriteString(dimStyle.Render("None"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("None"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
-	criticalStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444"))
-	highStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F97316"))
-	mediumStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#EAB308"))
-	lowStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#3B82F6"))
+	c := theme.Colors()
+	criticalStyle := SeverityCriticalStyle
+	highStyle := SeverityHighStyle
+	mediumStyle := SeverityMediumStyle
+	lowStyle := SeverityLowStyle
 
 	barWidth := width - 20
 	if barWidth < 10 {
@@ -183,7 +187,7 @@ func (m SecurityDashboardModel) renderThreatSeverity(width int) string {
 	if ts.CriticalCount > 0 {
 		pct := float64(ts.CriticalCount) / float64(ts.TotalThreats) * 100
 		b.WriteString(criticalStyle.Render("Critical "))
-		b.WriteString(renderBar(pct, barWidth, "#EF4444"))
+		b.WriteString(renderBar(pct, barWidth, string(c.Critical)))
 		b.WriteString(criticalStyle.Render(fmt.Sprintf(" %d", ts.CriticalCount)))
 		b.WriteString("\n")
 	}
@@ -192,7 +196,7 @@ func (m SecurityDashboardModel) renderThreatSeverity(width int) string {
 	if ts.HighCount > 0 {
 		pct := float64(ts.HighCount) / float64(ts.TotalThreats) * 100
 		b.WriteString(highStyle.Render("High     "))
-		b.WriteString(renderBar(pct, barWidth, "#F97316"))
+		b.WriteString(renderBar(pct, barWidth, string(c.High)))
 		b.WriteString(highStyle.Render(fmt.Sprintf(" %d", ts.HighCount)))
 		b.WriteString("\n")
 	}
@@ -201,7 +205,7 @@ func (m SecurityDashboardModel) renderThreatSeverity(width int) string {
 	if ts.MediumCount > 0 {
 		pct := float64(ts.MediumCount) / float64(ts.TotalThreats) * 100
 		b.WriteString(mediumStyle.Render("Medium   "))
-		b.WriteString(renderBar(pct, barWidth, "#EAB308"))
+		b.WriteString(renderBar(pct, barWidth, string(c.Medium)))
 		b.WriteString(mediumStyle.Render(fmt.Sprintf(" %d", ts.MediumCount)))
 		b.WriteString("\n")
 	}
@@ -210,25 +214,25 @@ func (m SecurityDashboardModel) renderThreatSeverity(width int) string {
 	if ts.LowCount > 0 {
 		pct := float64(ts.LowCount) / float64(ts.TotalThreats) * 100
 		b.WriteString(lowStyle.Render("Low      "))
-		b.WriteString(renderBar(pct, barWidth, "#3B82F6"))
+		b.WriteString(renderBar(pct, barWidth, string(c.Low)))
 		b.WriteString(lowStyle.Render(fmt.Sprintf(" %d", ts.LowCount)))
 	}
 
-	return panelStyle.Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
 }
 
 func (m SecurityDashboardModel) renderZeroHitRules(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Zero-Hit Rules"))
+	b.WriteString(titleStyle().Render("Zero-Hit Rules"))
 	b.WriteString("\n")
 
 	if m.policyErr != nil {
-		b.WriteString(dimStyle.Render("Not available"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.policies == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Find rules with zero hits
@@ -240,8 +244,8 @@ func (m SecurityDashboardModel) renderZeroHitRules(width int) string {
 	}
 
 	if len(zeroHitRules) == 0 {
-		b.WriteString(highlightStyle.Render("All active rules have hits"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(highlightStyle().Render("All active rules have hits"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Summary
@@ -253,8 +257,8 @@ func (m SecurityDashboardModel) renderZeroHitRules(width int) string {
 	}
 
 	pct := float64(len(zeroHitRules)) / float64(totalActive) * 100
-	b.WriteString(warningStyle.Render(fmt.Sprintf("%d", len(zeroHitRules))))
-	b.WriteString(dimStyle.Render(fmt.Sprintf(" of %d rules (%.0f%%)", totalActive, pct)))
+	b.WriteString(warningStyle().Render(fmt.Sprintf("%d", len(zeroHitRules))))
+	b.WriteString(dimStyle().Render(fmt.Sprintf(" of %d rules (%.0f%%)", totalActive, pct)))
 	b.WriteString("\n\n")
 
 	// List first few zero-hit rules
@@ -272,15 +276,15 @@ func (m SecurityDashboardModel) renderZeroHitRules(width int) string {
 		rule := zeroHitRules[i]
 		name := truncateEllipsis(rule.Name, nameWidth)
 
-		actionStyle := dimStyle
+		actionStyle := dimStyle()
 		if rule.Action == "allow" {
-			actionStyle = highlightStyle
+			actionStyle = highlightStyle()
 		} else if rule.Action == "deny" || rule.Action == "drop" {
-			actionStyle = errorStyle
+			actionStyle = errorStyle()
 		}
 
-		b.WriteString(labelStyle.Render(fmt.Sprintf("%3d. ", rule.Position)))
-		b.WriteString(valueStyle.Render(fmt.Sprintf("%-*s ", nameWidth, name)))
+		b.WriteString(labelStyle().Render(fmt.Sprintf("%3d. ", rule.Position)))
+		b.WriteString(valueStyle().Render(fmt.Sprintf("%-*s ", nameWidth, name)))
 		b.WriteString(actionStyle.Render(rule.Action))
 		if i < maxShow-1 {
 			b.WriteString("\n")
@@ -289,29 +293,29 @@ func (m SecurityDashboardModel) renderZeroHitRules(width int) string {
 
 	if len(zeroHitRules) > maxShow {
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("... and %d more", len(zeroHitRules)-maxShow)))
+		b.WriteString(dimStyle().Render(fmt.Sprintf("... and %d more", len(zeroHitRules)-maxShow)))
 	}
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m SecurityDashboardModel) renderMostHitRules(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Most-Hit Rules"))
+	b.WriteString(titleStyle().Render("Most-Hit Rules"))
 	b.WriteString("\n")
 
 	if m.policyErr != nil {
-		b.WriteString(dimStyle.Render("Not available"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.policies == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	if len(m.policies) == 0 {
-		b.WriteString(dimStyle.Render("No rules"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("No rules"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Sort by hit count (descending)
@@ -339,23 +343,23 @@ func (m SecurityDashboardModel) renderMostHitRules(width int) string {
 
 		name := truncateEllipsis(rule.Name, nameWidth)
 
-		actionStyle := dimStyle
+		actionStyle := dimStyle()
 		if rule.Action == "allow" {
-			actionStyle = highlightStyle
+			actionStyle = highlightStyle()
 		} else if rule.Action == "deny" || rule.Action == "drop" {
-			actionStyle = errorStyle
+			actionStyle = errorStyle()
 		}
 
-		b.WriteString(valueStyle.Render(fmt.Sprintf("%-*s ", nameWidth, name)))
+		b.WriteString(valueStyle().Render(fmt.Sprintf("%-*s ", nameWidth, name)))
 		b.WriteString(actionStyle.Render(fmt.Sprintf("%-5s ", rule.Action)))
-		b.WriteString(accentStyle.Render(formatNumber(rule.HitCount)))
+		b.WriteString(accentStyle().Render(formatNumber(rule.HitCount)))
 		b.WriteString("\n")
 		shown++
 	}
 
 	if shown == 0 {
-		b.WriteString(dimStyle.Render("No rules have been hit"))
+		b.WriteString(dimStyle().Render("No rules have been hit"))
 	}
 
-	return panelStyle.Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
 }

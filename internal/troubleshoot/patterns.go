@@ -82,56 +82,58 @@ type MatchResult struct {
 	Matches     []string // Capture groups
 }
 
-// PrecompiledPatterns contains commonly used PAN-OS patterns.
-var PrecompiledPatterns = struct {
-	SSLHandshakeFailed  string
-	ConnectionRefused   string
-	AuthenticationFailed string
-	PeerUnreachable     string
-	HAStateNonFunctional string
-	HASyncFailed        string
-	HALinkDown          string
-	CommitFailed        string
-	ValidationError     string
-	ObjectReference     string
-	ConfigLocked        string
-	LicenseExpired      string
-	HighCPU             string
-	HighMemory          string
-	OOMKiller           string
+// precompiledPatterns contains commonly used PAN-OS patterns.
+// These are package-private as they are only used within the troubleshoot package.
+var precompiledPatterns = struct {
+	sslHandshakeFailed   string
+	connectionRefused    string
+	authenticationFailed string
+	peerUnreachable      string
+	haStateNonFunctional string
+	haSyncFailed         string
+	haLinkDown           string
+	commitFailed         string
+	validationError      string
+	objectReference      string
+	configLocked         string
+	licenseExpired       string
+	highCPU              string
+	highMemory           string
+	oomKiller            string
 }{
-	SSLHandshakeFailed:   `(?i)ssl.*handshake.*(fail|error)|tls.*error`,
-	ConnectionRefused:    `(?i)connection.*refused|connect.*failed|unable.*to.*connect`,
-	AuthenticationFailed: `(?i)auth.*fail|authentication.*error|invalid.*credentials`,
-	PeerUnreachable:      `(?i)peer.*unreachable|cannot.*reach.*peer|peer.*timeout`,
-	HAStateNonFunctional: `(?i)state:\s*(suspended|non-functional|initial)`,
-	HASyncFailed:         `(?i)sync.*(fail|error)|synchronization.*problem`,
-	HALinkDown:           `(?i)ha[12].*down|link.*down|monitoring.*failed`,
-	CommitFailed:         `(?i)commit.*fail|result:\s*fail`,
-	ValidationError:      `(?i)validation.*error|invalid.*configuration`,
-	ObjectReference:      `(?i)object.*not.*found|reference.*error|undefined.*object`,
-	ConfigLocked:         `(?i)config.*lock|locked.*by|configuration.*is.*locked`,
-	LicenseExpired:       `(?i)license.*expir|expired:\s*yes|license.*invalid`,
-	HighCPU:              `(?i)cpu.*([89]\d|100)%|cpu.*utilization.*high`,
-	HighMemory:           `(?i)memory.*([89]\d|100)%|memory.*utilization.*high`,
-	OOMKiller:            `(?i)oom.*kill|out.*of.*memory|memory.*exhausted`,
+	sslHandshakeFailed:   `(?i)ssl.*handshake.*(fail|error)|tls.*error`,
+	connectionRefused:    `(?i)connection.*refused|connect.*failed|unable.*to.*connect`,
+	authenticationFailed: `(?i)auth.*fail|authentication.*error|invalid.*credentials`,
+	peerUnreachable:      `(?i)peer.*unreachable|cannot.*reach.*peer|peer.*timeout`,
+	haStateNonFunctional: `(?i)state:\s*(suspended|non-functional|initial)`,
+	haSyncFailed:         `(?i)sync.*(fail|error)|synchronization.*problem`,
+	haLinkDown:           `(?i)ha[12].*down|link.*down|monitoring.*failed`,
+	commitFailed:         `(?i)commit.*fail|result:\s*fail`,
+	validationError:      `(?i)validation.*error|invalid.*configuration`,
+	objectReference:      `(?i)object.*not.*found|reference.*error|undefined.*object`,
+	configLocked:         `(?i)config.*lock|locked.*by|configuration.*is.*locked`,
+	licenseExpired:       `(?i)license.*expir|expired:\s*yes|license.*invalid`,
+	highCPU:              `(?i)cpu.*([89]\d|100)%|cpu.*utilization.*high`,
+	highMemory:           `(?i)memory.*([89]\d|100)%|memory.*utilization.*high`,
+	oomKiller:            `(?i)oom.*kill|out.*of.*memory|memory.*exhausted`,
 }
 
-// CommonKBArticles contains common PAN-OS KB article URLs.
-var CommonKBArticles = struct {
-	PanoramaSSL       string
-	PanoramaConnect   string
-	HAConfig          string
-	HASync            string
-	CommitFail        string
-	Licensing         string
-	ResourceUsage     string
+// commonKBArticles contains common PAN-OS KB article URLs.
+// These are package-private as they are only used within the troubleshoot package.
+var commonKBArticles = struct {
+	panoramaSSL     string
+	panoramaConnect string
+	haConfig        string
+	haSync          string
+	commitFail      string
+	licensing       string
+	resourceUsage   string
 }{
-	PanoramaSSL:     "https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClGo",
-	PanoramaConnect: "https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClVr",
-	HAConfig:        "https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClH4",
-	HASync:          "https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClHE",
-	CommitFail:      "https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClIa",
-	Licensing:       "https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJ5",
-	ResourceUsage:   "https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJK",
+	panoramaSSL:     "https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClGo",
+	panoramaConnect: "https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClVr",
+	haConfig:        "https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClH4",
+	haSync:          "https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClHE",
+	commitFail:      "https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClIa",
+	licensing:       "https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJ5",
+	resourceUsage:   "https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClJK",
 }

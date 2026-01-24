@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -93,20 +95,36 @@ func (e *KeygenError) Unwrap() error {
 	return e.Cause
 }
 
+// IsAuthenticationError checks if the error indicates an authentication failure.
+// Uses errors.As to properly unwrap and check for KeygenError types.
 func IsAuthenticationError(err error) bool {
 	if err == nil {
 		return false
 	}
-	msg := err.Error()
-	return msg == "authentication failed" ||
-		msg == "Invalid credentials" ||
-		msg == "Invalid username or password"
+
+	// Check if this is a KeygenError with authentication-related message
+	var keygenErr *KeygenError
+	if errors.As(err, &keygenErr) {
+		msg := strings.ToLower(keygenErr.Message)
+		return strings.Contains(msg, "invalid credential") ||
+			strings.Contains(msg, "authentication failed") ||
+			strings.Contains(msg, "invalid username") ||
+			strings.Contains(msg, "invalid password")
+	}
+
+	// Fallback: check the error message directly for common auth failure strings
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "authentication failed") ||
+		strings.Contains(msg, "invalid credentials") ||
+		strings.Contains(msg, "invalid username or password")
 }
 
+// IsConnectionError checks if the error is a connection-related KeygenError.
+// Uses errors.As to properly unwrap error chains.
 func IsConnectionError(err error) bool {
 	if err == nil {
 		return false
 	}
-	_, ok := err.(*KeygenError)
-	return ok
+	var keygenErr *KeygenError
+	return errors.As(err, &keygenErr)
 }

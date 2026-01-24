@@ -1,4 +1,4 @@
-module github.com/joshuamontgomery/pyre
+module github.com/jp2195/pyre
 
 go 1.25.5
 

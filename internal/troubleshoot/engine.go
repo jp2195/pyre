@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/joshuamontgomery/pyre/internal/api"
-	"github.com/joshuamontgomery/pyre/internal/ssh"
+	"github.com/jp2195/pyre/internal/api"
+	"github.com/jp2195/pyre/internal/ssh"
 )
 
 // Engine executes troubleshooting runbooks.

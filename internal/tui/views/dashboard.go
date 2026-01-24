@@ -8,7 +8,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/joshuamontgomery/pyre/internal/models"
+	"github.com/jp2195/pyre/internal/models"
+	"github.com/jp2195/pyre/internal/tui/theme"
 )
 
 // DashboardType represents the type of dashboard to display
@@ -51,6 +52,7 @@ type DashboardModel struct {
 	diskUsage      []models.DiskUsage
 	environmentals []models.Environmental
 	certificates   []models.Certificate
+	natPools       []models.NATPoolInfo
 
 	sysInfoErr  error
 	resourceErr error
@@ -65,6 +67,7 @@ type DashboardModel struct {
 	diskErr     error
 	envErr      error
 	certErr     error
+	natPoolErr  error
 
 	width  int
 	height int
@@ -158,6 +161,12 @@ func (m DashboardModel) SetCertificates(certs []models.Certificate, err error) D
 	return m
 }
 
+func (m DashboardModel) SetNATPoolInfo(pools []models.NATPoolInfo, err error) DashboardModel {
+	m.natPools = pools
+	m.natPoolErr = err
+	return m
+}
+
 func (m DashboardModel) Update(msg tea.Msg) (DashboardModel, tea.Cmd) {
 	return m, nil
 }
@@ -177,61 +186,69 @@ func (m DashboardModel) View() string {
 		return m.renderSingleColumn(totalWidth)
 	}
 
-	// Build left column - system info and related
+	// Build left column - "Device Health"
+	// System info, resources, sessions, disk, hardware
 	leftPanels := []string{
 		m.renderSystemInfo(leftColWidth),
 		m.renderResourcesCompact(leftColWidth),
 		m.renderSessionsCompact(leftColWidth),
 	}
 
-	// Conditionally add HA panel if HA is enabled
-	if m.haStatus != nil && m.haStatus.Enabled {
-		leftPanels = append(leftPanels, m.renderHAStatus(leftColWidth))
+	// Add disk usage panel to left column (health metric)
+	if m.diskUsage != nil && len(m.diskUsage) > 0 {
+		leftPanels = append(leftPanels, m.renderDiskUsage(leftColWidth))
+	}
+
+	// Add hardware status panel to left column (health metric)
+	if m.environmentals != nil && len(m.environmentals) > 0 {
+		leftPanels = append(leftPanels, m.renderEnvironmentals(leftColWidth))
 	}
 
 	leftCol := lipgloss.JoinVertical(lipgloss.Left, leftPanels...)
 
-	// Build right column - versions, licenses, jobs, etc
-	rightPanels := []string{
-		m.renderContentVersions(rightColWidth),
+	// Build right column - "Operations & Security"
+	// HA at top (critical), NAT pools, content, licenses, etc.
+	var rightPanels []string
+
+	// HA Status at top of right column when enabled (high priority)
+	if m.haStatus != nil && m.haStatus.Enabled {
+		rightPanels = append(rightPanels, m.renderHAStatus(rightColWidth))
 	}
 
-	// Conditionally add licenses panel if we have data
+	// NAT Pool Utilization (NEW)
+	if m.natPools != nil && len(m.natPools) > 0 {
+		rightPanels = append(rightPanels, m.renderNATPoolUtilization(rightColWidth))
+	}
+
+	// Content Versions
+	rightPanels = append(rightPanels, m.renderContentVersions(rightColWidth))
+
+	// Licenses
 	if m.licenses != nil && len(m.licenses) > 0 {
 		rightPanels = append(rightPanels, m.renderLicenses(rightColWidth))
 	}
 
-	// Conditionally add admins panel if we have data
-	if m.admins != nil && len(m.admins) > 0 {
-		rightPanels = append(rightPanels, m.renderLoggedInAdmins(rightColWidth))
-	}
-
-	// Conditionally add GlobalProtect panel if configured
-	if m.gpInfo != nil && (m.gpInfo.ActiveUsers > 0 || m.gpInfo.TotalGateways > 0) {
-		rightPanels = append(rightPanels, m.renderGlobalProtect(rightColWidth))
-	}
-
-	// Conditionally add jobs panel if we have jobs
-	if m.jobs != nil && len(m.jobs) > 0 {
-		rightPanels = append(rightPanels, m.renderJobs(rightColWidth))
-	}
-
-	// Conditionally add threat summary if we have threat data
+	// Threat summary if we have threat data
 	if m.threatSummary != nil && m.threatSummary.TotalThreats > 0 {
 		rightPanels = append(rightPanels, m.renderThreatSummary(rightColWidth))
 	}
 
-	// Conditionally add disk usage panel
-	if m.diskUsage != nil && len(m.diskUsage) > 0 {
-		rightPanels = append(rightPanels, m.renderDiskUsage(rightColWidth))
+	// Admins Online
+	if m.admins != nil && len(m.admins) > 0 {
+		rightPanels = append(rightPanels, m.renderLoggedInAdmins(rightColWidth))
 	}
 
-	// Conditionally add environmentals panel if we have data with issues
-	if m.environmentals != nil && len(m.environmentals) > 0 {
-		rightPanels = append(rightPanels, m.renderEnvironmentals(rightColWidth))
+	// GlobalProtect if configured
+	if m.gpInfo != nil && (m.gpInfo.ActiveUsers > 0 || m.gpInfo.TotalGateways > 0) {
+		rightPanels = append(rightPanels, m.renderGlobalProtect(rightColWidth))
 	}
 
-	// Conditionally add certificates panel if we have expiring certs
+	// Recent Jobs
+	if m.jobs != nil && len(m.jobs) > 0 {
+		rightPanels = append(rightPanels, m.renderJobs(rightColWidth))
+	}
+
+	// Certificates (expiring/expired)
 	if m.certificates != nil && len(m.certificates) > 0 {
 		rightPanels = append(rightPanels, m.renderCertificates(rightColWidth))
 	}
@@ -248,8 +265,24 @@ func (m DashboardModel) renderSingleColumn(width int) string {
 		m.renderSessionsCompact(width),
 	}
 
+	// Disk usage (health)
+	if m.diskUsage != nil && len(m.diskUsage) > 0 {
+		panels = append(panels, m.renderDiskUsage(width))
+	}
+
+	// Hardware status (health)
+	if m.environmentals != nil && len(m.environmentals) > 0 {
+		panels = append(panels, m.renderEnvironmentals(width))
+	}
+
+	// HA Status (critical when enabled)
 	if m.haStatus != nil && m.haStatus.Enabled {
 		panels = append(panels, m.renderHAStatus(width))
+	}
+
+	// NAT Pool Utilization
+	if m.natPools != nil && len(m.natPools) > 0 {
+		panels = append(panels, m.renderNATPoolUtilization(width))
 	}
 
 	if m.licenses != nil && len(m.licenses) > 0 {
@@ -260,14 +293,6 @@ func (m DashboardModel) renderSingleColumn(width int) string {
 		panels = append(panels, m.renderJobs(width))
 	}
 
-	if m.diskUsage != nil && len(m.diskUsage) > 0 {
-		panels = append(panels, m.renderDiskUsage(width))
-	}
-
-	if m.environmentals != nil && len(m.environmentals) > 0 {
-		panels = append(panels, m.renderEnvironmentals(width))
-	}
-
 	if m.certificates != nil && len(m.certificates) > 0 {
 		panels = append(panels, m.renderCertificates(width))
 	}
@@ -275,99 +300,79 @@ func (m DashboardModel) renderSingleColumn(width int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, panels...)
 }
 
-// Styles
-var (
-	panelStyle = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#374151")).
-		Padding(0, 1)
+// panelStyle returns the panel style with reduced padding for dashboard
+func panelStyle() lipgloss.Style {
+	return ViewPanelStyle.Padding(0, 1)
+}
 
-	titleStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#A78BFA"))
-
-	subtitleStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#7C3AED")).
-		Bold(true)
-
-	labelStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#9CA3AF"))
-
-	valueStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#E5E7EB"))
-
-	dimStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280"))
-
-	highlightStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#10B981"))
-
-	warningStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#F59E0B"))
-
-	errorStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#EF4444"))
-
-	accentStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#60A5FA"))
-)
+// Style accessor functions - these must be functions (not variables) because
+// styles are initialized at runtime via InitStyles(), not at package load time
+func titleStyle() lipgloss.Style     { return ViewTitleStyle }
+func subtitleStyle() lipgloss.Style  { return SubtitleBoldStyle }
+func labelStyle() lipgloss.Style     { return DetailLabelStyle }
+func valueStyle() lipgloss.Style     { return DetailValueStyle }
+func dimStyle() lipgloss.Style       { return DetailDimStyle }
+func highlightStyle() lipgloss.Style { return StatusActiveStyle }
+func warningStyle() lipgloss.Style   { return StatusWarningStyle }
+func errorStyle() lipgloss.Style     { return ErrorMsgStyle }
+func accentStyle() lipgloss.Style    { return TagStyle }
 
 func (m DashboardModel) renderSystemInfo(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("System Information"))
+	b.WriteString(titleStyle().Render("System Information"))
 	b.WriteString("\n")
 
 	if m.sysInfoErr != nil {
-		b.WriteString(errorStyle.Render("Error: " + m.sysInfoErr.Error()))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(errorStyle().Render("Error: " + m.sysInfoErr.Error()))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.systemInfo == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	si := m.systemInfo
 
 	// Compact device info - hostname and model on first line
-	b.WriteString(valueStyle.Render(si.Hostname))
+	b.WriteString(valueStyle().Render(si.Hostname))
 	if si.Model != "" {
-		b.WriteString(dimStyle.Render(" • "))
-		b.WriteString(labelStyle.Render(si.Model))
+		b.WriteString(dimStyle().Render(" • "))
+		b.WriteString(labelStyle().Render(si.Model))
 	}
 	b.WriteString("\n")
 
 	// Serial and version on second line
 	if si.Serial != "" {
-		b.WriteString(dimStyle.Render("S/N: "))
-		b.WriteString(labelStyle.Render(si.Serial))
+		b.WriteString(dimStyle().Render("S/N: "))
+		b.WriteString(labelStyle().Render(si.Serial))
 	}
 	if si.Version != "" {
-		b.WriteString(dimStyle.Render("  PAN-OS: "))
-		b.WriteString(valueStyle.Render(si.Version))
+		b.WriteString(dimStyle().Render("  PAN-OS: "))
+		b.WriteString(valueStyle().Render(si.Version))
 	}
 	b.WriteString("\n")
 
 	// IP and uptime on third line
 	if si.IPAddress != "" {
-		b.WriteString(dimStyle.Render("IP: "))
-		b.WriteString(valueStyle.Render(si.IPAddress))
+		b.WriteString(dimStyle().Render("IP: "))
+		b.WriteString(valueStyle().Render(si.IPAddress))
 	}
 	if si.Uptime != "" {
-		b.WriteString(dimStyle.Render("  Up: "))
-		b.WriteString(labelStyle.Render(si.Uptime))
+		b.WriteString(dimStyle().Render("  Up: "))
+		b.WriteString(labelStyle().Render(si.Uptime))
 	}
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m DashboardModel) renderContentVersions(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Content Versions"))
+	b.WriteString(titleStyle().Render("Content Versions"))
 	b.WriteString("\n")
 
 	if m.systemInfo == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	si := m.systemInfo
@@ -390,31 +395,31 @@ func (m DashboardModel) renderContentVersions(width int) string {
 	for _, v := range versions {
 		if v.version != "" {
 			hasContent = true
-			b.WriteString(labelStyle.Render(v.abbrev + ": "))
-			b.WriteString(valueStyle.Render(v.version))
+			b.WriteString(labelStyle().Render(v.abbrev + ": "))
+			b.WriteString(valueStyle().Render(v.version))
 			b.WriteString("\n")
 		}
 	}
 
 	if !hasContent {
-		b.WriteString(dimStyle.Render("No content info"))
+		b.WriteString(dimStyle().Render("No content info"))
 	}
 
-	return panelStyle.Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
 }
 
 func (m DashboardModel) renderResourcesCompact(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Resources"))
+	b.WriteString(titleStyle().Render("Resources"))
 	b.WriteString("\n")
 
 	if m.resourceErr != nil {
-		b.WriteString(errorStyle.Render("Error"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(errorStyle().Render("Error"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.resources == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	barWidth := width - 20
@@ -422,64 +427,72 @@ func (m DashboardModel) renderResourcesCompact(width int) string {
 		barWidth = 10
 	}
 
-	// CPU
-	cpuPct := m.resources.CPUPercent
-	cpuColor := "#10B981"
-	if cpuPct > 80 {
-		cpuColor = "#EF4444"
-	} else if cpuPct > 60 {
-		cpuColor = "#F59E0B"
+	c := theme.Colors()
+
+	// Management CPU (from load average, treated as percentage)
+	mgmtCPU := m.resources.ManagementCPU
+	mgmtColor := string(c.Success)
+	if mgmtCPU > 80 {
+		mgmtColor = string(c.Error)
+	} else if mgmtCPU > 60 {
+		mgmtColor = string(c.Warning)
 	}
-	b.WriteString(labelStyle.Render("CPU "))
-	b.WriteString(renderBar(cpuPct, barWidth, cpuColor))
-	b.WriteString(fmt.Sprintf(" %4.0f%%\n", cpuPct))
+	b.WriteString(labelStyle().Render("Mgmt"))
+	b.WriteString(renderBar(mgmtCPU, barWidth, mgmtColor))
+	b.WriteString(fmt.Sprintf(" %4.0f%%\n", mgmtCPU))
+
+	// Dataplane CPU (percentage from resource monitor)
+	dpCPU := m.resources.DataPlaneCPU
+	dpColor := string(c.Success)
+	if dpCPU > 80 {
+		dpColor = string(c.Error)
+	} else if dpCPU > 60 {
+		dpColor = string(c.Warning)
+	}
+	b.WriteString(labelStyle().Render("DP  "))
+	b.WriteString(renderBar(dpCPU, barWidth, dpColor))
+	b.WriteString(fmt.Sprintf(" %4.0f%%\n", dpCPU))
 
 	// Memory
 	memPct := m.resources.MemoryPercent
-	memColor := "#10B981"
+	memColor := string(c.Success)
 	if memPct > 85 {
-		memColor = "#EF4444"
+		memColor = string(c.Error)
 	} else if memPct > 70 {
-		memColor = "#F59E0B"
+		memColor = string(c.Warning)
 	}
-	b.WriteString(labelStyle.Render("Mem "))
+	b.WriteString(labelStyle().Render("Mem "))
 	b.WriteString(renderBar(memPct, barWidth, memColor))
 	b.WriteString(fmt.Sprintf(" %4.0f%%", memPct))
 
-	// Load average on same line as session bar if available
-	if m.resources.Load1 > 0 || m.resources.Load5 > 0 {
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render("Load: "))
-		b.WriteString(valueStyle.Render(fmt.Sprintf("%.1f %.1f %.1f", m.resources.Load1, m.resources.Load5, m.resources.Load15)))
-	}
-
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m DashboardModel) renderSessionsCompact(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Sessions"))
+	b.WriteString(titleStyle().Render("Sessions"))
 	b.WriteString("\n")
 
 	if m.sessionErr != nil {
-		b.WriteString(errorStyle.Render("Error"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(errorStyle().Render("Error"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.sessionInfo == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	si := m.sessionInfo
 
 	// Active/Max with utilization bar
 	if si.MaxCount > 0 {
+		c := theme.Colors()
 		sessPct := float64(si.ActiveCount) / float64(si.MaxCount) * 100
-		sessColor := "#10B981"
+		sessColor := string(c.Success)
 		if sessPct > 80 {
-			sessColor = "#EF4444"
+			sessColor = string(c.Error)
 		} else if sessPct > 60 {
-			sessColor = "#F59E0B"
+			sessColor = string(c.Warning)
 		}
 		barWidth := width - 22
 		if barWidth < 8 {
@@ -490,102 +503,102 @@ func (m DashboardModel) renderSessionsCompact(width int) string {
 	}
 
 	// CPS and throughput on one line
-	b.WriteString(dimStyle.Render("CPS: "))
-	b.WriteString(valueStyle.Render(fmt.Sprintf("%d", si.CPS)))
-	b.WriteString(dimStyle.Render("  Thru: "))
-	b.WriteString(valueStyle.Render(formatThroughput(si.ThroughputKbps)))
+	b.WriteString(dimStyle().Render("CPS: "))
+	b.WriteString(valueStyle().Render(fmt.Sprintf("%d", si.CPS)))
+	b.WriteString(dimStyle().Render("  Thru: "))
+	b.WriteString(valueStyle().Render(formatThroughput(si.ThroughputKbps)))
 
 	// Protocol breakdown inline (if available)
 	if si.TCPSessions > 0 || si.UDPSessions > 0 || si.ICMPSessions > 0 {
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render("TCP:"))
-		b.WriteString(valueStyle.Render(formatNumber(int64(si.TCPSessions))))
-		b.WriteString(dimStyle.Render(" UDP:"))
-		b.WriteString(valueStyle.Render(formatNumber(int64(si.UDPSessions))))
-		b.WriteString(dimStyle.Render(" ICMP:"))
-		b.WriteString(valueStyle.Render(formatNumber(int64(si.ICMPSessions))))
+		b.WriteString(dimStyle().Render("TCP:"))
+		b.WriteString(valueStyle().Render(formatNumber(int64(si.TCPSessions))))
+		b.WriteString(dimStyle().Render(" UDP:"))
+		b.WriteString(valueStyle().Render(formatNumber(int64(si.UDPSessions))))
+		b.WriteString(dimStyle().Render(" ICMP:"))
+		b.WriteString(valueStyle().Render(formatNumber(int64(si.ICMPSessions))))
 	}
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m DashboardModel) renderHAStatus(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("HA Status"))
+	b.WriteString(titleStyle().Render("HA Status"))
 	b.WriteString("\n")
 
 	if m.haErr != nil || m.haStatus == nil || !m.haStatus.Enabled {
-		b.WriteString(dimStyle.Render("Not enabled"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not enabled"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Local state with colored indicator
-	stateStyle := valueStyle
+	stateStyle := valueStyle()
 	switch m.haStatus.State {
 	case "active":
-		stateStyle = highlightStyle
+		stateStyle = highlightStyle()
 	case "passive":
-		stateStyle = warningStyle
+		stateStyle = warningStyle()
 	case "suspended", "initial":
-		stateStyle = errorStyle
+		stateStyle = errorStyle()
 	}
 
 	b.WriteString(stateStyle.Render(strings.ToUpper(m.haStatus.State)))
-	b.WriteString(dimStyle.Render(" / peer: "))
-	b.WriteString(valueStyle.Render(m.haStatus.PeerState))
+	b.WriteString(dimStyle().Render(" / peer: "))
+	b.WriteString(valueStyle().Render(m.haStatus.PeerState))
 
 	if m.haStatus.SyncState != "" {
-		syncStyle := dimStyle
+		syncStyle := dimStyle()
 		if m.haStatus.SyncState == "synchronized" {
-			syncStyle = highlightStyle
+			syncStyle = highlightStyle()
 		}
 		b.WriteString("\n")
 		b.WriteString(syncStyle.Render(m.haStatus.SyncState))
 	}
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m DashboardModel) renderGlobalProtect(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("GlobalProtect"))
+	b.WriteString(titleStyle().Render("GlobalProtect"))
 	b.WriteString("\n")
 
 	if m.gpErr != nil || m.gpInfo == nil {
-		b.WriteString(dimStyle.Render("Not configured"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not configured"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Users and gateways on one line
-	b.WriteString(dimStyle.Render("Users: "))
+	b.WriteString(dimStyle().Render("Users: "))
 	if m.gpInfo.ActiveUsers > 0 {
-		b.WriteString(highlightStyle.Render(fmt.Sprintf("%d", m.gpInfo.ActiveUsers)))
+		b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", m.gpInfo.ActiveUsers)))
 	} else {
-		b.WriteString(dimStyle.Render("0"))
+		b.WriteString(dimStyle().Render("0"))
 	}
-	b.WriteString(dimStyle.Render("  GW: "))
-	b.WriteString(valueStyle.Render(fmt.Sprintf("%d/%d", m.gpInfo.ActiveGateways, m.gpInfo.TotalGateways)))
+	b.WriteString(dimStyle().Render("  GW: "))
+	b.WriteString(valueStyle().Render(fmt.Sprintf("%d/%d", m.gpInfo.ActiveGateways, m.gpInfo.TotalGateways)))
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m DashboardModel) renderLicenses(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Licenses"))
+	b.WriteString(titleStyle().Render("Licenses"))
 	b.WriteString("\n")
 
 	if m.licenseErr != nil {
-		b.WriteString(dimStyle.Render("Not available"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.licenses == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	if len(m.licenses) == 0 {
-		b.WriteString(dimStyle.Render("No licenses"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("No licenses"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Count status
@@ -601,17 +614,17 @@ func (m DashboardModel) renderLicenses(width int) string {
 	}
 
 	// Summary line
-	b.WriteString(highlightStyle.Render(fmt.Sprintf("%d", valid)))
-	b.WriteString(dimStyle.Render(" valid"))
+	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", valid)))
+	b.WriteString(dimStyle().Render(" valid"))
 	if expiring > 0 {
-		b.WriteString(dimStyle.Render("  "))
-		b.WriteString(warningStyle.Render(fmt.Sprintf("%d", expiring)))
-		b.WriteString(dimStyle.Render(" expiring"))
+		b.WriteString(dimStyle().Render("  "))
+		b.WriteString(warningStyle().Render(fmt.Sprintf("%d", expiring)))
+		b.WriteString(dimStyle().Render(" expiring"))
 	}
 	if expired > 0 {
-		b.WriteString(dimStyle.Render("  "))
-		b.WriteString(errorStyle.Render(fmt.Sprintf("%d", expired)))
-		b.WriteString(dimStyle.Render(" expired"))
+		b.WriteString(dimStyle().Render("  "))
+		b.WriteString(errorStyle().Render(fmt.Sprintf("%d", expired)))
+		b.WriteString(dimStyle().Render(" expired"))
 	}
 
 	// Show licenses needing attention (expiring or expired), max 3
@@ -638,45 +651,45 @@ func (m DashboardModel) renderLicenses(width int) string {
 			var statusStyle lipgloss.Style
 			var days string
 			if lic.Expired {
-				statusStyle = errorStyle
+				statusStyle = errorStyle()
 				days = "exp"
 			} else {
 				if lic.DaysLeft < 30 {
-					statusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#F97316"))
+					statusStyle = SeverityHighStyle
 				} else {
-					statusStyle = warningStyle
+					statusStyle = warningStyle()
 				}
 				days = fmt.Sprintf("%dd", lic.DaysLeft)
 			}
 			b.WriteString(statusStyle.Render(days))
-			b.WriteString(dimStyle.Render(" "))
-			b.WriteString(labelStyle.Render(name))
+			b.WriteString(dimStyle().Render(" "))
+			b.WriteString(labelStyle().Render(name))
 			if i < len(attention)-1 && i < maxShow-1 {
 				b.WriteString("\n")
 			}
 		}
 	}
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m DashboardModel) renderLoggedInAdmins(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Admins Online"))
+	b.WriteString(titleStyle().Render("Admins Online"))
 	b.WriteString("\n")
 
 	if m.adminErr != nil {
-		b.WriteString(dimStyle.Render("Not available"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.admins == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	if len(m.admins) == 0 {
-		b.WriteString(dimStyle.Render("None"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("None"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Show up to 4 admins, single line each
@@ -687,20 +700,20 @@ func (m DashboardModel) renderLoggedInAdmins(width int) string {
 		}
 
 		// Format admin type with style
-		typeStyle := dimStyle
+		typeStyle := dimStyle()
 		switch admin.Type {
 		case "Web":
-			typeStyle = accentStyle
+			typeStyle = accentStyle()
 		case "CLI":
-			typeStyle = highlightStyle
+			typeStyle = highlightStyle()
 		case "API":
-			typeStyle = warningStyle
+			typeStyle = warningStyle()
 		}
 
 		// Single line: username (type) from IP
-		b.WriteString(valueStyle.Render(admin.Username))
+		b.WriteString(valueStyle().Render(admin.Username))
 		b.WriteString(typeStyle.Render(" " + admin.Type))
-		b.WriteString(dimStyle.Render(" " + admin.From))
+		b.WriteString(dimStyle().Render(" " + admin.From))
 
 		if i < len(m.admins)-1 && i < maxAdmins-1 {
 			b.WriteString("\n")
@@ -708,29 +721,29 @@ func (m DashboardModel) renderLoggedInAdmins(width int) string {
 	}
 
 	if len(m.admins) > maxAdmins {
-		b.WriteString(dimStyle.Render(fmt.Sprintf(" +%d", len(m.admins)-maxAdmins)))
+		b.WriteString(dimStyle().Render(fmt.Sprintf(" +%d", len(m.admins)-maxAdmins)))
 	}
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m DashboardModel) renderJobs(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Recent Jobs"))
+	b.WriteString(titleStyle().Render("Recent Jobs"))
 	b.WriteString("\n")
 
 	if m.jobErr != nil {
-		b.WriteString(dimStyle.Render("Not available"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.jobs == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	if len(m.jobs) == 0 {
-		b.WriteString(dimStyle.Render("None"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("None"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Show up to 4 most recent jobs
@@ -747,20 +760,20 @@ func (m DashboardModel) renderJobs(width int) string {
 		switch job.Status {
 		case "FIN":
 			if job.Result == "OK" {
-				statusStyle = highlightStyle
+				statusStyle = highlightStyle()
 				statusIndicator = "✓"
 			} else {
-				statusStyle = errorStyle
+				statusStyle = errorStyle()
 				statusIndicator = "✗"
 			}
 		case "ACT":
-			statusStyle = accentStyle
+			statusStyle = accentStyle()
 			statusIndicator = "●"
 		case "PEND":
-			statusStyle = warningStyle
+			statusStyle = warningStyle()
 			statusIndicator = "○"
 		default:
-			statusStyle = dimStyle
+			statusStyle = dimStyle()
 			statusIndicator = "?"
 		}
 
@@ -771,39 +784,39 @@ func (m DashboardModel) renderJobs(width int) string {
 		}
 
 		b.WriteString(statusStyle.Render(statusIndicator))
-		b.WriteString(valueStyle.Render(" " + jobType))
-		b.WriteString(dimStyle.Render(fmt.Sprintf(" %d", job.ID)))
+		b.WriteString(valueStyle().Render(" " + jobType))
+		b.WriteString(dimStyle().Render(fmt.Sprintf(" %d", job.ID)))
 
 		if i < len(m.jobs)-1 && i < maxJobs-1 {
 			b.WriteString("\n")
 		}
 	}
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m DashboardModel) renderThreatSummary(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Threats"))
+	b.WriteString(titleStyle().Render("Threats"))
 	b.WriteString("\n")
 
 	if m.threatErr != nil || m.threatSummary == nil {
-		b.WriteString(dimStyle.Render("Not available"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	ts := m.threatSummary
 
 	if ts.TotalThreats == 0 {
-		b.WriteString(highlightStyle.Render("None detected"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(highlightStyle().Render("None detected"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Color-coded severity on one line
-	criticalStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444"))
-	highStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F97316"))
-	mediumStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#EAB308"))
-	lowStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#3B82F6"))
+	criticalStyle := SeverityCriticalStyle
+	highStyle := SeverityHighStyle
+	mediumStyle := SeverityMediumStyle
+	lowStyle := SeverityLowStyle
 
 	if ts.CriticalCount > 0 {
 		b.WriteString(criticalStyle.Render(fmt.Sprintf("C:%d ", ts.CriticalCount)))
@@ -820,37 +833,39 @@ func (m DashboardModel) renderThreatSummary(width int) string {
 
 	// Actions on second line
 	b.WriteString("\n")
-	b.WriteString(highlightStyle.Render(fmt.Sprintf("%d", ts.BlockedCount)))
-	b.WriteString(dimStyle.Render(" blocked  "))
-	b.WriteString(warningStyle.Render(fmt.Sprintf("%d", ts.AlertedCount)))
-	b.WriteString(dimStyle.Render(" alerted"))
+	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", ts.BlockedCount)))
+	b.WriteString(dimStyle().Render(" blocked  "))
+	b.WriteString(warningStyle().Render(fmt.Sprintf("%d", ts.AlertedCount)))
+	b.WriteString(dimStyle().Render(" alerted"))
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m DashboardModel) renderDiskUsage(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Disk Usage"))
+	b.WriteString(titleStyle().Render("Disk Usage"))
 	b.WriteString("\n")
 
 	if m.diskErr != nil {
-		b.WriteString(dimStyle.Render("Not available"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.diskUsage == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	if len(m.diskUsage) == 0 {
-		b.WriteString(dimStyle.Render("No disk info"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("No disk info"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	barWidth := width - 25
 	if barWidth < 10 {
 		barWidth = 10
 	}
+
+	c := theme.Colors()
 
 	// Show most relevant filesystems (root, var, etc)
 	maxShow := 4
@@ -866,11 +881,11 @@ func (m DashboardModel) renderDiskUsage(width int) string {
 		}
 
 		// Determine color based on usage
-		color := "#10B981"
+		color := string(c.Success)
 		if disk.Percent > 90 {
-			color = "#EF4444"
+			color = string(c.Error)
 		} else if disk.Percent > 80 {
-			color = "#F59E0B"
+			color = string(c.Warning)
 		}
 
 		mountPoint := disk.MountPoint
@@ -878,32 +893,32 @@ func (m DashboardModel) renderDiskUsage(width int) string {
 			mountPoint = mountPoint[:10] + ".."
 		}
 
-		b.WriteString(labelStyle.Render(fmt.Sprintf("%-12s ", mountPoint)))
+		b.WriteString(labelStyle().Render(fmt.Sprintf("%-12s ", mountPoint)))
 		b.WriteString(renderBar(disk.Percent, barWidth, color))
 		b.WriteString(fmt.Sprintf(" %3.0f%%\n", disk.Percent))
 		shown++
 	}
 
-	return panelStyle.Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
 }
 
 func (m DashboardModel) renderEnvironmentals(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Hardware Status"))
+	b.WriteString(titleStyle().Render("Hardware Status"))
 	b.WriteString("\n")
 
 	if m.envErr != nil {
-		b.WriteString(dimStyle.Render("Not available"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.environmentals == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	if len(m.environmentals) == 0 {
-		b.WriteString(dimStyle.Render("No sensor data"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("No sensor data"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Count status
@@ -916,10 +931,10 @@ func (m DashboardModel) renderEnvironmentals(width int) string {
 
 	// Summary
 	if alarmCount == 0 {
-		b.WriteString(highlightStyle.Render("All sensors normal"))
+		b.WriteString(highlightStyle().Render("All sensors normal"))
 		b.WriteString("\n")
 	} else {
-		b.WriteString(errorStyle.Render(fmt.Sprintf("%d alarm(s) active", alarmCount)))
+		b.WriteString(errorStyle().Render(fmt.Sprintf("%d alarm(s) active", alarmCount)))
 		b.WriteString("\n")
 	}
 
@@ -936,13 +951,13 @@ func (m DashboardModel) renderEnvironmentals(width int) string {
 			continue
 		}
 
-		statusStyle := errorStyle
+		statusStyle := errorStyle()
 		statusIcon := "!"
 
 		component := truncateEllipsis(env.Component, 18)
 		b.WriteString(statusStyle.Render(statusIcon))
 		b.WriteString(" ")
-		b.WriteString(labelStyle.Render(fmt.Sprintf("%-18s ", component)))
+		b.WriteString(labelStyle().Render(fmt.Sprintf("%-18s ", component)))
 		b.WriteString(statusStyle.Render(env.Value))
 		b.WriteString("\n")
 		shown++
@@ -959,35 +974,35 @@ func (m DashboardModel) renderEnvironmentals(width int) string {
 			}
 
 			component := truncateEllipsis(env.Component, 18)
-			b.WriteString(highlightStyle.Render("o"))
+			b.WriteString(highlightStyle().Render("o"))
 			b.WriteString(" ")
-			b.WriteString(labelStyle.Render(fmt.Sprintf("%-18s ", component)))
-			b.WriteString(dimStyle.Render(env.Value))
+			b.WriteString(labelStyle().Render(fmt.Sprintf("%-18s ", component)))
+			b.WriteString(dimStyle().Render(env.Value))
 			b.WriteString("\n")
 			shown++
 		}
 	}
 
-	return panelStyle.Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
 }
 
 func (m DashboardModel) renderCertificates(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Certificates"))
+	b.WriteString(titleStyle().Render("Certificates"))
 	b.WriteString("\n")
 
 	if m.certErr != nil {
-		b.WriteString(dimStyle.Render("Not available"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.certificates == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	if len(m.certificates) == 0 {
-		b.WriteString(dimStyle.Render("No certificates"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("No certificates"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Count by status
@@ -1004,17 +1019,17 @@ func (m DashboardModel) renderCertificates(width int) string {
 	}
 
 	// Summary
-	b.WriteString(highlightStyle.Render(fmt.Sprintf("%d", valid)))
-	b.WriteString(dimStyle.Render(" valid"))
+	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", valid)))
+	b.WriteString(dimStyle().Render(" valid"))
 	if expiring > 0 {
-		b.WriteString(dimStyle.Render("  "))
-		b.WriteString(warningStyle.Render(fmt.Sprintf("%d", expiring)))
-		b.WriteString(dimStyle.Render(" expiring"))
+		b.WriteString(dimStyle().Render("  "))
+		b.WriteString(warningStyle().Render(fmt.Sprintf("%d", expiring)))
+		b.WriteString(dimStyle().Render(" expiring"))
 	}
 	if expired > 0 {
-		b.WriteString(dimStyle.Render("  "))
-		b.WriteString(errorStyle.Render(fmt.Sprintf("%d", expired)))
-		b.WriteString(dimStyle.Render(" expired"))
+		b.WriteString(dimStyle().Render("  "))
+		b.WriteString(errorStyle().Render(fmt.Sprintf("%d", expired)))
+		b.WriteString(dimStyle().Render(" expired"))
 	}
 
 	// Show certs needing attention
@@ -1038,45 +1053,109 @@ func (m DashboardModel) renderCertificates(width int) string {
 			var days string
 
 			if cert.Status == "expired" {
-				statusStyle = errorStyle
+				statusStyle = errorStyle()
 				days = "exp"
 			} else {
 				if cert.DaysLeft < 14 {
-					statusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#F97316"))
+					statusStyle = SeverityHighStyle
 				} else {
-					statusStyle = warningStyle
+					statusStyle = warningStyle()
 				}
 				days = fmt.Sprintf("%dd", cert.DaysLeft)
 			}
 
 			b.WriteString(statusStyle.Render(fmt.Sprintf("%-4s ", days)))
-			b.WriteString(labelStyle.Render(name))
+			b.WriteString(labelStyle().Render(name))
 			if i < len(attention)-1 && i < maxShow-1 {
 				b.WriteString("\n")
 			}
 		}
 	}
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
+}
+
+func (m DashboardModel) renderNATPoolUtilization(width int) string {
+	var b strings.Builder
+	b.WriteString(titleStyle().Render("NAT Pool Utilization"))
+	b.WriteString("\n")
+
+	if m.natPoolErr != nil {
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
+	}
+	if m.natPools == nil {
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
+	}
+
+	if len(m.natPools) == 0 {
+		b.WriteString(dimStyle().Render("No NAT pools configured"))
+		return panelStyle().Width(width).Render(b.String())
+	}
+
+	barWidth := width - 28
+	if barWidth < 8 {
+		barWidth = 8
+	}
+
+	c := theme.Colors()
+
+	// Show up to 5 pools
+	maxShow := 5
+	for i, pool := range m.natPools {
+		if i >= maxShow {
+			break
+		}
+
+		// Truncate pool name to 15 chars
+		name := pool.RuleName
+		if len(name) > 15 {
+			name = name[:12] + "..."
+		}
+
+		// Color based on utilization
+		color := string(c.Success)
+		if pool.Percent > 80 {
+			color = string(c.Error)
+		} else if pool.Percent > 60 {
+			color = string(c.Warning)
+		}
+
+		b.WriteString(labelStyle().Render(fmt.Sprintf("%-15s ", name)))
+		b.WriteString(renderBar(pool.Percent, barWidth, color))
+		b.WriteString(fmt.Sprintf(" %3.0f%%", pool.Percent))
+
+		if i < len(m.natPools)-1 && i < maxShow-1 {
+			b.WriteString("\n")
+		}
+	}
+
+	if len(m.natPools) > maxShow {
+		b.WriteString("\n")
+		b.WriteString(dimStyle().Render(fmt.Sprintf("... and %d more", len(m.natPools)-maxShow)))
+	}
+
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m DashboardModel) renderInterfaces(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Network Interfaces"))
+	b.WriteString(titleStyle().Render("Network Interfaces"))
 	b.WriteString("\n\n")
 
 	if m.ifaceErr != nil {
-		b.WriteString(errorStyle.Render("Error: " + m.ifaceErr.Error()))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(errorStyle().Render("Error: " + m.ifaceErr.Error()))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.interfaces == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	if len(m.interfaces) == 0 {
-		b.WriteString(dimStyle.Render("No interfaces configured"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("No interfaces configured"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Calculate column widths based on available space
@@ -1091,9 +1170,7 @@ func (m DashboardModel) renderInterfaces(width int) string {
 	}
 
 	// Header
-	headerStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#9CA3AF")).
-		Bold(true)
+	headerStyle := DetailLabelStyle.Bold(true)
 
 	header := fmt.Sprintf("%-*s %-*s %-*s %-*s",
 		nameW, "Interface",
@@ -1102,7 +1179,7 @@ func (m DashboardModel) renderInterfaces(width int) string {
 		ipW, "IP Address")
 	b.WriteString(headerStyle.Render(header))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(strings.Repeat("─", minInt(availWidth, len(header)))))
+	b.WriteString(dimStyle().Render(strings.Repeat("─", minInt(availWidth, len(header)))))
 	b.WriteString("\n")
 
 	// Show interfaces, prioritizing those with IPs
@@ -1134,10 +1211,10 @@ func (m DashboardModel) renderInterfaces(width int) string {
 		}
 
 		stateStr := "up"
-		stStyle := highlightStyle
+		stStyle := highlightStyle()
 		if iface.State != "up" {
 			stateStr = "down"
-			stStyle = dimStyle
+			stStyle = dimStyle()
 		}
 
 		zone := iface.Zone
@@ -1162,10 +1239,10 @@ func (m DashboardModel) renderInterfaces(width int) string {
 
 	if len(m.interfaces) > maxRows {
 		remaining := len(m.interfaces) - maxRows
-		b.WriteString(dimStyle.Render(fmt.Sprintf("... and %d more", remaining)))
+		b.WriteString(dimStyle().Render(fmt.Sprintf("... and %d more", remaining)))
 	}
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }
 
 // Helper functions
@@ -1174,7 +1251,7 @@ func formatRow(label, value string, labelWidth int) string {
 	if value == "" {
 		return ""
 	}
-	return labelStyle.Width(labelWidth).Render(label+":") + " " + valueStyle.Render(value) + "\n"
+	return labelStyle().Width(labelWidth).Render(label+":") + " " + valueStyle().Render(value) + "\n"
 }
 
 func renderBar(percent float64, width int, color string) string {
@@ -1191,7 +1268,7 @@ func renderBar(percent float64, width int, color string) string {
 	}
 
 	filledStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(color))
-	emptyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#374151"))
+	emptyStyle := StatusMutedStyle
 
 	bar := strings.Builder{}
 	for i := 0; i < width; i++ {

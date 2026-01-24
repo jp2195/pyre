@@ -4,33 +4,33 @@ import "time"
 
 type SystemInfo struct {
 	// Basic Info
-	Hostname   string
-	Model      string
-	Serial     string
-	Version    string
-	Uptime     string
+	Hostname string
+	Model    string
+	Serial   string
+	Version  string
+	Uptime   string
 
 	// Network
-	IPAddress    string
-	Netmask      string
-	Gateway      string
-	IPv6Address  string
-	MACAddress   string
+	IPAddress   string
+	Netmask     string
+	Gateway     string
+	IPv6Address string
+	MACAddress  string
 
 	// Settings
-	Domain       string
-	TimeZone     string
-	CurrentTime  time.Time
+	Domain      string
+	TimeZone    string
+	CurrentTime time.Time
 
 	// Content Versions
-	AppVersion         string // e.g., "8039-9750"
-	AppReleaseDate     string // e.g., "11/12/25"
-	ThreatVersion      string
-	ThreatReleaseDate  string
-	AntivirusVersion   string
-	AntivirusDate      string
-	WildFireVersion    string
-	WildFireDate       string
+	AppVersion          string // e.g., "8039-9750"
+	AppReleaseDate      string // e.g., "11/12/25"
+	ThreatVersion       string
+	ThreatReleaseDate   string
+	AntivirusVersion    string
+	AntivirusDate       string
+	WildFireVersion     string
+	WildFireDate        string
 	URLFilteringVersion string
 
 	// Features
@@ -39,15 +39,15 @@ type SystemInfo struct {
 }
 
 type Resources struct {
-	CPUPercent       float64
-	MemoryPercent    float64
-	Load1            float64
-	Load5            float64
-	Load15           float64
+	CPUPercent    float64
+	MemoryPercent float64
+	Load1         float64
+	Load5         float64
+	Load15        float64
 
 	// Separate CPU metrics
-	ManagementCPU    float64
-	DataPlaneCPU     float64
+	ManagementCPU float64
+	DataPlaneCPU  float64
 }
 
 type SessionInfo struct {
@@ -56,9 +56,9 @@ type SessionInfo struct {
 	ThroughputKbps int64
 	CPS            int
 	// Per-protocol breakdown (optional)
-	TCPSessions    int
-	UDPSessions    int
-	ICMPSessions   int
+	TCPSessions  int
+	UDPSessions  int
+	ICMPSessions int
 }
 
 type HAStatus struct {
@@ -101,13 +101,13 @@ type Interface struct {
 }
 
 type ThreatSummary struct {
-	TotalThreats   int64
-	CriticalCount  int64
-	HighCount      int64
-	MediumCount    int64
-	LowCount       int64
-	BlockedCount   int64
-	AlertedCount   int64
+	TotalThreats  int64
+	CriticalCount int64
+	HighCount     int64
+	MediumCount   int64
+	LowCount      int64
+	BlockedCount  int64
+	AlertedCount  int64
 }
 
 type GlobalProtectInfo struct {
@@ -248,16 +248,16 @@ type GlobalProtectUser struct {
 
 // ObjectCounts represents configuration object counts
 type ObjectCounts struct {
-	AddressObjects  int // Address objects count
-	AddressGroups   int // Address groups count
-	ServiceObjects  int // Service objects count
-	ServiceGroups   int // Service groups count
+	AddressObjects    int // Address objects count
+	AddressGroups     int // Address groups count
+	ServiceObjects    int // Service objects count
+	ServiceGroups     int // Service groups count
 	ApplicationGroups int // Application groups count
-	SecurityRules   int // Security rules count
-	NATRules        int // NAT rules count
-	Zones           int // Security zones count
-	Interfaces      int // Interfaces count
-	VirtualRouters  int // Virtual routers count
+	SecurityRules     int // Security rules count
+	NATRules          int // NAT rules count
+	Zones             int // Security zones count
+	Interfaces        int // Interfaces count
+	VirtualRouters    int // Virtual routers count
 }
 
 // PendingChange represents a pending configuration change
@@ -267,4 +267,13 @@ type PendingChange struct {
 	Type        string    // Type of change (add, edit, delete)
 	Description string    // Change description
 	Time        time.Time // When change was made
+}
+
+// NATPoolInfo represents NAT IP pool utilization information
+type NATPoolInfo struct {
+	RuleName  string  // NAT rule name
+	Type      string  // Pool type: DIPP, DIP, Static
+	Used      int64   // Used addresses/ports
+	Available int64   // Available addresses/ports
+	Percent   float64 // Utilization percentage
 }

@@ -1,0 +1,65 @@
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  default: none
+  enable:
+    # Default linters
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+    # Additional linters
+    - misspell
+    - unconvert
+    - gosec
+    - prealloc
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+
+    gosec:
+      excludes:
+        - G104 # Audit errors not checked (handled by errcheck)
+        - G304 # File path provided as taint input (intentional for config files)
+
+    misspell:
+      ignore-rules:
+        - licence
+        - colour
+
+  exclusions:
+    rules:
+      # Ignore long lines in generated files
+      - path: _test\.go
+        linters:
+          - errcheck
+
+      # Allow unused parameters in test files
+      - path: _test\.go
+        text: "unused-parameter"
+
+    max-issues-per-linter: 50
+    max-same-issues: 10
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/jp2195/pyre

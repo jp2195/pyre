@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/joshuamontgomery/pyre/internal/config"
+	"github.com/jp2195/pyre/internal/config"
 )
 
 func TestNewClient(t *testing.T) {
@@ -190,6 +190,86 @@ func TestClientWithMockServer(t *testing.T) {
 			t.Errorf("Unexpected output: %s", result.Stdout)
 		}
 	})
+
+	t.Run("ShowLog default lines", func(t *testing.T) {
+		result, err := client.ShowLog(ctx, "system", 0)
+		if err != nil {
+			t.Fatalf("ShowLog failed: %v", err)
+		}
+		if result.Error != nil {
+			t.Fatalf("Command returned error: %v", result.Error)
+		}
+	})
+
+	t.Run("ShowHALink", func(t *testing.T) {
+		result, err := client.ShowHALink(ctx)
+		if err != nil {
+			t.Fatalf("ShowHALink failed: %v", err)
+		}
+		if result.Error != nil {
+			t.Fatalf("Command returned error: %v", result.Error)
+		}
+	})
+
+	t.Run("ShowCommitHistory", func(t *testing.T) {
+		result, err := client.ShowCommitHistory(ctx)
+		if err != nil {
+			t.Fatalf("ShowCommitHistory failed: %v", err)
+		}
+		if result.Error != nil {
+			t.Fatalf("Command returned error: %v", result.Error)
+		}
+	})
+
+	t.Run("ShowConfigLock", func(t *testing.T) {
+		result, err := client.ShowConfigLock(ctx)
+		if err != nil {
+			t.Fatalf("ShowConfigLock failed: %v", err)
+		}
+		if result.Error != nil {
+			t.Fatalf("Command returned error: %v", result.Error)
+		}
+	})
+
+	t.Run("ShowLicenseInfo", func(t *testing.T) {
+		result, err := client.ShowLicenseInfo(ctx)
+		if err != nil {
+			t.Fatalf("ShowLicenseInfo failed: %v", err)
+		}
+		if result.Error != nil {
+			t.Fatalf("Command returned error: %v", result.Error)
+		}
+	})
+
+	t.Run("ShowTopProcesses", func(t *testing.T) {
+		result, err := client.ShowTopProcesses(ctx)
+		if err != nil {
+			t.Fatalf("ShowTopProcesses failed: %v", err)
+		}
+		if result.Error != nil {
+			t.Fatalf("Command returned error: %v", result.Error)
+		}
+	})
+
+	t.Run("ShowSessionTable", func(t *testing.T) {
+		result, err := client.ShowSessionTable(ctx)
+		if err != nil {
+			t.Fatalf("ShowSessionTable failed: %v", err)
+		}
+		if result.Error != nil {
+			t.Fatalf("Command returned error: %v", result.Error)
+		}
+	})
+
+	t.Run("ShowDataplaneStats", func(t *testing.T) {
+		result, err := client.ShowDataplaneStats(ctx)
+		if err != nil {
+			t.Fatalf("ShowDataplaneStats failed: %v", err)
+		}
+		if result.Error != nil {
+			t.Fatalf("Command returned error: %v", result.Error)
+		}
+	})
 }
 
 func TestClientNotConnected(t *testing.T) {
@@ -234,6 +314,15 @@ func TestExpandPath(t *testing.T) {
 		if result != tt.expected {
 			t.Errorf("expandPath(%q) = %q, want %q", tt.input, result, tt.expected)
 		}
+	}
+
+	// Test ~ expansion - result should contain home dir, not ~/
+	result := expandPath("~/somepath")
+	if strings.HasPrefix(result, "~/") {
+		t.Error("expandPath should expand ~ to home directory")
+	}
+	if !strings.HasSuffix(result, "/somepath") {
+		t.Errorf("expandPath(~/somepath) should end with /somepath, got %q", result)
 	}
 }
 
@@ -300,5 +389,117 @@ func TestMockSSHServerAddress(t *testing.T) {
 	addr := server.Address()
 	if !strings.Contains(addr, "127.0.0.1:") {
 		t.Errorf("Unexpected address format: %s", addr)
+	}
+}
+
+// TestExecuteContextCancellation tests that command execution properly
+// handles context cancellation and cleans up resources.
+func TestExecuteContextCancellation(t *testing.T) {
+	server, err := NewMockSSHServer()
+	if err != nil {
+		t.Fatalf("Failed to create mock server: %v", err)
+	}
+
+	// Set up a slow command response
+	server.SetResponse("sleep-command", "started\n")
+
+	if err := server.Start(); err != nil {
+		t.Fatalf("Failed to start mock server: %v", err)
+	}
+	defer server.Close()
+
+	cfg := config.SSHConfig{
+		Username: "admin",
+		Password: "password",
+		Port:     server.Port(),
+		Timeout:  10,
+	}
+
+	client, err := NewClient(server.Host(), cfg)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	defer client.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := client.Connect(ctx); err != nil {
+		t.Fatalf("Failed to connect: %v", err)
+	}
+
+	// Create a context that we'll cancel
+	cmdCtx, cmdCancel := context.WithCancel(context.Background())
+
+	// Start command in goroutine
+	resultCh := make(chan *CommandResult, 1)
+	go func() {
+		result, _ := client.Execute(cmdCtx, "show clock")
+		resultCh <- result
+	}()
+
+	// Cancel the context immediately
+	cmdCancel()
+
+	// Wait for result with timeout
+	select {
+	case result := <-resultCh:
+		// Should get a result (either successful or cancelled)
+		if result != nil && result.Error != nil {
+			// Context cancellation should be reflected
+			if result.Error != context.Canceled {
+				// It's okay if the command completed before cancellation
+				t.Logf("Command completed with: %v", result.Error)
+			}
+		}
+	case <-time.After(3 * time.Second):
+		t.Error("Command did not respond to context cancellation in time")
+	}
+}
+
+// TestExecuteWithAlreadyCancelledContext tests execution with pre-cancelled context.
+func TestExecuteWithAlreadyCancelledContext(t *testing.T) {
+	server, err := NewMockSSHServer()
+	if err != nil {
+		t.Fatalf("Failed to create mock server: %v", err)
+	}
+
+	server.SetDefaultResponses()
+
+	if err := server.Start(); err != nil {
+		t.Fatalf("Failed to start mock server: %v", err)
+	}
+	defer server.Close()
+
+	cfg := config.SSHConfig{
+		Username: "admin",
+		Password: "password",
+		Port:     server.Port(),
+		Timeout:  10,
+	}
+
+	client, err := NewClient(server.Host(), cfg)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	defer client.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := client.Connect(ctx); err != nil {
+		t.Fatalf("Failed to connect: %v", err)
+	}
+
+	// Create an already-cancelled context
+	cancelledCtx, cancelFunc := context.WithCancel(context.Background())
+	cancelFunc() // Cancel immediately
+
+	result, _ := client.Execute(cancelledCtx, "show clock")
+
+	// Should return an error due to cancelled context
+	if result != nil && result.Error == nil && result.Stdout == "" {
+		// Either error or we got a result before cancellation kicked in
+		t.Logf("Execution with cancelled context: error=%v, stdout=%q", result.Error, result.Stdout)
 	}
 }

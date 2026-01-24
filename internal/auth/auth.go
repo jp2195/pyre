@@ -6,10 +6,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/joshuamontgomery/pyre/internal/api"
-	"github.com/joshuamontgomery/pyre/internal/config"
-	"github.com/joshuamontgomery/pyre/internal/models"
-	"github.com/joshuamontgomery/pyre/internal/ssh"
+	"github.com/jp2195/pyre/internal/api"
+	"github.com/jp2195/pyre/internal/config"
+	"github.com/jp2195/pyre/internal/models"
+	"github.com/jp2195/pyre/internal/ssh"
 )
 
 type Session struct {

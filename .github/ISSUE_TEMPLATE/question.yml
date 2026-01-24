@@ -1,0 +1,41 @@
+name: Question
+description: Ask a question about using pyre
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question about pyre? Fill out the form below.
+
+        For general discussions, consider using [GitHub Discussions](https://github.com/jp2195/pyre/discussions) instead.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What would you like to know?
+      placeholder: How do I...
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Provide any relevant context for your question
+      placeholder: I'm trying to accomplish...
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: What I've Tried
+      description: What have you already tried or researched?
+      placeholder: I've looked at the README and tried...
+
+  - type: input
+    id: version
+    attributes:
+      label: Pyre Version (if applicable)
+      description: Run `pyre --version` to get the version
+      placeholder: e.g., v1.2.3

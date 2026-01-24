@@ -7,9 +7,11 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/joshuamontgomery/pyre/internal/auth"
-	"github.com/joshuamontgomery/pyre/internal/config"
-	"github.com/joshuamontgomery/pyre/internal/tui"
+	"github.com/jp2195/pyre/internal/auth"
+	"github.com/jp2195/pyre/internal/config"
+	"github.com/jp2195/pyre/internal/tui"
+	"github.com/jp2195/pyre/internal/tui/theme"
+	"github.com/jp2195/pyre/internal/tui/views"
 )
 
 var (
@@ -66,6 +68,11 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Initialize theme system
+	theme.Init(cfg.Settings.Theme)
+	tui.InitStyles()
+	views.InitStyles()
 
 	creds := auth.ResolveCredentials(cfg, flags)
 

@@ -20,10 +20,10 @@ type TrafficLogEntry struct {
 	Subtype     string // start, end, drop, deny
 
 	// Source/Destination
-	SourceIP   string
-	DestIP     string
-	SourcePort int
-	DestPort   int
+	SourceIP      string
+	DestIP        string
+	SourcePort    int
+	DestPort      int
 	NATSourceIP   string
 	NATDestIP     string
 	NATSourcePort int
@@ -40,8 +40,8 @@ type TrafficLogEntry struct {
 	SessionID   int64
 
 	// Action and result
-	Action      string // allow, deny, drop
-	SessionEnd  string // aged-out, tcp-fin, tcp-rst, etc.
+	Action     string // allow, deny, drop
+	SessionEnd string // aged-out, tcp-fin, tcp-rst, etc.
 
 	// Metrics
 	Bytes       int64
@@ -53,9 +53,9 @@ type TrafficLogEntry struct {
 	Duration    int64 // seconds
 
 	// Protocol info
-	Protocol    string
-	Category    string
-	Flags       string
+	Protocol string
+	Category string
+	Flags    string
 
 	// Additional context
 	VirtualSystem string
@@ -71,10 +71,10 @@ type ThreatLogEntry struct {
 	Subtype     string // vulnerability, virus, spyware, url, wildfire, etc.
 
 	// Source/Destination
-	SourceIP   string
-	DestIP     string
-	SourcePort int
-	DestPort   int
+	SourceIP      string
+	DestIP        string
+	SourcePort    int
+	DestPort      int
 	NATSourceIP   string
 	NATDestIP     string
 	NATSourcePort int
@@ -98,17 +98,17 @@ type ThreatLogEntry struct {
 	Direction      string // client-to-server, server-to-client
 
 	// Action
-	Action         string // alert, allow, deny, drop, reset-client, reset-server, reset-both
+	Action string // alert, allow, deny, drop, reset-client, reset-server, reset-both
 
 	// URL/File info (for url/wildfire threats)
-	URL            string
-	Filename       string
-	FileHash       string
-	ContentType    string
+	URL         string
+	Filename    string
+	FileHash    string
+	ContentType string
 
 	// Additional context
-	VirtualSystem  string
-	DeviceName     string
-	ReportID       int64
-	PCAP           string // pcap ID if captured
+	VirtualSystem string
+	DeviceName    string
+	ReportID      int64
+	PCAP          string // pcap ID if captured
 }

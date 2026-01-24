@@ -1,167 +1,252 @@
 package tui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"github.com/charmbracelet/lipgloss"
 
+	"github.com/jp2195/pyre/internal/tui/theme"
+)
+
+// Style variables - initialized by InitStyles()
 var (
-	// Colors
-	primaryColor   = lipgloss.Color("#7C3AED")
-	secondaryColor = lipgloss.Color("#10B981")
-	errorColor     = lipgloss.Color("#EF4444")
-	warningColor   = lipgloss.Color("#F59E0B")
-	mutedColor     = lipgloss.Color("#6B7280")
-	borderColor    = lipgloss.Color("#374151")
-	highlightColor = lipgloss.Color("#1F2937")
+	// Header/Footer
+	HeaderStyle lipgloss.Style
+	FooterStyle lipgloss.Style
+
+	// Status indicators
+	ConnectedStyle    lipgloss.Style
+	DisconnectedStyle lipgloss.Style
+	StatusUpStyle     lipgloss.Style
+	StatusDownStyle   lipgloss.Style
+
+	// Tables
+	TableHeaderStyle   lipgloss.Style
+	TableRowStyle      lipgloss.Style
+	TableSelectedStyle lipgloss.Style
+
+	// Panels/Boxes
+	PanelStyle      lipgloss.Style
+	PanelTitleStyle lipgloss.Style
+
+	// Input fields
+	InputStyle        lipgloss.Style
+	InputFocusedStyle lipgloss.Style
+	InputLabelStyle   lipgloss.Style
+
+	// Messages
+	ErrorStyle   lipgloss.Style
+	WarningStyle lipgloss.Style
+	SuccessStyle lipgloss.Style
+
+	// Specific elements
+	DisabledRuleStyle lipgloss.Style
+	ZeroHitStyle      lipgloss.Style
+
+	// View tabs
+	TabStyle       lipgloss.Style
+	ActiveTabStyle lipgloss.Style
+
+	// Navigation tabs
+	NavTabInactive  lipgloss.Style
+	NavTabActive    lipgloss.Style
+	NavViewLabel    lipgloss.Style
+	NavHeaderBorder lipgloss.Style
+
+	// Progress bars
+	ProgressBarStyle   lipgloss.Style
+	ProgressBarBgStyle lipgloss.Style
+
+	// Help
+	HelpKeyStyle  lipgloss.Style
+	HelpDescStyle lipgloss.Style
+
+	// Spinner
+	SpinnerStyle lipgloss.Style
+
+	// Command Palette
+	PaletteOverlayStyle  lipgloss.Style
+	PaletteModalStyle    lipgloss.Style
+	PaletteInputStyle    lipgloss.Style
+	PaletteCategoryStyle lipgloss.Style
+	PaletteItemStyle     lipgloss.Style
+	PaletteSelectedStyle lipgloss.Style
+	PaletteShortcutStyle lipgloss.Style
+	PaletteDescStyle     lipgloss.Style
+)
+
+// InitStyles initializes all styles using the current theme colors.
+// Must be called after theme.Init().
+func InitStyles() {
+	c := theme.Colors()
 
 	// Header/Footer
 	HeaderStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Background(primaryColor).
-			Padding(0, 1)
+		Bold(true).
+		Foreground(c.White).
+		Background(c.Primary).
+		Padding(0, 1)
 
 	FooterStyle = lipgloss.NewStyle().
-			Foreground(mutedColor).
-			Padding(0, 1)
+		Foreground(c.TextMuted).
+		Padding(0, 1)
 
 	// Status indicators
 	ConnectedStyle = lipgloss.NewStyle().
-			Foreground(secondaryColor).
-			Bold(true)
+		Foreground(c.Success).
+		Bold(true)
 
 	DisconnectedStyle = lipgloss.NewStyle().
-				Foreground(errorColor).
-				Bold(true)
+		Foreground(c.Error).
+		Bold(true)
 
 	StatusUpStyle = lipgloss.NewStyle().
-			Foreground(secondaryColor)
+		Foreground(c.Success)
 
 	StatusDownStyle = lipgloss.NewStyle().
-			Foreground(errorColor)
+		Foreground(c.Error)
 
 	// Tables
 	TableHeaderStyle = lipgloss.NewStyle().
-				Bold(true).
-				Foreground(lipgloss.Color("#FFFFFF")).
-				Background(lipgloss.Color("#374151")).
-				Padding(0, 1)
+		Bold(true).
+		Foreground(c.White).
+		Background(c.Border).
+		Padding(0, 1)
 
 	TableRowStyle = lipgloss.NewStyle().
-			Padding(0, 1)
+		Padding(0, 1)
 
 	TableSelectedStyle = lipgloss.NewStyle().
-				Background(highlightColor).
-				Foreground(lipgloss.Color("#FFFFFF")).
-				Padding(0, 1)
+		Background(c.BackgroundAlt).
+		Foreground(c.White).
+		Padding(0, 1)
 
 	// Panels/Boxes
 	PanelStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(borderColor).
-			Padding(1, 2)
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(c.Border).
+		Padding(1, 2)
 
 	PanelTitleStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(primaryColor).
-			MarginBottom(1)
+		Bold(true).
+		Foreground(c.Primary).
+		MarginBottom(1)
 
 	// Input fields
 	InputStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(borderColor).
-			Padding(0, 1)
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(c.Border).
+		Padding(0, 1)
 
 	InputFocusedStyle = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(primaryColor).
-				Padding(0, 1)
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(c.Primary).
+		Padding(0, 1)
 
 	InputLabelStyle = lipgloss.NewStyle().
-			Foreground(mutedColor).
-			MarginBottom(1)
+		Foreground(c.TextMuted).
+		MarginBottom(1)
 
 	// Messages
 	ErrorStyle = lipgloss.NewStyle().
-			Foreground(errorColor).
-			Bold(true)
+		Foreground(c.Error).
+		Bold(true)
 
 	WarningStyle = lipgloss.NewStyle().
-			Foreground(warningColor)
+		Foreground(c.Warning)
 
 	SuccessStyle = lipgloss.NewStyle().
-			Foreground(secondaryColor)
+		Foreground(c.Success)
 
 	// Specific elements
 	DisabledRuleStyle = lipgloss.NewStyle().
-				Foreground(mutedColor).
-				Italic(true)
+		Foreground(c.TextMuted).
+		Italic(true)
 
 	ZeroHitStyle = lipgloss.NewStyle().
-			Foreground(warningColor)
+		Foreground(c.Warning)
 
 	// View tabs
 	TabStyle = lipgloss.NewStyle().
-			Padding(0, 2)
+		Padding(0, 2)
 
 	ActiveTabStyle = lipgloss.NewStyle().
-			Padding(0, 2).
-			Bold(true).
-			Foreground(primaryColor).
-			Underline(true)
+		Padding(0, 2).
+		Bold(true).
+		Foreground(c.Primary).
+		Underline(true)
+
+	// Navigation tabs
+	NavTabInactive = lipgloss.NewStyle().
+		Foreground(c.TextMuted).
+		Padding(0, 1)
+
+	NavTabActive = lipgloss.NewStyle().
+		Foreground(c.Primary).
+		Bold(true).
+		Padding(0, 1)
+
+	NavViewLabel = lipgloss.NewStyle().
+		Foreground(c.White).
+		Bold(true)
+
+	NavHeaderBorder = lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderBottom(true).
+		BorderForeground(c.Border)
 
 	// Progress bars
 	ProgressBarStyle = lipgloss.NewStyle().
-				Foreground(primaryColor)
+		Foreground(c.Primary)
 
 	ProgressBarBgStyle = lipgloss.NewStyle().
-				Foreground(borderColor)
+		Foreground(c.Border)
 
 	// Help
 	HelpKeyStyle = lipgloss.NewStyle().
-			Foreground(primaryColor).
-			Bold(true)
+		Foreground(c.Primary).
+		Bold(true)
 
 	HelpDescStyle = lipgloss.NewStyle().
-			Foreground(mutedColor)
+		Foreground(c.TextMuted)
 
 	// Spinner
 	SpinnerStyle = lipgloss.NewStyle().
-			Foreground(primaryColor)
+		Foreground(c.Primary)
 
 	// Command Palette
 	PaletteOverlayStyle = lipgloss.NewStyle().
-				Background(lipgloss.Color("#000000"))
+		Background(c.Overlay)
 
 	PaletteModalStyle = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(primaryColor).
-				Padding(0, 1).
-				Width(60)
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(c.Primary).
+		Padding(0, 1).
+		Width(60)
 
 	PaletteInputStyle = lipgloss.NewStyle().
-				BorderStyle(lipgloss.NormalBorder()).
-				BorderBottom(true).
-				BorderForeground(primaryColor).
-				Padding(0, 0)
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderBottom(true).
+		BorderForeground(c.Primary).
+		Padding(0, 0)
 
 	PaletteCategoryStyle = lipgloss.NewStyle().
-				Foreground(mutedColor).
-				Bold(true).
-				MarginTop(1)
+		Foreground(c.TextMuted).
+		Bold(true).
+		MarginTop(1)
 
 	PaletteItemStyle = lipgloss.NewStyle().
-				Padding(0, 1)
+		Padding(0, 1)
 
 	PaletteSelectedStyle = lipgloss.NewStyle().
-				Background(primaryColor).
-				Foreground(lipgloss.Color("#FFFFFF")).
-				Padding(0, 1)
+		Background(c.Primary).
+		Foreground(c.White).
+		Padding(0, 1)
 
 	PaletteShortcutStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#9CA3AF"))
+		Foreground(c.TextLabel)
 
 	PaletteDescStyle = lipgloss.NewStyle().
-				Foreground(mutedColor)
-)
+		Foreground(c.TextMuted)
+}
 
 func RenderProgressBar(percent float64, width int) string {
 	filled := int(percent / 100 * float64(width))

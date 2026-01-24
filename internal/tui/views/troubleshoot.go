@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/joshuamontgomery/pyre/internal/troubleshoot"
+	"github.com/jp2195/pyre/internal/troubleshoot"
 )
 
 // TroubleshootMode represents the current mode of the troubleshoot view.
@@ -22,18 +22,18 @@ const (
 
 // TroubleshootModel represents the troubleshooting view.
 type TroubleshootModel struct {
-	runbooks  []*troubleshoot.Runbook
-	selected  int
-	mode      TroubleshootMode
-	result    *troubleshoot.RunbookResult
-	hasSSH    bool
-	width     int
-	height    int
+	runbooks []*troubleshoot.Runbook
+	selected int
+	mode     TroubleshootMode
+	result   *troubleshoot.RunbookResult
+	hasSSH   bool
+	width    int
+	height   int
 
 	// Running state
-	currentStep    int
-	stepStatuses   []troubleshoot.StepStatus
-	stepOutputs    []string
+	currentStep  int
+	stepStatuses []troubleshoot.StepStatus
+	stepOutputs  []string
 
 	// SSH connection state
 	sshConfigured bool // SSH settings exist in config
@@ -205,34 +205,13 @@ func (m TroubleshootModel) View() string {
 }
 
 func (m TroubleshootModel) renderList() string {
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#7C3AED")).
-		MarginBottom(1)
-
-	panelStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#374151")).
-		Padding(1, 2).
-		Width(m.width - 4)
-
-	selectedStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("#1F2937")).
-		Foreground(lipgloss.Color("#FFFFFF")).
-		Bold(true)
-
-	normalStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#FFFFFF"))
-
-	sshRequiredStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#F59E0B"))
-
-	categoryStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280")).
-		Italic(true)
-
-	descStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280"))
+	titleStyle := ViewTitleStyle.MarginBottom(1)
+	panelStyle := ViewPanelStyle.Width(m.width - 4)
+	selectedStyle := TableRowSelectedStyle.Bold(true)
+	normalStyle := DetailValueStyle
+	sshRequiredStyle := StatusWarningStyle
+	categoryStyle := DetailDimStyle.Italic(true)
+	descStyle := DetailDimStyle
 
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("Troubleshooting Runbooks"))
@@ -288,14 +267,10 @@ func (m TroubleshootModel) renderList() string {
 
 	// SSH status messages
 	if m.sshConnecting {
-		connectingStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#3B82F6"))
-		b.WriteString(connectingStyle.Render("Connecting to SSH..."))
+		b.WriteString(SeverityLowStyle.Render("Connecting to SSH..."))
 		b.WriteString("\n")
 	} else if m.sshError != nil {
-		errorStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#EF4444"))
-		b.WriteString(errorStyle.Render("SSH connection failed: " + m.sshError.Error()))
+		b.WriteString(ErrorMsgStyle.Render("SSH connection failed: " + m.sshError.Error()))
 		b.WriteString("\n")
 		b.WriteString(sshRequiredStyle.Render("Press R to retry SSH connection"))
 		b.WriteString("\n")
@@ -321,28 +296,12 @@ func (m TroubleshootModel) renderList() string {
 }
 
 func (m TroubleshootModel) renderRunning() string {
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#7C3AED")).
-		MarginBottom(1)
-
-	panelStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#374151")).
-		Padding(1, 2).
-		Width(m.width - 4)
-
-	runningStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#F59E0B"))
-
-	passedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#10B981"))
-
-	failedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#EF4444"))
-
-	pendingStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280"))
+	titleStyle := ViewTitleStyle.MarginBottom(1)
+	panelStyle := ViewPanelStyle.Width(m.width - 4)
+	runningStyle := StatusWarningStyle
+	passedStyle := StatusActiveStyle
+	failedStyle := StatusInactiveStyle
+	pendingStyle := StatusMutedStyle
 
 	var b strings.Builder
 
@@ -392,50 +351,18 @@ func (m TroubleshootModel) renderRunning() string {
 }
 
 func (m TroubleshootModel) renderResult() string {
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#7C3AED")).
-		MarginBottom(1)
-
-	panelStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#374151")).
-		Padding(1, 2).
-		Width(m.width - 4)
-
-	passedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#10B981")).
-		Bold(true)
-
-	failedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#EF4444")).
-		Bold(true)
-
-	stepPassedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#10B981"))
-
-	stepFailedStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#EF4444"))
-
-	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280"))
-
-	criticalStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#EF4444")).
-		Bold(true)
-
-	errorStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#EF4444"))
-
-	warningStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#F59E0B"))
-
-	infoStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#3B82F6"))
-
-	linkStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#60A5FA")).
-		Underline(true)
+	titleStyle := ViewTitleStyle.MarginBottom(1)
+	panelStyle := ViewPanelStyle.Width(m.width - 4)
+	passedStyle := ActionAllowStyle
+	failedStyle := ActionDenyStyle
+	stepPassedStyle := StatusActiveStyle
+	stepFailedStyle := StatusInactiveStyle
+	labelStyle := DetailLabelStyle
+	criticalStyle := SeverityCriticalStyle
+	errorStyle := ErrorMsgStyle
+	warningStyle := WarningMsgStyle
+	infoStyle := SeverityLowStyle
+	linkStyle := TagStyle.Underline(true)
 
 	var b strings.Builder
 

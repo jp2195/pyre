@@ -7,7 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/joshuamontgomery/pyre/internal/auth"
+	"github.com/jp2195/pyre/internal/auth"
 )
 
 type PickerModel struct {
@@ -74,43 +74,22 @@ func (m PickerModel) View() string {
 		return "Loading..."
 	}
 
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#7C3AED")).
-		MarginBottom(1)
-
-	panelStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#374151")).
-		Padding(1, 2)
-
-	rowStyle := lipgloss.NewStyle().
-		Padding(0, 1)
-
-	selectedStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("#1F2937")).
-		Foreground(lipgloss.Color("#FFFFFF")).
-		Padding(0, 1)
-
-	activeStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#10B981"))
-
-	helpStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6B7280")).
-		MarginTop(1)
+	titleStyle := ViewTitleStyle.MarginBottom(1)
+	panelStyle := ViewPanelStyle
+	rowStyle := TableRowNormalStyle
+	selectedStyle := TableRowSelectedStyle
+	activeStyle := StatusActiveStyle
+	helpStyle := HelpDescStyle.MarginTop(1)
 
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("Firewall Connections"))
 	b.WriteString("\n\n")
 
-	panoramaStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#A855F7"))
-
-	targetStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#60A5FA"))
+	panoramaStyle := PanoramaStyle
+	targetStyle := TagStyle
 
 	if len(m.connections) == 0 {
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Render("No connections. Press 'a' to add a new firewall."))
+		b.WriteString(EmptyMsgStyle.Render("No connections. Press 'a' to add a new firewall."))
 	} else {
 		for i, conn := range m.connections {
 			style := rowStyle
@@ -123,13 +102,13 @@ func (m PickerModel) View() string {
 				indicator = activeStyle.Render("● ")
 			}
 
-			status := lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981")).Render("connected")
+			status := StatusActiveStyle.Render("connected")
 			if !conn.Connected {
-				status = lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444")).Render("disconnected")
+				status = StatusInactiveStyle.Render("disconnected")
 			}
 
 			line := indicator + style.Render(conn.Name) + " " +
-				lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Render("("+conn.Config.Host+")")
+				DetailDimStyle.Render("("+conn.Config.Host+")")
 
 			// Add Panorama indicator with device count
 			if conn.IsPanorama {

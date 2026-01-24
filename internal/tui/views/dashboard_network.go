@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/joshuamontgomery/pyre/internal/models"
+	"github.com/jp2195/pyre/internal/models"
 )
 
 // NetworkDashboardModel represents the network-focused dashboard
@@ -106,21 +106,21 @@ func (m NetworkDashboardModel) renderSingleColumn(width int) string {
 
 func (m NetworkDashboardModel) renderTopInterfaces(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Top Interfaces by Traffic"))
+	b.WriteString(titleStyle().Render("Top Interfaces by Traffic"))
 	b.WriteString("\n")
 
 	if m.ifaceErr != nil {
-		b.WriteString(errorStyle.Render("Error: " + m.ifaceErr.Error()))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(errorStyle().Render("Error: " + m.ifaceErr.Error()))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.interfaces == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	if len(m.interfaces) == 0 {
-		b.WriteString(dimStyle.Render("No interfaces"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("No interfaces"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Sort interfaces by total bytes (descending)
@@ -146,33 +146,33 @@ func (m NetworkDashboardModel) renderTopInterfaces(width int) string {
 			continue // Skip interfaces with no traffic after top 4
 		}
 
-		stateStyle := highlightStyle
+		stateStyle := highlightStyle()
 		if iface.State != "up" {
-			stateStyle = dimStyle
+			stateStyle = dimStyle()
 		}
 
 		name := truncateEllipsis(iface.Name, nameWidth)
 		b.WriteString(fmt.Sprintf("%-*s ", nameWidth, name))
 		b.WriteString(stateStyle.Render(fmt.Sprintf("%-4s", iface.State)))
 		b.WriteString(" ")
-		b.WriteString(dimStyle.Render("In:"))
-		b.WriteString(valueStyle.Render(formatBytes(iface.BytesIn)))
-		b.WriteString(dimStyle.Render(" Out:"))
-		b.WriteString(valueStyle.Render(formatBytes(iface.BytesOut)))
+		b.WriteString(dimStyle().Render("In:"))
+		b.WriteString(valueStyle().Render(formatBytes(iface.BytesIn)))
+		b.WriteString(dimStyle().Render(" Out:"))
+		b.WriteString(valueStyle().Render(formatBytes(iface.BytesOut)))
 		b.WriteString("\n")
 	}
 
-	return panelStyle.Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
 }
 
 func (m NetworkDashboardModel) renderInterfaceErrors(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Interface Errors & Drops"))
+	b.WriteString(titleStyle().Render("Interface Errors & Drops"))
 	b.WriteString("\n")
 
 	if m.ifaceErr != nil || m.interfaces == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Find interfaces with errors or drops
@@ -184,8 +184,8 @@ func (m NetworkDashboardModel) renderInterfaceErrors(width int) string {
 	}
 
 	if len(problemIfaces) == 0 {
-		b.WriteString(highlightStyle.Render("No errors or drops detected"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(highlightStyle().Render("No errors or drops detected"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Sort by total errors/drops
@@ -208,34 +208,34 @@ func (m NetworkDashboardModel) renderInterfaceErrors(width int) string {
 		b.WriteString(fmt.Sprintf("%-*s ", nameWidth, name))
 
 		if iface.ErrorsIn > 0 || iface.ErrorsOut > 0 {
-			b.WriteString(errorStyle.Render(fmt.Sprintf("Err:%d/%d ", iface.ErrorsIn, iface.ErrorsOut)))
+			b.WriteString(errorStyle().Render(fmt.Sprintf("Err:%d/%d ", iface.ErrorsIn, iface.ErrorsOut)))
 		}
 		if iface.DropsIn > 0 || iface.DropsOut > 0 {
-			b.WriteString(warningStyle.Render(fmt.Sprintf("Drop:%d/%d", iface.DropsIn, iface.DropsOut)))
+			b.WriteString(warningStyle().Render(fmt.Sprintf("Drop:%d/%d", iface.DropsIn, iface.DropsOut)))
 		}
 		b.WriteString("\n")
 	}
 
-	return panelStyle.Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
 }
 
 func (m NetworkDashboardModel) renderARPSummary(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("ARP Table"))
+	b.WriteString(titleStyle().Render("ARP Table"))
 	b.WriteString("\n")
 
 	if m.arpErr != nil {
-		b.WriteString(dimStyle.Render("Not available"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.arpTable == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	if len(m.arpTable) == 0 {
-		b.WriteString(dimStyle.Render("Empty"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Empty"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Count by interface
@@ -249,14 +249,14 @@ func (m NetworkDashboardModel) renderARPSummary(width int) string {
 	}
 
 	// Summary
-	b.WriteString(valueStyle.Render(fmt.Sprintf("%d", len(m.arpTable))))
-	b.WriteString(dimStyle.Render(" entries ("))
-	b.WriteString(highlightStyle.Render(fmt.Sprintf("%d", completeCount)))
-	b.WriteString(dimStyle.Render(" complete)"))
+	b.WriteString(valueStyle().Render(fmt.Sprintf("%d", len(m.arpTable))))
+	b.WriteString(dimStyle().Render(" entries ("))
+	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", completeCount)))
+	b.WriteString(dimStyle().Render(" complete)"))
 	b.WriteString("\n\n")
 
 	// Per-interface breakdown
-	b.WriteString(subtitleStyle.Render("By Interface:"))
+	b.WriteString(subtitleStyle().Render("By Interface:"))
 	b.WriteString("\n")
 
 	// Sort interfaces by count
@@ -279,33 +279,33 @@ func (m NetworkDashboardModel) renderARPSummary(width int) string {
 	for i := 0; i < maxShow; i++ {
 		ic := counts[i]
 		name := truncateEllipsis(ic.name, 16)
-		b.WriteString(labelStyle.Render(fmt.Sprintf("  %-16s ", name)))
-		b.WriteString(valueStyle.Render(fmt.Sprintf("%d", ic.count)))
+		b.WriteString(labelStyle().Render(fmt.Sprintf("  %-16s ", name)))
+		b.WriteString(valueStyle().Render(fmt.Sprintf("%d", ic.count)))
 		if i < maxShow-1 {
 			b.WriteString("\n")
 		}
 	}
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m NetworkDashboardModel) renderRoutingSummary(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Routing Table"))
+	b.WriteString(titleStyle().Render("Routing Table"))
 	b.WriteString("\n")
 
 	if m.routeErr != nil {
-		b.WriteString(dimStyle.Render("Not available"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.routes == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	if len(m.routes) == 0 {
-		b.WriteString(dimStyle.Render("Empty"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Empty"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Count by protocol
@@ -319,28 +319,28 @@ func (m NetworkDashboardModel) renderRoutingSummary(width int) string {
 	}
 
 	// Total routes
-	b.WriteString(valueStyle.Render(fmt.Sprintf("%d", len(m.routes))))
-	b.WriteString(dimStyle.Render(" routes"))
+	b.WriteString(valueStyle().Render(fmt.Sprintf("%d", len(m.routes))))
+	b.WriteString(dimStyle().Render(" routes"))
 	b.WriteString("\n\n")
 
 	// By protocol breakdown
-	b.WriteString(subtitleStyle.Render("By Protocol:"))
+	b.WriteString(subtitleStyle().Render("By Protocol:"))
 	b.WriteString("\n")
 
 	protocols := []string{"connected", "static", "bgp", "ospf"}
 	for _, proto := range protocols {
 		if count, ok := protocolCounts[proto]; ok && count > 0 {
-			protoStyle := dimStyle
+			protoStyle := dimStyle()
 			switch proto {
 			case "connected":
-				protoStyle = highlightStyle
+				protoStyle = highlightStyle()
 			case "bgp":
-				protoStyle = accentStyle
+				protoStyle = accentStyle()
 			case "ospf":
-				protoStyle = warningStyle
+				protoStyle = warningStyle()
 			}
 			b.WriteString(protoStyle.Render(fmt.Sprintf("  %-12s ", proto)))
-			b.WriteString(valueStyle.Render(fmt.Sprintf("%d", count)))
+			b.WriteString(valueStyle().Render(fmt.Sprintf("%d", count)))
 			b.WriteString("\n")
 		}
 	}
@@ -355,11 +355,11 @@ func (m NetworkDashboardModel) renderRoutingSummary(width int) string {
 			}
 		}
 		if !found && count > 0 {
-			b.WriteString(dimStyle.Render(fmt.Sprintf("  %-12s ", proto)))
-			b.WriteString(valueStyle.Render(fmt.Sprintf("%d", count)))
+			b.WriteString(dimStyle().Render(fmt.Sprintf("  %-12s ", proto)))
+			b.WriteString(valueStyle().Render(fmt.Sprintf("%d", count)))
 			b.WriteString("\n")
 		}
 	}
 
-	return panelStyle.Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
 }

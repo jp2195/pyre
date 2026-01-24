@@ -6,11 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/joshuamontgomery/pyre/internal/models"
+	"github.com/jp2195/pyre/internal/models"
 )
 
 type InterfaceSortField int
@@ -23,63 +22,49 @@ const (
 )
 
 type InterfacesModel struct {
+	TableBase
 	interfaces  []models.Interface
 	filtered    []models.Interface
-	err         error
-	cursor      int
-	offset      int
-	filterMode  bool
-	filter      textinput.Model
-	expanded    bool
-	width       int
-	height      int
 	sortBy      InterfaceSortField
-	sortAsc     bool
-	loading     bool
 	lastRefresh time.Time
 }
 
 func NewInterfacesModel() InterfacesModel {
-	f := textinput.New()
-	f.Placeholder = "Filter interfaces..."
-	f.CharLimit = 100
-	f.Width = 40
-
+	base := NewTableBase("Filter interfaces...")
+	base.SortAsc = true
 	return InterfacesModel{
-		filter:  f,
-		sortAsc: true,
+		TableBase: base,
 	}
 }
 
 func (m InterfacesModel) SetSize(width, height int) InterfacesModel {
-	m.width = width
-	m.height = height
+	m.TableBase = m.TableBase.SetSize(width, height)
 	return m
 }
 
 func (m InterfacesModel) SetLoading(loading bool) InterfacesModel {
-	m.loading = loading
+	m.TableBase = m.TableBase.SetLoading(loading)
 	return m
 }
 
 func (m InterfacesModel) SetInterfaces(interfaces []models.Interface, err error) InterfacesModel {
 	m.interfaces = interfaces
-	m.err = err
-	m.loading = false
+	m.Err = err
+	m.Loading = false
 	m.lastRefresh = time.Now()
 	m.applyFilter()
-	if m.cursor >= len(m.filtered) && len(m.filtered) > 0 {
-		m.cursor = len(m.filtered) - 1
+	if m.Cursor >= len(m.filtered) && len(m.filtered) > 0 {
+		m.Cursor = len(m.filtered) - 1
 	}
 	return m
 }
 
 func (m *InterfacesModel) applyFilter() {
-	if m.filter.Value() == "" {
+	if m.FilterValue() == "" {
 		m.filtered = make([]models.Interface, len(m.interfaces))
 		copy(m.filtered, m.interfaces)
 	} else {
-		query := strings.ToLower(m.filter.Value())
+		query := strings.ToLower(m.FilterValue())
 		m.filtered = nil
 
 		for _, iface := range m.interfaces {
@@ -115,7 +100,7 @@ func (m *InterfacesModel) applySort() {
 		default:
 			less = m.filtered[i].Name < m.filtered[j].Name
 		}
-		if !m.sortAsc {
+		if !m.SortAsc {
 			less = !less
 		}
 		return less
@@ -127,91 +112,48 @@ func (m InterfacesModel) Init() tea.Cmd {
 }
 
 func (m InterfacesModel) Update(msg tea.Msg) (InterfacesModel, tea.Cmd) {
-	if m.filterMode {
+	if m.FilterMode {
 		return m.updateFilterMode(msg)
 	}
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// Handle interface-specific keys first
 		switch msg.String() {
-		case "j", "down":
-			if m.cursor < len(m.filtered)-1 {
-				m.cursor++
-				m.ensureVisible()
-			}
-		case "k", "up":
-			if m.cursor > 0 {
-				m.cursor--
-				m.ensureVisible()
-			}
-		case "g", "home":
-			m.cursor = 0
-			m.offset = 0
-		case "G", "end":
-			if len(m.filtered) > 0 {
-				m.cursor = len(m.filtered) - 1
-				m.ensureVisible()
-			}
-		case "ctrl+d", "pgdown":
-			visible := m.visibleCards()
-			m.cursor = minInt(m.cursor+visible, len(m.filtered)-1)
-			m.ensureVisible()
-		case "ctrl+u", "pgup":
-			visible := m.visibleCards()
-			m.cursor = maxInt(m.cursor-visible, 0)
-			m.ensureVisible()
-		case "/":
-			m.filterMode = true
-			m.filter.Focus()
-			return m, textinput.Blink
-		case "enter":
-			m.expanded = !m.expanded
 		case "s":
 			m.sortBy = (m.sortBy + 1) % 4
 			m.applySort()
+			return m, nil
 		case "S":
-			m.sortAsc = !m.sortAsc
+			m.SortAsc = !m.SortAsc
 			m.applySort()
+			return m, nil
+		}
+
+		// Delegate to TableBase for common navigation
+		visible := m.visibleCards()
+		base, handled, cmd := m.TableBase.HandleNavigation(msg, len(m.filtered), visible)
+		if handled {
+			m.TableBase = base
+			return m, cmd
 		}
 	}
 	return m, nil
 }
 
 func (m InterfacesModel) updateFilterMode(msg tea.Msg) (InterfacesModel, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "enter", "esc":
-			m.filterMode = false
-			m.filter.Blur()
-			if msg.String() == "enter" {
-				m.cursor = 0
-				m.offset = 0
-				m.applyFilter()
-			}
-			return m, nil
-		}
+	base, exited, cmd := m.TableBase.HandleFilterMode(msg)
+	m.TableBase = base
+	if exited {
+		m.applyFilter()
 	}
-
-	var cmd tea.Cmd
-	m.filter, cmd = m.filter.Update(msg)
 	return m, cmd
-}
-
-func (m *InterfacesModel) ensureVisible() {
-	visible := m.visibleCards()
-	if m.cursor < m.offset {
-		m.offset = m.cursor
-	}
-	if m.cursor >= m.offset+visible {
-		m.offset = m.cursor - visible + 1
-	}
 }
 
 func (m InterfacesModel) visibleCards() int {
 	cardHeight := 4
-	available := m.height - 6
-	if m.expanded {
+	available := m.Height - 6
+	if m.Expanded {
 		available -= 14 // Reserve space for detail panel
 	}
 	result := available / cardHeight
@@ -221,17 +163,15 @@ func (m InterfacesModel) visibleCards() int {
 	return result
 }
 
-// cleanValue, formatBytes, formatPackets are defined in helpers.go
-
 func (m InterfacesModel) View() string {
-	if m.width == 0 {
+	if m.Width == 0 {
 		return "Loading..."
 	}
 
 	var sections []string
 
 	// Loading banner (prominent)
-	if m.loading {
+	if m.Loading {
 		sections = append(sections, m.renderLoadingBanner())
 	}
 
@@ -239,23 +179,21 @@ func (m InterfacesModel) View() string {
 	sections = append(sections, m.renderHeader())
 
 	// Filter bar
-	if m.filterMode {
+	if m.FilterMode {
 		sections = append(sections, m.renderFilterBar())
-	} else if m.filter.Value() != "" {
-		filterInfo := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6B7280")).
-			Render(fmt.Sprintf("Filter: %s (%d/%d)  [esc to clear]", m.filter.Value(), len(m.filtered), len(m.interfaces)))
+	} else if m.IsFiltered() {
+		filterInfo := FilterInfoStyle.Render(fmt.Sprintf("Filter: %s (%d/%d)  [esc to clear]", m.FilterValue(), len(m.filtered), len(m.interfaces)))
 		sections = append(sections, filterInfo)
 	}
 
 	// Error or content
-	if m.err != nil {
+	if m.Err != nil {
 		sections = append(sections, m.renderError())
-	} else if !m.loading {
+	} else if !m.Loading {
 		sections = append(sections, m.renderCards())
 
 		// Expanded detail panel
-		if m.expanded && len(m.filtered) > 0 && m.cursor < len(m.filtered) {
+		if m.Expanded && len(m.filtered) > 0 && m.Cursor < len(m.filtered) {
 			sections = append(sections, m.renderDetailPanel())
 		}
 	}
@@ -267,15 +205,10 @@ func (m InterfacesModel) View() string {
 }
 
 func (m InterfacesModel) renderLoadingBanner() string {
-	banner := lipgloss.NewStyle().
-		Background(lipgloss.Color("#F59E0B")).
-		Foreground(lipgloss.Color("#000000")).
-		Bold(true).
-		Padding(0, 2).
-		Render(" Refreshing interfaces... ")
+	banner := LoadingBannerStyle.Render(" Refreshing interfaces... ")
 
 	// Center it
-	padding := (m.width - lipgloss.Width(banner)) / 2
+	padding := (m.Width - lipgloss.Width(banner)) / 2
 	if padding < 0 {
 		padding = 0
 	}
@@ -300,10 +233,10 @@ func (m InterfacesModel) renderHeader() string {
 		totalBytesOut += iface.BytesOut
 	}
 
-	upStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981")).Bold(true)
-	downStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444")).Bold(true)
-	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9CA3AF"))
-	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#E5E7EB"))
+	upStyle := StatusActiveStyle
+	downStyle := StatusInactiveStyle
+	labelStyle := DetailLabelStyle
+	valueStyle := DetailValueStyle
 
 	stats := []string{
 		fmt.Sprintf("%d interfaces", len(m.interfaces)),
@@ -328,7 +261,7 @@ func (m InterfacesModel) renderHeader() string {
 		right = labelStyle.Render(fmt.Sprintf("Updated %s ago", ago))
 	}
 
-	padding := m.width - lipgloss.Width(left) - lipgloss.Width(right) - 2
+	padding := m.Width - lipgloss.Width(left) - lipgloss.Width(right) - 2
 	if padding < 1 {
 		padding = 1
 	}
@@ -337,40 +270,28 @@ func (m InterfacesModel) renderHeader() string {
 }
 
 func (m InterfacesModel) renderError() string {
-	return lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#EF4444")).
-		Bold(true).
-		Padding(1, 0).
-		Render(fmt.Sprintf("Error: %v", m.err))
+	return ErrorMsgStyle.Bold(true).Padding(1, 0).Render(fmt.Sprintf("Error: %v", m.Err))
 }
 
 func (m InterfacesModel) renderFilterBar() string {
-	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#6366F1")).
-		Padding(0, 1).
-		Render(m.filter.View())
+	return FilterBorderStyle.Render(m.Filter.View())
 }
 
 func (m InterfacesModel) renderCards() string {
 	if len(m.filtered) == 0 {
-		return lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6B7280")).
-			Padding(1, 0).
-			Render("No interfaces found")
+		return EmptyMsgStyle.Padding(1, 0).Render("No interfaces found")
 	}
 
 	visible := m.visibleCards()
-	end := minInt(m.offset+visible, len(m.filtered))
+	end := minInt(m.Offset+visible, len(m.filtered))
 
 	var cards []string
-	for i := m.offset; i < end; i++ {
-		cards = append(cards, m.renderCard(m.filtered[i], i == m.cursor))
+	for i := m.Offset; i < end; i++ {
+		cards = append(cards, m.renderCard(m.filtered[i], i == m.Cursor))
 	}
 
 	if len(m.filtered) > visible {
-		dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280"))
-		scrollInfo := dimStyle.Render(fmt.Sprintf("  Showing %d-%d of %d", m.offset+1, end, len(m.filtered)))
+		scrollInfo := DetailDimStyle.Render(fmt.Sprintf("  Showing %d-%d of %d", m.Offset+1, end, len(m.filtered)))
 		cards = append(cards, scrollInfo)
 	}
 
@@ -378,23 +299,16 @@ func (m InterfacesModel) renderCards() string {
 }
 
 func (m InterfacesModel) renderCard(iface models.Interface, selected bool) string {
-	upStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981"))
-	downStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444"))
-	nameStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#E5E7EB"))
-	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9CA3AF"))
-	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#D1D5DB"))
-	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280"))
+	upStyle := StatusActiveStyle
+	downStyle := StatusInactiveStyle
+	labelStyle := DetailLabelStyle
+	valueStyle := DetailValueStyle
+	dimStyle := DetailDimStyle
 
-	borderColor := lipgloss.Color("#374151")
+	cardStyle := CardStyle.Width(m.Width - 2)
 	if selected {
-		borderColor = lipgloss.Color("#6366F1")
+		cardStyle = CardSelectedStyle.Width(m.Width - 2)
 	}
-
-	cardStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(borderColor).
-		Padding(0, 1).
-		Width(m.width - 2)
 
 	// Line 1: Status, Name, Type, Zone, Mode
 	var line1Parts []string
@@ -403,10 +317,10 @@ func (m InterfacesModel) renderCard(iface models.Interface, selected bool) strin
 	} else {
 		line1Parts = append(line1Parts, downStyle.Render("○"))
 	}
-	line1Parts = append(line1Parts, nameStyle.Render(iface.Name))
+	line1Parts = append(line1Parts, TextBoldStyle.Render(iface.Name))
 
 	if t := cleanValue(iface.Type); t != "" {
-		line1Parts = append(line1Parts, lipgloss.NewStyle().Foreground(lipgloss.Color("#A78BFA")).Render("["+t+"]"))
+		line1Parts = append(line1Parts, TagStyle.Render("["+t+"]"))
 	}
 	if z := cleanValue(iface.Zone); z != "" {
 		line1Parts = append(line1Parts, labelStyle.Render("zone:")+valueStyle.Render(z))
@@ -449,11 +363,11 @@ func (m InterfacesModel) renderCard(iface models.Interface, selected bool) strin
 			valueStyle.Render(fmt.Sprintf(" %s / %s", formatPackets(iface.PacketsIn), formatPackets(iface.PacketsOut))))
 
 		if iface.ErrorsIn > 0 || iface.ErrorsOut > 0 {
-			trafficParts = append(trafficParts, lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B")).
+			trafficParts = append(trafficParts, StatusWarningStyle.
 				Render(fmt.Sprintf("Err: %d/%d", iface.ErrorsIn, iface.ErrorsOut)))
 		}
 		if iface.DropsIn > 0 || iface.DropsOut > 0 {
-			trafficParts = append(trafficParts, lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444")).
+			trafficParts = append(trafficParts, StatusInactiveStyle.
 				Render(fmt.Sprintf("Drop: %d/%d", iface.DropsIn, iface.DropsOut)))
 		}
 		line3 = strings.Join(trafficParts, "  ")
@@ -472,26 +386,20 @@ func (m InterfacesModel) renderCard(iface models.Interface, selected bool) strin
 }
 
 func (m InterfacesModel) renderDetailPanel() string {
-	if m.cursor >= len(m.filtered) {
+	if m.Cursor >= len(m.filtered) {
 		return ""
 	}
 
-	iface := m.filtered[m.cursor]
+	iface := m.filtered[m.Cursor]
 
-	panelStyle := lipgloss.NewStyle().
-		Border(lipgloss.DoubleBorder()).
-		BorderForeground(lipgloss.Color("#6366F1")).
-		Padding(0, 2).
-		Width(m.width - 2).
-		MarginTop(1)
-
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#A78BFA"))
-	sectionStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#9CA3AF")).MarginTop(1)
-	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9CA3AF")).Width(16)
-	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F3F4F6"))
-	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280"))
-	upStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981")).Bold(true)
-	downStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444")).Bold(true)
+	panelStyle := DetailPanelStyle.Width(m.Width - 2)
+	titleStyle := ViewTitleStyle
+	sectionStyle := DetailSectionStyle
+	labelStyle := DetailLabelStyle.Width(16)
+	valueStyle := DetailValueStyle
+	dimStyle := DetailDimStyle
+	upStyle := StatusActiveStyle
+	downStyle := StatusInactiveStyle
 
 	row := func(label, value string) string {
 		v := cleanValue(value)
@@ -544,24 +452,23 @@ func (m InterfacesModel) renderDetailPanel() string {
 		lines = append(lines, labelStyle.Render("Packets Out")+valueStyle.Render(formatPackets(iface.PacketsOut)))
 
 		if iface.ErrorsIn > 0 || iface.ErrorsOut > 0 {
-			errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B"))
-			lines = append(lines, labelStyle.Render("Errors")+errStyle.Render(fmt.Sprintf("%d in / %d out", iface.ErrorsIn, iface.ErrorsOut)))
+			lines = append(lines, labelStyle.Render("Errors")+StatusWarningStyle.Render(fmt.Sprintf("%d in / %d out", iface.ErrorsIn, iface.ErrorsOut)))
 		}
 		if iface.DropsIn > 0 || iface.DropsOut > 0 {
-			dropStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444"))
-			lines = append(lines, labelStyle.Render("Drops")+dropStyle.Render(fmt.Sprintf("%d in / %d out", iface.DropsIn, iface.DropsOut)))
+			lines = append(lines, labelStyle.Render("Drops")+StatusInactiveStyle.Render(fmt.Sprintf("%d in / %d out", iface.DropsIn, iface.DropsOut)))
 		}
 	}
 
 	// Use two-column layout if wide enough
-	if m.width >= 100 {
+	if m.Width >= 100 {
 		// Split lines into two columns
 		leftLines := lines[:len(lines)/2+1]
 		rightLines := lines[len(lines)/2+1:]
 
-		colWidth := (m.width - 8) / 2
-		leftCol := lipgloss.NewStyle().Width(colWidth).Render(lipgloss.JoinVertical(lipgloss.Left, leftLines...))
-		rightCol := lipgloss.NewStyle().Width(colWidth).Render(lipgloss.JoinVertical(lipgloss.Left, rightLines...))
+		colWidth := (m.Width - 8) / 2
+		colStyle := lipgloss.NewStyle().Width(colWidth)
+		leftCol := colStyle.Render(lipgloss.JoinVertical(lipgloss.Left, leftLines...))
+		rightCol := colStyle.Render(lipgloss.JoinVertical(lipgloss.Left, rightLines...))
 
 		return panelStyle.Render(lipgloss.JoinHorizontal(lipgloss.Top, leftCol, "  ", rightCol))
 	}
@@ -570,17 +477,17 @@ func (m InterfacesModel) renderDetailPanel() string {
 }
 
 func (m InterfacesModel) renderHelp() string {
-	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#A78BFA"))
-	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280"))
+	keyStyle := HelpKeyStyle
+	descStyle := HelpDescStyle
 
 	sortNames := []string{"name", "zone", "state", "ip"}
 	sortDir := "asc"
-	if !m.sortAsc {
+	if !m.SortAsc {
 		sortDir = "desc"
 	}
 
 	expandText := "details"
-	if m.expanded {
+	if m.Expanded {
 		expandText = "collapse"
 	}
 
@@ -598,5 +505,5 @@ func (m InterfacesModel) renderHelp() string {
 		parts = append(parts, keyStyle.Render(k.key)+descStyle.Render(":"+k.desc))
 	}
 
-	return lipgloss.NewStyle().MarginTop(1).Render(strings.Join(parts, "  "))
+	return ViewSubtitleStyle.MarginTop(1).Render(strings.Join(parts, "  "))
 }

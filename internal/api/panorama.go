@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/joshuamontgomery/pyre/internal/models"
+	"github.com/jp2195/pyre/internal/models"
 )
 
 // GetManagedDevices fetches all devices managed by Panorama.

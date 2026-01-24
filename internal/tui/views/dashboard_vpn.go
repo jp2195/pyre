@@ -7,7 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/joshuamontgomery/pyre/internal/models"
+	"github.com/jp2195/pyre/internal/models"
 )
 
 // VPNDashboardModel represents the VPN-focused dashboard
@@ -96,21 +96,21 @@ func (m VPNDashboardModel) renderSingleColumn(width int) string {
 
 func (m VPNDashboardModel) renderIPSecSummary(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("IPSec VPN Status"))
+	b.WriteString(titleStyle().Render("IPSec VPN Status"))
 	b.WriteString("\n")
 
 	if m.tunnelErr != nil {
-		b.WriteString(dimStyle.Render("Not available"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.tunnels == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	if len(m.tunnels) == 0 {
-		b.WriteString(dimStyle.Render("No IPSec tunnels configured"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("No IPSec tunnels configured"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// Count up/down tunnels
@@ -129,19 +129,19 @@ func (m VPNDashboardModel) renderIPSecSummary(width int) string {
 	}
 
 	// Status indicators
-	b.WriteString(highlightStyle.Render(fmt.Sprintf("%d", upCount)))
-	b.WriteString(dimStyle.Render(" up"))
+	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", upCount)))
+	b.WriteString(dimStyle().Render(" up"))
 
 	if downCount > 0 {
-		b.WriteString(dimStyle.Render("  "))
-		b.WriteString(errorStyle.Render(fmt.Sprintf("%d", downCount)))
-		b.WriteString(dimStyle.Render(" down"))
+		b.WriteString(dimStyle().Render("  "))
+		b.WriteString(errorStyle().Render(fmt.Sprintf("%d", downCount)))
+		b.WriteString(dimStyle().Render(" down"))
 	}
 
 	if initCount > 0 {
-		b.WriteString(dimStyle.Render("  "))
-		b.WriteString(warningStyle.Render(fmt.Sprintf("%d", initCount)))
-		b.WriteString(dimStyle.Render(" init"))
+		b.WriteString(dimStyle().Render("  "))
+		b.WriteString(warningStyle().Render(fmt.Sprintf("%d", initCount)))
+		b.WriteString(dimStyle().Render(" init"))
 	}
 
 	// Visual bar
@@ -155,22 +155,22 @@ func (m VPNDashboardModel) renderIPSecSummary(width int) string {
 		b.WriteString(renderBar(upPct, barWidth, "#10B981"))
 	}
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m VPNDashboardModel) renderIPSecTunnels(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("IPSec Tunnels"))
+	b.WriteString(titleStyle().Render("IPSec Tunnels"))
 	b.WriteString("\n")
 
 	if m.tunnelErr != nil || m.tunnels == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	if len(m.tunnels) == 0 {
-		b.WriteString(dimStyle.Render("None"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("None"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	nameWidth := 20
@@ -187,34 +187,34 @@ func (m VPNDashboardModel) renderIPSecTunnels(width int) string {
 		tunnel := m.tunnels[i]
 
 		// State indicator
-		stateStyle := errorStyle
+		stateStyle := errorStyle()
 		stateIcon := "x"
 		if tunnel.State == "up" {
-			stateStyle = highlightStyle
+			stateStyle = highlightStyle()
 			stateIcon = "o"
 		} else if tunnel.State == "init" {
-			stateStyle = warningStyle
+			stateStyle = warningStyle()
 			stateIcon = "~"
 		}
 
 		name := truncateEllipsis(tunnel.Name, nameWidth)
 		b.WriteString(stateStyle.Render(stateIcon))
 		b.WriteString(" ")
-		b.WriteString(valueStyle.Render(fmt.Sprintf("%-*s ", nameWidth, name)))
+		b.WriteString(valueStyle().Render(fmt.Sprintf("%-*s ", nameWidth, name)))
 
 		// Gateway
 		if tunnel.Gateway != "" {
 			gateway := truncateEllipsis(tunnel.Gateway, 15)
-			b.WriteString(dimStyle.Render(gateway))
+			b.WriteString(dimStyle().Render(gateway))
 		}
 
 		// Traffic stats if available
 		if tunnel.BytesIn > 0 || tunnel.BytesOut > 0 {
 			b.WriteString(" ")
-			b.WriteString(dimStyle.Render("In:"))
-			b.WriteString(labelStyle.Render(formatBytes(tunnel.BytesIn)))
-			b.WriteString(dimStyle.Render(" Out:"))
-			b.WriteString(labelStyle.Render(formatBytes(tunnel.BytesOut)))
+			b.WriteString(dimStyle().Render("In:"))
+			b.WriteString(labelStyle().Render(formatBytes(tunnel.BytesIn)))
+			b.WriteString(dimStyle().Render(" Out:"))
+			b.WriteString(labelStyle().Render(formatBytes(tunnel.BytesOut)))
 		}
 
 		if i < maxShow-1 {
@@ -224,34 +224,34 @@ func (m VPNDashboardModel) renderIPSecTunnels(width int) string {
 
 	if len(m.tunnels) > maxShow {
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("... and %d more", len(m.tunnels)-maxShow)))
+		b.WriteString(dimStyle().Render(fmt.Sprintf("... and %d more", len(m.tunnels)-maxShow)))
 	}
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m VPNDashboardModel) renderGlobalProtectSummary(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("GlobalProtect Status"))
+	b.WriteString(titleStyle().Render("GlobalProtect Status"))
 	b.WriteString("\n")
 
 	if m.gpErr != nil {
-		b.WriteString(dimStyle.Render("Not available"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.gpUsers == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	if len(m.gpUsers) == 0 {
-		b.WriteString(dimStyle.Render("No active users"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("No active users"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	// User count
-	b.WriteString(highlightStyle.Render(fmt.Sprintf("%d", len(m.gpUsers))))
-	b.WriteString(dimStyle.Render(" active users"))
+	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", len(m.gpUsers))))
+	b.WriteString(dimStyle().Render(" active users"))
 
 	// Count by gateway if available
 	gatewayCounts := make(map[string]int)
@@ -265,32 +265,32 @@ func (m VPNDashboardModel) renderGlobalProtectSummary(width int) string {
 
 	if len(gatewayCounts) > 1 {
 		b.WriteString("\n\n")
-		b.WriteString(subtitleStyle.Render("By Gateway:"))
+		b.WriteString(subtitleStyle().Render("By Gateway:"))
 		b.WriteString("\n")
 		for gw, count := range gatewayCounts {
 			gwName := truncateEllipsis(gw, 20)
-			b.WriteString(labelStyle.Render(fmt.Sprintf("  %-20s ", gwName)))
-			b.WriteString(valueStyle.Render(fmt.Sprintf("%d", count)))
+			b.WriteString(labelStyle().Render(fmt.Sprintf("  %-20s ", gwName)))
+			b.WriteString(valueStyle().Render(fmt.Sprintf("%d", count)))
 			b.WriteString("\n")
 		}
 	}
 
-	return panelStyle.Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
 }
 
 func (m VPNDashboardModel) renderGlobalProtectUsers(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("GlobalProtect Users"))
+	b.WriteString(titleStyle().Render("GlobalProtect Users"))
 	b.WriteString("\n")
 
 	if m.gpErr != nil || m.gpUsers == nil {
-		b.WriteString(dimStyle.Render("Loading..."))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	if len(m.gpUsers) == 0 {
-		b.WriteString(dimStyle.Render("None"))
-		return panelStyle.Width(width).Render(b.String())
+		b.WriteString(dimStyle().Render("None"))
+		return panelStyle().Width(width).Render(b.String())
 	}
 
 	userWidth := 15
@@ -309,17 +309,17 @@ func (m VPNDashboardModel) renderGlobalProtectUsers(width int) string {
 		user := m.gpUsers[i]
 
 		username := truncateEllipsis(user.Username, userWidth)
-		b.WriteString(valueStyle.Render(fmt.Sprintf("%-*s ", userWidth, username)))
+		b.WriteString(valueStyle().Render(fmt.Sprintf("%-*s ", userWidth, username)))
 
 		if user.VirtualIP != "" {
 			vip := truncateEllipsis(user.VirtualIP, ipWidth)
-			b.WriteString(accentStyle.Render(fmt.Sprintf("%-*s ", ipWidth, vip)))
+			b.WriteString(accentStyle().Render(fmt.Sprintf("%-*s ", ipWidth, vip)))
 		}
 
 		if user.Duration != "" {
-			b.WriteString(dimStyle.Render(user.Duration))
+			b.WriteString(dimStyle().Render(user.Duration))
 		} else if !user.LoginTime.IsZero() {
-			b.WriteString(dimStyle.Render(formatTimeAgo(user.LoginTime)))
+			b.WriteString(dimStyle().Render(formatTimeAgo(user.LoginTime)))
 		}
 
 		if i < maxShow-1 {
@@ -329,8 +329,8 @@ func (m VPNDashboardModel) renderGlobalProtectUsers(width int) string {
 
 	if len(m.gpUsers) > maxShow {
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("... and %d more", len(m.gpUsers)-maxShow)))
+		b.WriteString(dimStyle().Render(fmt.Sprintf("... and %d more", len(m.gpUsers)-maxShow)))
 	}
 
-	return panelStyle.Width(width).Render(b.String())
+	return panelStyle().Width(width).Render(b.String())
 }

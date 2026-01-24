@@ -1,0 +1,42 @@
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '*.md'
+          - 'docs/**'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+
+tui:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'internal/tui/**'
+
+api:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'internal/api/**'
+
+config:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'internal/config/**'
+
+auth:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'internal/auth/**'
+
+models:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'internal/models/**'
+
+troubleshoot:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'internal/troubleshoot/**'
+
+# Note: 'dependencies' label is handled by Renovate for dependency PRs

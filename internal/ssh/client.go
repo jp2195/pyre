@@ -11,16 +11,17 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/joshuamontgomery/pyre/internal/config"
+	"github.com/jp2195/pyre/internal/config"
 )
 
 // Client represents an SSH client for connecting to PAN-OS devices.
+// Fields are ordered for optimal memory alignment on 64-bit systems.
 type Client struct {
-	host    string
-	port    int
-	config  *ssh.ClientConfig
-	client  *ssh.Client
-	timeout time.Duration
+	host    string            // 16 bytes (string header)
+	config  *ssh.ClientConfig // 8 bytes (pointer)
+	client  *ssh.Client       // 8 bytes (pointer)
+	timeout time.Duration     // 8 bytes (int64)
+	port    int               // 8 bytes (int on 64-bit)
 }
 
 // CommandResult contains the result of an SSH command execution.
