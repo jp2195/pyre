@@ -1,8 +1,18 @@
 # pyre
 
+[![Go Version](https://img.shields.io/github/go-mod/go-version/jp2195/pyre)](https://go.dev/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/jp2195/pyre)](https://github.com/jp2195/pyre/releases)
+
 A terminal user interface (TUI) for managing and monitoring Palo Alto firewalls.
 
-![pyre demo](docs/demo.gif)
+## Why pyre?
+
+The Palo Alto web interface requires clicking through multiple menus to gather basic information—checking system health, then navigating to policies, then sessions, then logs. Each view is a separate page load and context switch.
+
+pyre solves this by combining multiple API calls into unified terminal views. Get system info, HA status, resource usage, and session counts in a single dashboard. Filter policies and sessions instantly with keyboard shortcuts. No more clicking through menus to get the information you need.
+
+**Built for network engineers who want answers fast.**
 
 ## Features
 
@@ -22,12 +32,19 @@ A terminal user interface (TUI) for managing and monitoring Palo Alto firewalls.
 
 ### Download Binary
 
-Download the latest release from the [Releases](https://github.com/jp2195/pyre/releases) page.
+Download the latest release for your platform from the [Releases](https://github.com/jp2195/pyre/releases) page.
 
+**macOS/Linux:**
 ```bash
-# macOS/Linux: Make executable and move to PATH
 chmod +x pyre-darwin-arm64
 sudo mv pyre-darwin-arm64 /usr/local/bin/pyre
+```
+
+**Windows:**
+1. Download `pyre-windows-amd64.exe`
+2. Rename to `pyre.exe` and move to a directory in your PATH, or run directly:
+```powershell
+.\pyre-windows-amd64.exe --host firewall.example.com --api-key YOUR_API_KEY
 ```
 
 ### Build from Source
@@ -137,6 +154,10 @@ See [Keybindings](docs/keybindings.md) for the complete reference.
 - [Logs](docs/views/logs.md) - Log viewer
 - [Troubleshoot](docs/views/troubleshoot.md) - Diagnostic runbooks
 
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+Apache License 2.0 - see [LICENSE](LICENSE) for details.
