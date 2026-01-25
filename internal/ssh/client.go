@@ -54,7 +54,7 @@ func NewClient(host string, cfg config.SSHConfig) (*Client, error) {
 	// Try private key auth first
 	if cfg.PrivateKeyPath != "" {
 		keyPath := expandPath(cfg.PrivateKeyPath)
-		key, err := os.ReadFile(keyPath)
+		key, err := os.ReadFile(keyPath) // #nosec G304 -- Path is from user config, directory traversal not applicable
 		if err != nil {
 			return nil, fmt.Errorf("failed to read private key: %w", err)
 		}
@@ -282,7 +282,7 @@ func expandPath(path string) string {
 // Otherwise, it uses the known_hosts file for verification.
 func getHostKeyCallback(cfg config.SSHConfig) (ssh.HostKeyCallback, error) {
 	if cfg.Insecure {
-		return ssh.InsecureIgnoreHostKey(), nil //nolint:gosec // G106: InsecureIgnoreHostKey used when user explicitly disables host key verification
+		return ssh.InsecureIgnoreHostKey(), nil //nolint:gosec // #nosec G106 -- InsecureIgnoreHostKey used when user explicitly disables host key verification
 	}
 
 	// Determine known_hosts path
@@ -305,7 +305,7 @@ func getHostKeyCallback(cfg config.SSHConfig) (ssh.HostKeyCallback, error) {
 
 	// Create known_hosts file if it doesn't exist
 	if _, err := os.Stat(knownHostsPath); os.IsNotExist(err) {
-		f, err := os.OpenFile(knownHostsPath, os.O_CREATE|os.O_WRONLY, 0600)
+		f, err := os.OpenFile(knownHostsPath, os.O_CREATE|os.O_WRONLY, 0600) // #nosec G304 -- Path is user's .ssh directory or from config
 		if err != nil {
 			return nil, fmt.Errorf("creating known_hosts file: %w", err)
 		}
@@ -344,7 +344,7 @@ func getHostKeyCallback(cfg config.SSHConfig) (ssh.HostKeyCallback, error) {
 
 // addHostKey appends a host key to the known_hosts file.
 func addHostKey(knownHostsPath, hostname string, remote net.Addr, key ssh.PublicKey) error {
-	f, err := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY, 0600)
+	f, err := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY, 0600) // #nosec G304 -- Path is user's .ssh directory or from config
 	if err != nil {
 		return err
 	}

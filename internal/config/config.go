@@ -61,7 +61,7 @@ func Load() (*Config, error) {
 	}
 
 	configPath := filepath.Join(homeDir, ".pyre.yaml")
-	data, err := os.ReadFile(configPath)
+	data, err := os.ReadFile(configPath) // #nosec G304 -- Path is constructed from user's home directory
 	if err != nil {
 		if os.IsNotExist(err) {
 			return cfg, nil

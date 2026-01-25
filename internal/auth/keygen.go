@@ -33,7 +33,7 @@ func GenerateAPIKey(ctx context.Context, host, username, password string, insecu
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure}, //nolint:gosec // G402: InsecureSkipVerify required for self-signed firewall certificates when user enables --insecure
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure}, //nolint:gosec // #nosec G402 -- InsecureSkipVerify required for self-signed firewall certificates when user enables --insecure
 		},
 	}
 
