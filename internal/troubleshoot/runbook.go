@@ -48,8 +48,8 @@ type Step struct {
 	Name        string    `yaml:"name"`
 	Description string    `yaml:"description"`
 	Type        StepType  `yaml:"type"`
-	Command     string    `yaml:"command"`   // For SSH steps
-	APICall     string    `yaml:"api_call"`  // For API steps
+	Command     string    `yaml:"command"`  // For SSH steps
+	APICall     string    `yaml:"api_call"` // For API steps
 	Patterns    []Pattern `yaml:"patterns"`
 	Required    bool      `yaml:"required"` // Stop on failure?
 }

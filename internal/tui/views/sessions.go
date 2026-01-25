@@ -143,7 +143,7 @@ func (m SessionsModel) Update(msg tea.Msg) (SessionsModel, tea.Cmd) {
 
 		// Delegate to TableBase for common navigation
 		visible := m.visibleRows()
-		base, handled, cmd := m.TableBase.HandleNavigation(msg, len(m.filtered), visible)
+		base, handled, cmd := m.HandleNavigation(msg, len(m.filtered), visible)
 		if handled {
 			m.TableBase = base
 			return m, cmd
@@ -154,7 +154,7 @@ func (m SessionsModel) Update(msg tea.Msg) (SessionsModel, tea.Cmd) {
 }
 
 func (m SessionsModel) updateFilter(msg tea.Msg) (SessionsModel, tea.Cmd) {
-	base, exited, cmd := m.TableBase.HandleFilterMode(msg)
+	base, exited, cmd := m.HandleFilterMode(msg)
 	m.TableBase = base
 	if exited {
 		m.applyFilter()

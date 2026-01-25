@@ -2,6 +2,7 @@ package tui
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/jp2195/pyre/internal/tui/views"
 )
 
@@ -76,13 +77,6 @@ func (m Model) navigateToCurrentItem() (tea.Model, tea.Cmd) {
 		cmd = m.fetchLogs()
 
 	// Tools group
-	case "troubleshoot":
-		m.currentView = ViewTroubleshoot
-		m.updateTroubleshootSSH()
-		conn := m.session.GetActiveConnection()
-		if conn != nil && conn.HasSSH() && conn.SSHClient == nil {
-			cmd = m.connectSSH(conn)
-		}
 	case "config":
 		m.currentView = ViewDashboard
 		m.currentDashboard = views.DashboardConfig
@@ -122,8 +116,6 @@ func (m *Model) syncNavbarToCurrentView() {
 		m.navbar = m.navbar.SetActiveByID("analyze", "interfaces")
 	case ViewLogs:
 		m.navbar = m.navbar.SetActiveByID("analyze", "logs")
-	case ViewTroubleshoot:
-		m.navbar = m.navbar.SetActiveByID("tools", "troubleshoot")
 	case ViewPicker:
 		m.navbar = m.navbar.SetActiveByID("connections", "picker")
 	}

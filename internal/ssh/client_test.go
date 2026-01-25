@@ -78,8 +78,8 @@ func TestClientWithMockServer(t *testing.T) {
 
 	server.SetDefaultResponses()
 
-	if err := server.Start(); err != nil {
-		t.Fatalf("Failed to start mock server: %v", err)
+	if startErr := server.Start(); startErr != nil {
+		t.Fatalf("Failed to start mock server: %v", startErr)
 	}
 	defer server.Close()
 
@@ -99,8 +99,8 @@ func TestClientWithMockServer(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := client.Connect(ctx); err != nil {
-		t.Fatalf("Failed to connect: %v", err)
+	if connErr := client.Connect(ctx); connErr != nil {
+		t.Fatalf("Failed to connect: %v", connErr)
 	}
 
 	if !client.IsConnected() {
@@ -334,8 +334,8 @@ func TestMockSSHServerCustomResponse(t *testing.T) {
 
 	server.SetResponse("custom-command", "custom-response\n")
 
-	if err := server.Start(); err != nil {
-		t.Fatalf("Failed to start mock server: %v", err)
+	if startErr := server.Start(); startErr != nil {
+		t.Fatalf("Failed to start mock server: %v", startErr)
 	}
 	defer server.Close()
 
@@ -354,8 +354,8 @@ func TestMockSSHServerCustomResponse(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := client.Connect(ctx); err != nil {
-		t.Fatalf("Failed to connect: %v", err)
+	if connErr := client.Connect(ctx); connErr != nil {
+		t.Fatalf("Failed to connect: %v", connErr)
 	}
 
 	result, err := client.Execute(ctx, "custom-command")
@@ -373,8 +373,8 @@ func TestMockSSHServerAddress(t *testing.T) {
 		t.Fatalf("Failed to create mock server: %v", err)
 	}
 
-	if err := server.Start(); err != nil {
-		t.Fatalf("Failed to start mock server: %v", err)
+	if startErr := server.Start(); startErr != nil {
+		t.Fatalf("Failed to start mock server: %v", startErr)
 	}
 	defer server.Close()
 
@@ -403,8 +403,8 @@ func TestExecuteContextCancellation(t *testing.T) {
 	// Set up a slow command response
 	server.SetResponse("sleep-command", "started\n")
 
-	if err := server.Start(); err != nil {
-		t.Fatalf("Failed to start mock server: %v", err)
+	if startErr := server.Start(); startErr != nil {
+		t.Fatalf("Failed to start mock server: %v", startErr)
 	}
 	defer server.Close()
 
@@ -424,8 +424,8 @@ func TestExecuteContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := client.Connect(ctx); err != nil {
-		t.Fatalf("Failed to connect: %v", err)
+	if connErr := client.Connect(ctx); connErr != nil {
+		t.Fatalf("Failed to connect: %v", connErr)
 	}
 
 	// Create a context that we'll cancel
@@ -466,8 +466,8 @@ func TestExecuteWithAlreadyCancelledContext(t *testing.T) {
 
 	server.SetDefaultResponses()
 
-	if err := server.Start(); err != nil {
-		t.Fatalf("Failed to start mock server: %v", err)
+	if startErr := server.Start(); startErr != nil {
+		t.Fatalf("Failed to start mock server: %v", startErr)
 	}
 	defer server.Close()
 
@@ -487,8 +487,8 @@ func TestExecuteWithAlreadyCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := client.Connect(ctx); err != nil {
-		t.Fatalf("Failed to connect: %v", err)
+	if connErr := client.Connect(ctx); connErr != nil {
+		t.Fatalf("Failed to connect: %v", connErr)
 	}
 
 	// Create an already-cancelled context

@@ -2,7 +2,6 @@ package tui
 
 import (
 	"github.com/jp2195/pyre/internal/models"
-	"github.com/jp2195/pyre/internal/troubleshoot"
 	"github.com/jp2195/pyre/internal/tui/views"
 )
 
@@ -77,7 +76,8 @@ type LoginSuccessMsg struct {
 	Name     string
 	APIKey   string
 	Username string
-	Password string
+	Insecure bool
+	// Password is intentionally not included - credentials should not persist in messages.
 }
 
 type LoginErrorMsg struct {
@@ -90,17 +90,6 @@ type ErrorMsg struct {
 	Err error
 }
 
-type TroubleshootResultMsg struct {
-	Result *troubleshoot.RunbookResult
-	Err    error
-}
-
-type TroubleshootStepMsg struct {
-	StepIndex int
-	Status    troubleshoot.StepStatus
-	Output    string
-}
-
 type ManagedDevicesMsg struct {
 	Devices []models.ManagedDevice
 	Err     error
@@ -109,15 +98,6 @@ type ManagedDevicesMsg struct {
 type PanoramaDetectedMsg struct {
 	IsPanorama bool
 	Model      string
-}
-
-type SSHConnectedMsg struct {
-	ConnectionName string
-}
-
-type SSHErrorMsg struct {
-	ConnectionName string
-	Err            error
 }
 
 type SystemLogsMsg struct {
@@ -163,6 +143,7 @@ type DiskUsageMsg struct {
 	Err   error
 }
 
+//nolint:misspell // "environmentals" is the PAN-OS XML API tag name
 type EnvironmentalsMsg struct {
 	Environmentals []models.Environmental
 	Err            error

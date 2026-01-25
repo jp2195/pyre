@@ -153,10 +153,13 @@ func TestLoginModel_Update(t *testing.T) {
 
 	// Type in host field
 	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")}
-	m, _ = m.Update(msg)
+	updated, _ := m.Update(msg)
 
 	// The input should have processed the key
-	// (Actual value depends on textinput implementation)
+	// Verify the update returned a valid model
+	if updated.View() == "" {
+		t.Error("expected non-empty view after update")
+	}
 }
 
 func TestLoginModel_View(t *testing.T) {

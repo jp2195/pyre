@@ -66,7 +66,7 @@ func (s *MockSSHServer) Start() error {
 	}
 
 	s.listener = listener
-	addr := listener.Addr().(*net.TCPAddr)
+	addr := listener.Addr().(*net.TCPAddr) //nolint:errcheck // known type
 	s.host = addr.IP.String()
 	s.port = addr.Port
 
@@ -116,20 +116,20 @@ func (s *MockSSHServer) acceptLoop() {
 }
 
 func (s *MockSSHServer) handleConnection(netConn net.Conn) {
-	defer netConn.Close()
+	defer func() { _ = netConn.Close() }() //nolint:errcheck // test helper
 
 	sshConn, chans, reqs, err := ssh.NewServerConn(netConn, s.config)
 	if err != nil {
 		return
 	}
-	defer sshConn.Close()
+	defer func() { _ = sshConn.Close() }() //nolint:errcheck // test helper
 
 	// Discard out-of-band requests
 	go ssh.DiscardRequests(reqs)
 
 	for newChannel := range chans {
 		if newChannel.ChannelType() != "session" {
-			newChannel.Reject(ssh.UnknownChannelType, "unknown channel type")
+			_ = newChannel.Reject(ssh.UnknownChannelType, "unknown channel type") //nolint:errcheck // test helper
 			continue
 		}
 
@@ -143,43 +143,43 @@ func (s *MockSSHServer) handleConnection(netConn net.Conn) {
 }
 
 func (s *MockSSHServer) handleChannel(channel ssh.Channel, requests <-chan *ssh.Request) {
-	defer channel.Close()
+	defer func() { _ = channel.Close() }() //nolint:errcheck // test helper
 
 	for req := range requests {
 		switch req.Type {
 		case "exec":
 			if len(req.Payload) < 4 {
-				req.Reply(false, nil)
+				_ = req.Reply(false, nil) //nolint:errcheck // test helper
 				continue
 			}
 
 			// Extract command from payload (length-prefixed string)
 			cmdLen := int(req.Payload[0])<<24 | int(req.Payload[1])<<16 | int(req.Payload[2])<<8 | int(req.Payload[3])
 			if len(req.Payload) < 4+cmdLen {
-				req.Reply(false, nil)
+				_ = req.Reply(false, nil) //nolint:errcheck // test helper
 				continue
 			}
 			cmd := string(req.Payload[4 : 4+cmdLen])
 
-			req.Reply(true, nil)
+			_ = req.Reply(true, nil) //nolint:errcheck // test helper
 
 			response := s.getResponse(cmd)
-			io.WriteString(channel, response)
+			_, _ = io.WriteString(channel, response) //nolint:errcheck // test helper
 
 			// Send exit status
-			channel.SendRequest("exit-status", false, []byte{0, 0, 0, 0})
+			_, _ = channel.SendRequest("exit-status", false, []byte{0, 0, 0, 0}) //nolint:errcheck // test helper
 
 			// Close stdout to signal command completion
-			channel.CloseWrite()
+			_ = channel.CloseWrite() //nolint:errcheck // test helper
 			return
 
 		case "shell":
-			req.Reply(true, nil)
+			_ = req.Reply(true, nil) //nolint:errcheck // test helper
 			// For shell requests, just close the channel
 			return
 
 		default:
-			req.Reply(false, nil)
+			_ = req.Reply(false, nil) //nolint:errcheck // test helper
 		}
 	}
 }

@@ -276,11 +276,14 @@ func (m SecurityDashboardModel) renderZeroHitRules(width int) string {
 		rule := zeroHitRules[i]
 		name := truncateEllipsis(rule.Name, nameWidth)
 
-		actionStyle := dimStyle()
-		if rule.Action == "allow" {
+		var actionStyle lipgloss.Style
+		switch rule.Action {
+		case "allow":
 			actionStyle = highlightStyle()
-		} else if rule.Action == "deny" || rule.Action == "drop" {
+		case "deny", "drop":
 			actionStyle = errorStyle()
+		default:
+			actionStyle = dimStyle()
 		}
 
 		b.WriteString(labelStyle().Render(fmt.Sprintf("%3d. ", rule.Position)))
@@ -343,11 +346,14 @@ func (m SecurityDashboardModel) renderMostHitRules(width int) string {
 
 		name := truncateEllipsis(rule.Name, nameWidth)
 
-		actionStyle := dimStyle()
-		if rule.Action == "allow" {
+		var actionStyle lipgloss.Style
+		switch rule.Action {
+		case "allow":
 			actionStyle = highlightStyle()
-		} else if rule.Action == "deny" || rule.Action == "drop" {
+		case "deny", "drop":
 			actionStyle = errorStyle()
+		default:
+			actionStyle = dimStyle()
 		}
 
 		b.WriteString(valueStyle().Render(fmt.Sprintf("%-*s ", nameWidth, name)))

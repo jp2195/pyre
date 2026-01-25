@@ -1,38 +1,35 @@
 package tui
 
 import (
-	"context"
-	"fmt"
-	"time"
-
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/jp2195/pyre/internal/api"
 	"github.com/jp2195/pyre/internal/auth"
-	"github.com/jp2195/pyre/internal/troubleshoot"
 	"github.com/jp2195/pyre/internal/tui/views"
 )
 
 func (m Model) doLogin() tea.Cmd {
 	ctx := m.ctx
+	host := m.login.Host()
+	username := m.login.Username()
+	password := m.login.Password()
+	insecure := m.login.Insecure()
+
 	return func() tea.Msg {
-		result, err := auth.GenerateAPIKey(
-			ctx,
-			m.login.Host(),
-			m.login.Username(),
-			m.login.Password(),
-			true,
-		)
+		result, err := auth.GenerateAPIKey(ctx, host, username, password, insecure)
 		if err != nil {
 			return LoginErrorMsg{Err: err}
 		}
 		if result.Error != nil {
 			return LoginErrorMsg{Err: result.Error}
 		}
+
+		// Password is now out of scope and will be garbage collected
 		return LoginSuccessMsg{
-			Name:     m.login.Host(),
+			Name:     host,
 			APIKey:   result.APIKey,
-			Username: m.login.Username(),
-			Password: m.login.Password(),
+			Username: username,
+			Insecure: insecure,
 		}
 	}
 }
@@ -248,6 +245,7 @@ func (m Model) fetchDiskUsage(conn *auth.Connection) tea.Cmd {
 	}
 }
 
+//nolint:misspell // "environmentals" is the PAN-OS XML API tag name
 func (m Model) fetchEnvironmentals(conn *auth.Connection) tea.Cmd {
 	ctx := m.ctx
 	return func() tea.Msg {
@@ -404,48 +402,4 @@ func (m Model) refreshCurrentView() tea.Cmd {
 		return m.fetchLogs()
 	}
 	return nil
-}
-
-func (m *Model) updateTroubleshootSSH() tea.Cmd {
-	conn := m.session.GetActiveConnection()
-	sshConfigured := conn != nil && conn.HasSSH()
-	hasSSH := conn != nil && conn.SSHEnabled && conn.SSHClient != nil
-	m.troubleshoot = m.troubleshoot.SetSSHConfigured(sshConfigured)
-	m.troubleshoot = m.troubleshoot.SetSSHAvailable(hasSSH)
-	return nil
-}
-
-func (m Model) connectSSH(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		if !conn.HasSSH() {
-			return nil
-		}
-		// Use a timeout derived from the app context
-		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-
-		if err := conn.ConnectSSH(ctx); err != nil {
-			return SSHErrorMsg{ConnectionName: conn.Name, Err: err}
-		}
-		return SSHConnectedMsg{ConnectionName: conn.Name}
-	}
-}
-
-func (m Model) runTroubleshoot(runbook *troubleshoot.Runbook) tea.Cmd {
-	conn := m.session.GetActiveConnection()
-	if conn == nil {
-		return func() tea.Msg {
-			return TroubleshootResultMsg{Err: fmt.Errorf("no active connection")}
-		}
-	}
-
-	// Create engine with current connections
-	engine := troubleshoot.NewEngine(conn.Client, conn.SSHClient, m.tsRegistry)
-	ctx := m.ctx
-
-	return func() tea.Msg {
-		result, err := engine.RunRunbook(ctx, runbook)
-		return TroubleshootResultMsg{Result: result, Err: err}
-	}
 }

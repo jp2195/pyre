@@ -318,7 +318,7 @@ func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
 
 		// Delegate to TableBase for common navigation
 		visible := m.visibleRows()
-		base, handled, cmd := m.TableBase.HandleNavigation(msg, m.filteredCount(), visible)
+		base, handled, cmd := m.HandleNavigation(msg, m.filteredCount(), visible)
 		if handled {
 			m.TableBase = base
 			return m, cmd
@@ -681,7 +681,14 @@ func (m LogsModel) renderSystemDetail(log models.SystemLogEntry) string {
 	panelStyle := DetailPanelStyle.Width(m.Width - 2)
 	labelStyle := DetailLabelStyle.Width(12)
 
-	var lines []string
+	// Word wrap the description for better readability
+	descWidth := m.Width - 10
+	if descWidth > 100 {
+		descWidth = 100
+	}
+	wrapped := wrapText(log.Description, descWidth)
+
+	lines := make([]string, 0, 7+len(wrapped))
 	lines = append(lines, ViewTitleStyle.Render("System Log Details"))
 	lines = append(lines, "")
 	lines = append(lines, labelStyle.Render("Time")+DetailValueStyle.Render(log.Time.Format("2006-01-02 15:04:05")))
@@ -690,12 +697,6 @@ func (m LogsModel) renderSystemDetail(log models.SystemLogEntry) string {
 	lines = append(lines, "")
 	lines = append(lines, ViewTitleStyle.Render("Message"))
 
-	// Word wrap the description for better readability
-	descWidth := m.Width - 10
-	if descWidth > 100 {
-		descWidth = 100
-	}
-	wrapped := wrapText(log.Description, descWidth)
 	for _, line := range wrapped {
 		lines = append(lines, DetailValueStyle.Render(line))
 	}
@@ -819,7 +820,7 @@ func (m LogsModel) renderHelp() string {
 		{"r", "refresh"},
 	}
 
-	var parts []string
+	parts := make([]string, 0, len(keys))
 	for _, k := range keys {
 		parts = append(parts, HelpKeyStyle.Render(k.key)+HelpDescStyle.Render(":"+k.desc))
 	}

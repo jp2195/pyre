@@ -408,6 +408,9 @@ func TestStepResult_Fields(t *testing.T) {
 	if stepResult.Duration != 100*time.Millisecond {
 		t.Errorf("expected duration 100ms, got %v", stepResult.Duration)
 	}
+	if stepResult.Error != nil {
+		t.Errorf("expected nil error, got %v", stepResult.Error)
+	}
 	if len(stepResult.Matches) != 1 {
 		t.Errorf("expected 1 match, got %d", len(stepResult.Matches))
 	}
@@ -429,8 +432,26 @@ func TestIssue_Fields(t *testing.T) {
 	if issue.StepID != "step1" {
 		t.Errorf("expected StepID 'step1', got %q", issue.StepID)
 	}
+	if issue.StepName != "Step Name" {
+		t.Errorf("expected StepName 'Step Name', got %q", issue.StepName)
+	}
+	if issue.PatternID != "pattern1" {
+		t.Errorf("expected PatternID 'pattern1', got %q", issue.PatternID)
+	}
+	if issue.PatternName != "Pattern Name" {
+		t.Errorf("expected PatternName 'Pattern Name', got %q", issue.PatternName)
+	}
 	if issue.Severity != SeverityError {
 		t.Errorf("expected severity Error, got %s", issue.Severity)
+	}
+	if issue.Message != "Error message" {
+		t.Errorf("expected Message 'Error message', got %q", issue.Message)
+	}
+	if issue.MatchedText != "matched text" {
+		t.Errorf("expected MatchedText 'matched text', got %q", issue.MatchedText)
+	}
+	if issue.Remediation != "Fix it like this" {
+		t.Errorf("expected Remediation 'Fix it like this', got %q", issue.Remediation)
 	}
 	if len(issue.KBArticles) != 2 {
 		t.Errorf("expected 2 KB articles, got %d", len(issue.KBArticles))

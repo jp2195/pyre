@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -12,14 +13,17 @@ type Config struct {
 	DefaultFirewall string                    `yaml:"default_firewall"`
 	Firewalls       map[string]FirewallConfig `yaml:"firewalls"`
 	Settings        Settings                  `yaml:"settings"`
+	Warnings        []string                  `yaml:"-"` // Security warnings from config validation
 }
 
 type SSHConfig struct {
-	Port           int    `yaml:"port"`             // Default: 22
+	Port           int    `yaml:"port"` // Default: 22
 	Username       string `yaml:"username"`
-	Password       string `yaml:"password"`         // Or use key
+	Password       string `yaml:"password,omitempty"` // Deprecated: use env vars instead
 	PrivateKeyPath string `yaml:"private_key_path"`
 	Timeout        int    `yaml:"timeout"`          // Seconds, default: 30
+	KnownHostsPath string `yaml:"known_hosts_path"` // Default: ~/.ssh/known_hosts
+	Insecure       bool   `yaml:"insecure"`         // Skip host key verification (not recommended)
 }
 
 type FirewallConfig struct {
@@ -57,7 +61,7 @@ func Load() (*Config, error) {
 	}
 
 	configPath := filepath.Join(homeDir, ".pyre.yaml")
-	data, err := os.ReadFile(configPath)
+	data, err := os.ReadFile(configPath) // #nosec G304 -- Path is constructed from user's home directory
 	if err != nil {
 		if os.IsNotExist(err) {
 			return cfg, nil
@@ -127,5 +131,20 @@ func LoadWithFlags(flags CLIFlags) (*Config, error) {
 	}
 
 	cfg.ApplyFlags(flags)
+	cfg.validateSecuritySettings()
 	return cfg, nil
+}
+
+// validateSecuritySettings checks for deprecated or insecure configuration settings
+// and adds warnings to the config.
+func (c *Config) validateSecuritySettings() {
+	for name, fw := range c.Firewalls {
+		// Warn about SSH password in config file (deprecated)
+		if fw.SSH.Password != "" {
+			c.Warnings = append(c.Warnings, fmt.Sprintf(
+				"SECURITY WARNING: Firewall %q has SSH password in config file. "+
+					"Use PYRE_SSH_PASSWORD or PYRE_%s_SSH_PASSWORD environment variable instead.",
+				name, name))
+		}
+	}
 }

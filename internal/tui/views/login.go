@@ -26,6 +26,7 @@ type LoginModel struct {
 	err           error
 	width         int
 	height        int
+	insecure      bool
 }
 
 func NewLoginModel(creds *auth.Credentials) LoginModel {
@@ -54,6 +55,7 @@ func NewLoginModel(creds *auth.Credentials) LoginModel {
 		usernameInput: username,
 		passwordInput: password,
 		focusedField:  fieldHost,
+		insecure:      creds.Insecure,
 	}
 
 	if creds.Host != "" {
@@ -106,6 +108,17 @@ func (m LoginModel) Username() string {
 
 func (m LoginModel) Password() string {
 	return m.passwordInput.Value()
+}
+
+func (m LoginModel) Insecure() bool {
+	return m.insecure
+}
+
+// ClearPassword clears the password from memory after successful login.
+// This is a security measure to minimize the time credentials are in memory.
+func (m LoginModel) ClearPassword() LoginModel {
+	m.passwordInput.SetValue("")
+	return m
 }
 
 func (m LoginModel) CanSubmit() bool {

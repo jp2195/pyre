@@ -149,7 +149,7 @@ func (m NATPoliciesModel) Update(msg tea.Msg) (NATPoliciesModel, tea.Cmd) {
 
 		// Delegate to TableBase for common navigation
 		visible := m.visibleRows()
-		base, handled, cmd := m.TableBase.HandleNavigation(msg, len(m.filtered), visible)
+		base, handled, cmd := m.HandleNavigation(msg, len(m.filtered), visible)
 		if handled {
 			m.TableBase = base
 			return m, cmd
@@ -160,7 +160,7 @@ func (m NATPoliciesModel) Update(msg tea.Msg) (NATPoliciesModel, tea.Cmd) {
 }
 
 func (m NATPoliciesModel) updateFilter(msg tea.Msg) (NATPoliciesModel, tea.Cmd) {
-	base, exited, cmd := m.TableBase.HandleFilterMode(msg)
+	base, exited, cmd := m.HandleFilterMode(msg)
 	m.TableBase = base
 	if exited {
 		m.applyFilter()

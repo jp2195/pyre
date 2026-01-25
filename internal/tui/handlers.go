@@ -3,6 +3,7 @@ package tui
 import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/jp2195/pyre/internal/auth"
 	"github.com/jp2195/pyre/internal/tui/views"
 )
@@ -71,7 +72,10 @@ func (m Model) handleDevicePickerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		conn := m.session.GetActiveConnection()
 		if conn != nil {
 			device := m.devicePicker.SelectedDevice()
-			conn.SetTarget(device)
+			if err := conn.SetTarget(device); err != nil {
+				m.err = err
+				return m, nil
+			}
 			m.currentView = ViewDashboard
 			return m, m.fetchCurrentDashboardData()
 		}
@@ -183,13 +187,6 @@ func (m Model) buildCommandRegistry() []views.Command {
 
 		// Tools - diagnostic and config
 		{
-			ID:          "tools-troubleshoot",
-			Label:       "Troubleshoot",
-			Description: "Diagnostic runbooks",
-			Category:    "Tools",
-			Action:      func() tea.Msg { return SwitchViewMsg{ViewTroubleshoot} },
-		},
-		{
 			ID:          "tools-config",
 			Label:       "Config",
 			Description: "Rules, pending changes",
@@ -263,27 +260,6 @@ func (m Model) handleViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.sessions, cmd = m.sessions.Update(msg)
 	case ViewInterfaces:
 		m.interfaces, cmd = m.interfaces.Update(msg)
-	case ViewTroubleshoot:
-		// Handle 'R' to retry SSH connection
-		if msg.String() == "R" && m.troubleshoot.Mode() == views.TroubleshootModeList {
-			conn := m.session.GetActiveConnection()
-			if conn != nil && conn.HasSSH() {
-				conn.DisconnectSSH()
-				m.troubleshoot = m.troubleshoot.SetSSHConnecting(true)
-				m.troubleshoot = m.troubleshoot.SetSSHError(nil)
-				return m, m.connectSSH(conn)
-			}
-		}
-		// Handle Enter to run runbook
-		if msg.String() == "enter" && m.troubleshoot.Mode() == views.TroubleshootModeList {
-			runbook := m.troubleshoot.Selected()
-			if runbook != nil {
-				m.loading = true
-				m.troubleshoot = m.troubleshoot.SetRunning(runbook)
-				return m, m.runTroubleshoot(runbook)
-			}
-		}
-		m.troubleshoot, cmd = m.troubleshoot.Update(msg)
 	case ViewLogs:
 		m.logs, cmd = m.logs.Update(msg)
 	}

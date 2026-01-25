@@ -41,7 +41,7 @@ func TestConcurrentSetActiveFirewall(t *testing.T) {
 		// Verify final state is valid
 		conn := session.GetActiveConnection()
 		if conn == nil {
-			t.Error("expected active connection after concurrent operations")
+			t.Fatal("expected active connection after concurrent operations")
 		}
 
 		// The active firewall should be one of the valid ones

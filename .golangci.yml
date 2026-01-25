@@ -51,8 +51,9 @@ linters:
       - path: _test\.go
         text: "unused-parameter"
 
-    max-issues-per-linter: 50
-    max-same-issues: 10
+issues:
+  max-issues-per-linter: 50
+  max-same-issues: 10
 
 formatters:
   enable:

@@ -184,15 +184,18 @@ func TestTableBase_HandleNavigation(t *testing.T) {
 			tb := NewTableBase("")
 			tb.Cursor = tt.cursor
 
-			msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(tt.key)}
-			if tt.key == "down" {
+			var msg tea.KeyMsg
+			switch tt.key {
+			case "down":
 				msg = tea.KeyMsg{Type: tea.KeyDown}
-			} else if tt.key == "up" {
+			case "up":
 				msg = tea.KeyMsg{Type: tea.KeyUp}
-			} else if tt.key == "home" {
+			case "home":
 				msg = tea.KeyMsg{Type: tea.KeyHome}
-			} else if tt.key == "end" {
+			case "end":
 				msg = tea.KeyMsg{Type: tea.KeyEnd}
+			default:
+				msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(tt.key)}
 			}
 
 			result, handled, _ := tb.HandleNavigation(msg, tt.itemCount, tt.visibleRows)

@@ -50,7 +50,7 @@ type DashboardModel struct {
 	licenses       []models.LicenseInfo
 	jobs           []models.Job
 	diskUsage      []models.DiskUsage
-	environmentals []models.Environmental
+	environmentals []models.Environmental //nolint:misspell // "environmentals" is the PAN-OS XML API tag name
 	certificates   []models.Certificate
 	natPools       []models.NATPoolInfo
 
@@ -195,12 +195,12 @@ func (m DashboardModel) View() string {
 	}
 
 	// Add disk usage panel to left column (health metric)
-	if m.diskUsage != nil && len(m.diskUsage) > 0 {
+	if len(m.diskUsage) > 0 {
 		leftPanels = append(leftPanels, m.renderDiskUsage(leftColWidth))
 	}
 
 	// Add hardware status panel to left column (health metric)
-	if m.environmentals != nil && len(m.environmentals) > 0 {
+	if len(m.environmentals) > 0 { //nolint:misspell // "environmentals" is the PAN-OS XML API tag name
 		leftPanels = append(leftPanels, m.renderEnvironmentals(leftColWidth))
 	}
 
@@ -216,7 +216,7 @@ func (m DashboardModel) View() string {
 	}
 
 	// NAT Pool Utilization (NEW)
-	if m.natPools != nil && len(m.natPools) > 0 {
+	if len(m.natPools) > 0 {
 		rightPanels = append(rightPanels, m.renderNATPoolUtilization(rightColWidth))
 	}
 
@@ -224,7 +224,7 @@ func (m DashboardModel) View() string {
 	rightPanels = append(rightPanels, m.renderContentVersions(rightColWidth))
 
 	// Licenses
-	if m.licenses != nil && len(m.licenses) > 0 {
+	if len(m.licenses) > 0 {
 		rightPanels = append(rightPanels, m.renderLicenses(rightColWidth))
 	}
 
@@ -234,7 +234,7 @@ func (m DashboardModel) View() string {
 	}
 
 	// Admins Online
-	if m.admins != nil && len(m.admins) > 0 {
+	if len(m.admins) > 0 {
 		rightPanels = append(rightPanels, m.renderLoggedInAdmins(rightColWidth))
 	}
 
@@ -244,12 +244,12 @@ func (m DashboardModel) View() string {
 	}
 
 	// Recent Jobs
-	if m.jobs != nil && len(m.jobs) > 0 {
+	if len(m.jobs) > 0 {
 		rightPanels = append(rightPanels, m.renderJobs(rightColWidth))
 	}
 
 	// Certificates (expiring/expired)
-	if m.certificates != nil && len(m.certificates) > 0 {
+	if len(m.certificates) > 0 {
 		rightPanels = append(rightPanels, m.renderCertificates(rightColWidth))
 	}
 
@@ -266,12 +266,12 @@ func (m DashboardModel) renderSingleColumn(width int) string {
 	}
 
 	// Disk usage (health)
-	if m.diskUsage != nil && len(m.diskUsage) > 0 {
+	if len(m.diskUsage) > 0 {
 		panels = append(panels, m.renderDiskUsage(width))
 	}
 
 	// Hardware status (health)
-	if m.environmentals != nil && len(m.environmentals) > 0 {
+	if len(m.environmentals) > 0 { //nolint:misspell // "environmentals" is the PAN-OS XML API tag name
 		panels = append(panels, m.renderEnvironmentals(width))
 	}
 
@@ -281,19 +281,19 @@ func (m DashboardModel) renderSingleColumn(width int) string {
 	}
 
 	// NAT Pool Utilization
-	if m.natPools != nil && len(m.natPools) > 0 {
+	if len(m.natPools) > 0 {
 		panels = append(panels, m.renderNATPoolUtilization(width))
 	}
 
-	if m.licenses != nil && len(m.licenses) > 0 {
+	if len(m.licenses) > 0 {
 		panels = append(panels, m.renderLicenses(width))
 	}
 
-	if m.jobs != nil && len(m.jobs) > 0 {
+	if len(m.jobs) > 0 {
 		panels = append(panels, m.renderJobs(width))
 	}
 
-	if m.certificates != nil && len(m.certificates) > 0 {
+	if len(m.certificates) > 0 {
 		panels = append(panels, m.renderCertificates(width))
 	}
 
@@ -1139,120 +1139,7 @@ func (m DashboardModel) renderNATPoolUtilization(width int) string {
 	return panelStyle().Width(width).Render(b.String())
 }
 
-func (m DashboardModel) renderInterfaces(width int) string {
-	var b strings.Builder
-	b.WriteString(titleStyle().Render("Network Interfaces"))
-	b.WriteString("\n\n")
-
-	if m.ifaceErr != nil {
-		b.WriteString(errorStyle().Render("Error: " + m.ifaceErr.Error()))
-		return panelStyle().Width(width).Render(b.String())
-	}
-	if m.interfaces == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
-		return panelStyle().Width(width).Render(b.String())
-	}
-
-	if len(m.interfaces) == 0 {
-		b.WriteString(dimStyle().Render("No interfaces configured"))
-		return panelStyle().Width(width).Render(b.String())
-	}
-
-	// Calculate column widths based on available space
-	availWidth := width - 8
-	nameW := 16
-	stateW := 6
-	zoneW := 12
-	ipW := availWidth - nameW - stateW - zoneW - 6
-
-	if ipW < 10 {
-		ipW = 15
-	}
-
-	// Header
-	headerStyle := DetailLabelStyle.Bold(true)
-
-	header := fmt.Sprintf("%-*s %-*s %-*s %-*s",
-		nameW, "Interface",
-		stateW, "State",
-		zoneW, "Zone",
-		ipW, "IP Address")
-	b.WriteString(headerStyle.Render(header))
-	b.WriteString("\n")
-	b.WriteString(dimStyle().Render(strings.Repeat("─", minInt(availWidth, len(header)))))
-	b.WriteString("\n")
-
-	// Show interfaces, prioritizing those with IPs
-	maxRows := 8
-	shown := 0
-	upWithIP := []models.Interface{}
-	upNoIP := []models.Interface{}
-	downIfaces := []models.Interface{}
-
-	for _, iface := range m.interfaces {
-		if iface.State == "up" {
-			if iface.IP != "" {
-				upWithIP = append(upWithIP, iface)
-			} else {
-				upNoIP = append(upNoIP, iface)
-			}
-		} else {
-			downIfaces = append(downIfaces, iface)
-		}
-	}
-
-	// Display order: up with IP, up without IP, down
-	displayOrder := append(upWithIP, upNoIP...)
-	displayOrder = append(displayOrder, downIfaces...)
-
-	for _, iface := range displayOrder {
-		if shown >= maxRows {
-			break
-		}
-
-		stateStr := "up"
-		stStyle := highlightStyle()
-		if iface.State != "up" {
-			stateStr = "down"
-			stStyle = dimStyle()
-		}
-
-		zone := iface.Zone
-		if zone == "" {
-			zone = "-"
-		}
-
-		ip := iface.IP
-		if ip == "" {
-			ip = "-"
-		}
-
-		row := fmt.Sprintf("%-*s %s %-*s %-*s",
-			nameW, truncateDash(iface.Name, nameW),
-			stStyle.Render(fmt.Sprintf("%-*s", stateW, stateStr)),
-			zoneW, truncateDash(zone, zoneW),
-			ipW, truncateDash(ip, ipW))
-		b.WriteString(row)
-		b.WriteString("\n")
-		shown++
-	}
-
-	if len(m.interfaces) > maxRows {
-		remaining := len(m.interfaces) - maxRows
-		b.WriteString(dimStyle().Render(fmt.Sprintf("... and %d more", remaining)))
-	}
-
-	return panelStyle().Width(width).Render(b.String())
-}
-
 // Helper functions
-
-func formatRow(label, value string, labelWidth int) string {
-	if value == "" {
-		return ""
-	}
-	return labelStyle().Width(labelWidth).Render(label+":") + " " + valueStyle().Render(value) + "\n"
-}
 
 func renderBar(percent float64, width int, color string) string {
 	if percent < 0 {
@@ -1308,10 +1195,6 @@ func formatThroughput(kbps int64) string {
 		return fmt.Sprintf("%.1f Mbps", float64(kbps)/1_000)
 	}
 	return fmt.Sprintf("%d Kbps", kbps)
-}
-
-func truncateDash(s string, maxLen int) string {
-	return truncateEllipsis(s, maxLen)
 }
 
 func formatTimeAgo(t time.Time) string {

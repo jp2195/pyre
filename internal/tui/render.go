@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+
 	"github.com/jp2195/pyre/internal/tui/views"
 )
 
@@ -98,8 +99,6 @@ func (m Model) currentViewName() string {
 		return "Sessions"
 	case ViewInterfaces:
 		return "Interfaces"
-	case ViewTroubleshoot:
-		return "Troubleshoot"
 	case ViewLogs:
 		return "Logs"
 	case ViewPicker:

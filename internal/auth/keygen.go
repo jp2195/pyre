@@ -33,26 +33,28 @@ func GenerateAPIKey(ctx context.Context, host, username, password string, insecu
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure}, //nolint:gosec // #nosec G402 -- InsecureSkipVerify required for self-signed firewall certificates when user enables --insecure
 		},
 	}
 
-	params := url.Values{}
-	params.Set("type", "keygen")
-	params.Set("user", username)
-	params.Set("password", password)
+	// Use POST with form body to keep credentials out of URLs/logs
+	reqURL := fmt.Sprintf("https://%s/api/", host)
+	formData := url.Values{}
+	formData.Set("type", "keygen")
+	formData.Set("user", username)
+	formData.Set("password", password)
 
-	reqURL := fmt.Sprintf("https://%s/api/?%s", host, params.Encode())
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, strings.NewReader(formData.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("creating keygen request: %w", err)
 	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("keygen request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }() //nolint:errcheck // best effort cleanup
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

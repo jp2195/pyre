@@ -22,7 +22,7 @@ func main() {
 	var (
 		host       = flag.String("host", "", "Firewall hostname or IP address")
 		apiKey     = flag.String("api-key", "", "API key for authentication")
-		insecure   = flag.Bool("insecure", true, "Skip TLS certificate verification")
+		insecure   = flag.Bool("insecure", false, "Skip TLS certificate verification (for self-signed certs)")
 		configPath = flag.String("config", "", "Path to config file (default: ~/.pyre.yaml)")
 		showHelp   = flag.Bool("help", false, "Show help message")
 		showVer    = flag.Bool("version", false, "Show version")

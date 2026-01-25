@@ -8,12 +8,12 @@ import (
 )
 
 type MockPANOS struct {
-	Server      *httptest.Server
-	Hostname    string
-	Model       string
-	Serial      string
-	Version     string
-	IsPanorama  bool
+	Server     *httptest.Server
+	Hostname   string
+	Model      string
+	Serial     string
+	Version    string
+	IsPanorama bool
 }
 
 func NewMockPANOS() *MockPANOS {
@@ -57,7 +57,16 @@ func (m *MockPANOS) Host() string {
 }
 
 func (m *MockPANOS) handleAPI(w http.ResponseWriter, r *http.Request) {
+	// Parse form for POST requests (keygen uses POST with form body)
+	if r.Method == http.MethodPost {
+		_ = r.ParseForm() //nolint:errcheck // test helper
+	}
+
+	// Get type from query string or form
 	apiType := r.URL.Query().Get("type")
+	if apiType == "" {
+		apiType = r.FormValue("type")
+	}
 	cmd := r.URL.Query().Get("cmd")
 
 	w.Header().Set("Content-Type", "application/xml")
@@ -70,18 +79,25 @@ func (m *MockPANOS) handleAPI(w http.ResponseWriter, r *http.Request) {
 	case "config":
 		m.handleConfig(w, r)
 	default:
-		w.Write([]byte(`<response status="error"><msg><line>Invalid request</line></msg></response>`))
+		_, _ = w.Write([]byte(`<response status="error"><msg><line>Invalid request</line></msg></response>`)) //nolint:errcheck // test helper
 	}
 }
 
 func (m *MockPANOS) handleKeygen(w http.ResponseWriter, r *http.Request) {
+	// Get user/password from query string or form (POST uses form body)
 	user := r.URL.Query().Get("user")
+	if user == "" {
+		user = r.FormValue("user")
+	}
 	password := r.URL.Query().Get("password")
+	if password == "" {
+		password = r.FormValue("password")
+	}
 
 	if user == "admin" && password == "admin" {
-		w.Write([]byte(`<response status="success"><result><key>LUFRPT1234567890abcdef==</key></result></response>`))
+		_, _ = w.Write([]byte(`<response status="success"><result><key>LUFRPT1234567890abcdef==</key></result></response>`)) //nolint:errcheck // test helper
 	} else {
-		w.Write([]byte(`<response status="error"><msg><line>Invalid credentials</line></msg></response>`))
+		_, _ = w.Write([]byte(`<response status="error"><msg><line>Invalid credentials</line></msg></response>`)) //nolint:errcheck // test helper
 	}
 }
 
@@ -110,7 +126,7 @@ func (m *MockPANOS) handleOp(w http.ResponseWriter, r *http.Request, cmd string)
 	case strings.Contains(cmd, "<show><devices><all>"):
 		m.respondManagedDevices(w)
 	default:
-		w.Write([]byte(`<response status="success"><result></result></response>`))
+		_, _ = w.Write([]byte(`<response status="success"><result></result></response>`)) //nolint:errcheck // test helper
 	}
 }
 
@@ -120,12 +136,13 @@ func (m *MockPANOS) handleConfig(w http.ResponseWriter, r *http.Request) {
 	if strings.Contains(xpath, "security/rules") {
 		m.respondSecurityRules(w)
 	} else {
-		w.Write([]byte(`<response status="success"><result></result></response>`))
+		_, _ = w.Write([]byte(`<response status="success"><result></result></response>`)) //nolint:errcheck // test helper
 	}
 }
 
+//nolint:errcheck // test helper
 func (m *MockPANOS) respondSystemInfo(w http.ResponseWriter) {
-	fmt.Fprintf(w, `<response status="success">
+	_, _ = fmt.Fprintf(w, `<response status="success">
 <result>
 <system>
 <hostname>%s</hostname>
@@ -142,7 +159,8 @@ func (m *MockPANOS) respondSystemInfo(w http.ResponseWriter) {
 }
 
 func (m *MockPANOS) respondResources(w http.ResponseWriter) {
-	w.Write([]byte(`<response status="success">
+	//nolint:errcheck // test helper
+	_, _ = w.Write([]byte(`<response status="success">
 <result>
 top - 14:32:18 up 15 days,  3:42,  0 users,  load average: 0.45, 0.52, 0.48
 Tasks: 150 total,   1 running, 149 sleeping,   0 stopped,   0 zombie
@@ -153,7 +171,8 @@ KiB Mem:  16384000 total, 12288000 used,  4096000 free,   256000 buffers
 }
 
 func (m *MockPANOS) respondSessionInfo(w http.ResponseWriter) {
-	w.Write([]byte(`<response status="success">
+	//nolint:errcheck // test helper
+	_, _ = w.Write([]byte(`<response status="success">
 <result>
 <num-active>15432</num-active>
 <num-max>262144</num-max>
@@ -164,7 +183,8 @@ func (m *MockPANOS) respondSessionInfo(w http.ResponseWriter) {
 }
 
 func (m *MockPANOS) respondSessions(w http.ResponseWriter) {
-	w.Write([]byte(`<response status="success">
+	//nolint:errcheck // test helper
+	_, _ = w.Write([]byte(`<response status="success">
 <result>
 <entry>
 <idx>12345</idx>
@@ -228,7 +248,8 @@ func (m *MockPANOS) respondSessions(w http.ResponseWriter) {
 }
 
 func (m *MockPANOS) respondHAStatus(w http.ResponseWriter) {
-	w.Write([]byte(`<response status="success">
+	//nolint:errcheck // test helper
+	_, _ = w.Write([]byte(`<response status="success">
 <result>
 <enabled>yes</enabled>
 <group>
@@ -246,7 +267,8 @@ func (m *MockPANOS) respondHAStatus(w http.ResponseWriter) {
 }
 
 func (m *MockPANOS) respondInterfaces(w http.ResponseWriter) {
-	w.Write([]byte(`<response status="success">
+	//nolint:errcheck // test helper
+	_, _ = w.Write([]byte(`<response status="success">
 <result>
 <ifnet>
 <entry>
@@ -313,7 +335,8 @@ func (m *MockPANOS) respondInterfaces(w http.ResponseWriter) {
 }
 
 func (m *MockPANOS) respondSecurityRules(w http.ResponseWriter) {
-	w.Write([]byte(`<response status="success">
+	//nolint:errcheck // test helper
+	_, _ = w.Write([]byte(`<response status="success">
 <result>
 <entry name="allow-outbound">
 <disabled>no</disabled>
@@ -364,7 +387,8 @@ func (m *MockPANOS) respondSecurityRules(w http.ResponseWriter) {
 }
 
 func (m *MockPANOS) respondRuleHitCount(w http.ResponseWriter) {
-	w.Write([]byte(`<response status="success">
+	//nolint:errcheck // test helper
+	_, _ = w.Write([]byte(`<response status="success">
 <result>
 <rule-hit-count>
 <vsys>
@@ -399,7 +423,8 @@ func (m *MockPANOS) respondRuleHitCount(w http.ResponseWriter) {
 }
 
 func (m *MockPANOS) respondThreatCounters(w http.ResponseWriter) {
-	w.Write([]byte(`<response status="success">
+	//nolint:errcheck // test helper
+	_, _ = w.Write([]byte(`<response status="success">
 <result>
 <global>
 <counters>
@@ -442,7 +467,8 @@ func (m *MockPANOS) respondThreatCounters(w http.ResponseWriter) {
 }
 
 func (m *MockPANOS) respondGlobalProtect(w http.ResponseWriter) {
-	w.Write([]byte(`<response status="success">
+	//nolint:errcheck // test helper
+	_, _ = w.Write([]byte(`<response status="success">
 <result>
 <entry>
 <username>jsmith</username>
@@ -473,7 +499,8 @@ func (m *MockPANOS) respondGlobalProtect(w http.ResponseWriter) {
 }
 
 func (m *MockPANOS) respondLicenseInfo(w http.ResponseWriter) {
-	w.Write([]byte(`<response status="success">
+	//nolint:errcheck // test helper
+	_, _ = w.Write([]byte(`<response status="success">
 <result>
 <licenses>
 <entry>
@@ -507,10 +534,11 @@ func (m *MockPANOS) respondLicenseInfo(w http.ResponseWriter) {
 
 func (m *MockPANOS) respondManagedDevices(w http.ResponseWriter) {
 	if !m.IsPanorama {
-		w.Write([]byte(`<response status="error"><msg><line>Command not available on this device</line></msg></response>`))
+		_, _ = w.Write([]byte(`<response status="error"><msg><line>Command not available on this device</line></msg></response>`)) //nolint:errcheck // test helper
 		return
 	}
-	w.Write([]byte(`<response status="success">
+	//nolint:errcheck // test helper
+	_, _ = w.Write([]byte(`<response status="success">
 <result>
 <devices>
 <entry name="007200001001">

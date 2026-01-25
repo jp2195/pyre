@@ -158,7 +158,7 @@ func (m PoliciesModel) Update(msg tea.Msg) (PoliciesModel, tea.Cmd) {
 
 		// Delegate to TableBase for common navigation
 		visible := m.visibleRows()
-		base, handled, cmd := m.TableBase.HandleNavigation(msg, len(m.filtered), visible)
+		base, handled, cmd := m.HandleNavigation(msg, len(m.filtered), visible)
 		if handled {
 			m.TableBase = base
 			return m, cmd
@@ -169,7 +169,7 @@ func (m PoliciesModel) Update(msg tea.Msg) (PoliciesModel, tea.Cmd) {
 }
 
 func (m PoliciesModel) updateFilter(msg tea.Msg) (PoliciesModel, tea.Cmd) {
-	base, exited, cmd := m.TableBase.HandleFilterMode(msg)
+	base, exited, cmd := m.HandleFilterMode(msg)
 	m.TableBase = base
 	if exited {
 		m.applyFilter()
@@ -393,7 +393,7 @@ func (m PoliciesModel) renderDetail(p models.SecurityRule) string {
 	b.WriteString("\n")
 	b.WriteString(labelStyle.Render("Source Zones:") + " " + valueStyle.Render(formatListFull(p.SourceZones)) + "\n")
 	b.WriteString(labelStyle.Render("Source Addr:") + " " + formatAddresses(p.Sources, p.NegateSource, valueStyle, dimValueStyle) + "\n")
-	if len(p.SourceUsers) > 0 && !(len(p.SourceUsers) == 1 && p.SourceUsers[0] == "any") {
+	if len(p.SourceUsers) > 0 && (len(p.SourceUsers) != 1 || p.SourceUsers[0] != "any") {
 		b.WriteString(labelStyle.Render("Source Users:") + " " + valueStyle.Render(formatListFull(p.SourceUsers)) + "\n")
 	}
 	b.WriteString(labelStyle.Render("Dest Zones:") + " " + valueStyle.Render(formatListFull(p.DestZones)) + "\n")
@@ -405,7 +405,7 @@ func (m PoliciesModel) renderDetail(p models.SecurityRule) string {
 	b.WriteString("\n")
 	b.WriteString(labelStyle.Render("Applications:") + " " + valueStyle.Render(formatListFull(p.Applications)) + "\n")
 	b.WriteString(labelStyle.Render("Services:") + " " + valueStyle.Render(formatListFull(p.Services)) + "\n")
-	if len(p.URLCategories) > 0 && !(len(p.URLCategories) == 1 && p.URLCategories[0] == "any") {
+	if len(p.URLCategories) > 0 && (len(p.URLCategories) != 1 || p.URLCategories[0] != "any") {
 		b.WriteString(labelStyle.Render("URL Categories:") + " " + valueStyle.Render(formatListFull(p.URLCategories)) + "\n")
 	}
 
