@@ -264,7 +264,7 @@ func (m NetworkDashboardModel) renderARPSummary(width int) string {
 		name  string
 		count int
 	}
-	var counts []ifaceCount
+	counts := make([]ifaceCount, 0, len(ifaceCounts))
 	for name, count := range ifaceCounts {
 		counts = append(counts, ifaceCount{name, count})
 	}
