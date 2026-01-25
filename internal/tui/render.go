@@ -98,8 +98,6 @@ func (m Model) currentViewName() string {
 		return "Sessions"
 	case ViewInterfaces:
 		return "Interfaces"
-	case ViewTroubleshoot:
-		return "Troubleshoot"
 	case ViewLogs:
 		return "Logs"
 	case ViewPicker:

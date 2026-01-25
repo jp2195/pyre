@@ -44,9 +44,6 @@ func NewClient(host, apiKey string, opts ...ClientOption) *Client {
 		apiKey:  apiKey,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			},
 		},
 	}
 
@@ -104,8 +101,6 @@ func (c *Client) GetTarget() string {
 }
 
 func (c *Client) request(ctx context.Context, params url.Values) (*XMLResponse, error) {
-	params.Set("key", c.apiKey)
-
 	// Inject target parameter for Panorama routing
 	if c.targetSerial != "" {
 		params.Set("target", c.targetSerial)
@@ -116,6 +111,10 @@ func (c *Client) request(ctx context.Context, params url.Values) (*XMLResponse, 
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
+
+	// Use X-PAN-KEY header instead of query parameter (PAN-OS 8.0+)
+	// This prevents API key from appearing in server/proxy logs
+	req.Header.Set("X-PAN-KEY", c.apiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

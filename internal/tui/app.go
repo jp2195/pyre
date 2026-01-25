@@ -11,7 +11,6 @@ import (
 
 	"github.com/jp2195/pyre/internal/auth"
 	"github.com/jp2195/pyre/internal/config"
-	"github.com/jp2195/pyre/internal/troubleshoot"
 	"github.com/jp2195/pyre/internal/tui/views"
 )
 
@@ -24,7 +23,6 @@ const (
 	ViewNATPolicies
 	ViewSessions
 	ViewInterfaces
-	ViewTroubleshoot
 	ViewLogs
 	ViewPicker
 	ViewDevicePicker
@@ -61,16 +59,11 @@ type Model struct {
 	natPolicies       views.NATPoliciesModel
 	sessions          views.SessionsModel
 	interfaces        views.InterfacesModel
-	troubleshoot      views.TroubleshootModel
 	logs              views.LogsModel
 	picker            views.PickerModel
 	devicePicker      views.DevicePickerModel
 	commandPalette    views.CommandPaletteModel
 	previousView      ViewState // Track previous view for Esc to return
-
-	// Troubleshooting
-	tsRegistry *troubleshoot.Registry
-	tsEngine   *troubleshoot.Engine
 }
 
 func NewModel(cfg *config.Config, creds *auth.Credentials) Model {
@@ -93,7 +86,7 @@ func NewModel(cfg *config.Config, creds *auth.Credentials) Model {
 	}
 
 	if creds.HasAPIKey() && creds.HasHost() {
-		// Look up full firewall config by host to get SSH settings
+		// Look up full firewall config by host
 		var fwConfig *config.FirewallConfig
 		var connName string
 		for name, fw := range cfg.Firewalls {
@@ -126,16 +119,10 @@ func NewModel(cfg *config.Config, creds *auth.Credentials) Model {
 	m.natPolicies = views.NewNATPoliciesModel()
 	m.sessions = views.NewSessionsModel()
 	m.interfaces = views.NewInterfacesModel()
-	m.troubleshoot = views.NewTroubleshootModel()
 	m.logs = views.NewLogsModel()
 	m.picker = views.NewPickerModel(session)
 	m.devicePicker = views.NewDevicePickerModel()
 	m.commandPalette = views.NewCommandPaletteModel()
-
-	// Initialize troubleshooting registry
-	m.tsRegistry = troubleshoot.NewRegistry()
-	m.tsRegistry.LoadEmbedded()
-	m.troubleshoot = m.troubleshoot.SetRunbooks(m.tsRegistry.List())
 
 	return m
 }
@@ -175,7 +162,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.natPolicies = m.natPolicies.SetSize(msg.Width, contentHeight)
 		m.sessions = m.sessions.SetSize(msg.Width, contentHeight)
 		m.interfaces = m.interfaces.SetSize(msg.Width, contentHeight)
-		m.troubleshoot = m.troubleshoot.SetSize(msg.Width, contentHeight)
 		m.logs = m.logs.SetSize(msg.Width, contentHeight)
 		m.picker = m.picker.SetSize(msg.Width, contentHeight)
 		m.devicePicker = m.devicePicker.SetSize(msg.Width, contentHeight)
@@ -296,7 +282,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case LoginSuccessMsg:
 		m.loading = false
-		// Look up full firewall config by host to get SSH settings
+		// Clear password from login model immediately after success
+		m.login = m.login.ClearPassword()
+
+		// Look up full firewall config by host
 		var fwConfig *config.FirewallConfig
 		var connName string
 		loginHost := m.login.Host()
@@ -311,12 +300,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if fwConfig == nil {
 			fwConfig = &config.FirewallConfig{
 				Host:     loginHost,
-				Insecure: true,
+				Insecure: m.login.Insecure(),
 			}
 			connName = msg.Name
 		}
-		// Pass login credentials for SSH reuse
-		conn := m.session.AddConnectionWithSSH(connName, fwConfig, msg.APIKey, msg.Username, msg.Password)
+		conn := m.session.AddConnection(connName, fwConfig, msg.APIKey)
 		m.currentView = ViewDashboard
 		cmds = append(cmds, m.fetchCurrentDashboardData(), m.detectPanorama(conn))
 
@@ -368,13 +356,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SessionsMsg:
 		m.sessions = m.sessions.SetSessions(msg.Sessions, msg.Err)
 
-	case TroubleshootResultMsg:
-		m.loading = false
-		m.troubleshoot = m.troubleshoot.SetResult(msg.Result, msg.Err)
-
-	case TroubleshootStepMsg:
-		m.troubleshoot = m.troubleshoot.UpdateStepProgress(msg.StepIndex, msg.Status, msg.Output)
-
 	case PanoramaDetectedMsg:
 		conn := m.session.GetActiveConnection()
 		if conn != nil {
@@ -389,16 +370,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if conn != nil && msg.Err == nil {
 			conn.ManagedDevices = msg.Devices
 		}
-
-	case SSHConnectedMsg:
-		m.troubleshoot = m.troubleshoot.SetSSHConnecting(false)
-		m.troubleshoot = m.troubleshoot.SetSSHAvailable(true)
-		m.troubleshoot = m.troubleshoot.SetSSHError(nil)
-
-	case SSHErrorMsg:
-		m.troubleshoot = m.troubleshoot.SetSSHConnecting(false)
-		m.troubleshoot = m.troubleshoot.SetSSHAvailable(false)
-		m.troubleshoot = m.troubleshoot.SetSSHError(msg.Err)
 
 	case SystemLogsMsg:
 		m.logs = m.logs.SetSystemLogs(msg.Logs, msg.Err)
@@ -431,15 +402,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.fetchSessions()
 		case ViewInterfaces:
 			return m, m.fetchInterfaces()
-		case ViewTroubleshoot:
-			conn := m.session.GetActiveConnection()
-			sshConfigured := conn != nil && conn.HasSSH()
-			m.troubleshoot = m.troubleshoot.SetSSHConfigured(sshConfigured)
-			if sshConfigured && !conn.SSHEnabled {
-				m.troubleshoot = m.troubleshoot.SetSSHConnecting(true)
-				return m, m.connectSSH(conn)
-			}
-			return m, m.updateTroubleshootSSH()
 		case ViewLogs:
 			m.logs = m.logs.SetLoading(true)
 			return m, m.fetchLogs()
@@ -559,9 +521,6 @@ func (m Model) View() string {
 
 	case ViewInterfaces:
 		content = m.interfaces.View()
-
-	case ViewTroubleshoot:
-		content = m.troubleshoot.View()
 
 	case ViewLogs:
 		content = m.logs.View()

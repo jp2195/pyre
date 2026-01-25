@@ -64,16 +64,15 @@ func TestSession_AddConnectionWithSSH(t *testing.T) {
 		Insecure: true,
 	}
 
-	conn := session.AddConnectionWithSSH("test-fw", fwConfig, "test-api-key", "admin", "password123")
+	// Note: SSH client is passed directly (established during login)
+	// Password is no longer stored - SSH must be established while credentials are in memory
+	conn := session.AddConnectionWithSSH("test-fw", fwConfig, "test-api-key", "admin", nil)
 
 	if conn == nil {
 		t.Fatal("expected non-nil connection")
 	}
 	if conn.SSHUsername != "admin" {
 		t.Errorf("expected SSH username 'admin', got %q", conn.SSHUsername)
-	}
-	if conn.SSHPassword != "password123" {
-		t.Errorf("expected SSH password 'password123', got %q", conn.SSHPassword)
 	}
 }
 
@@ -453,7 +452,6 @@ func TestConnection_getSSHConfig(t *testing.T) {
 			},
 		},
 		SSHUsername: "login-admin",
-		SSHPassword: "login-pass",
 	}
 
 	cfg := conn.getSSHConfig()
@@ -472,6 +470,10 @@ func TestConnection_getSSHConfig(t *testing.T) {
 }
 
 func TestConnection_getSSHConfig_LoginFallback(t *testing.T) {
+	// Set SSH password env var for this test
+	os.Setenv("PYRE_SSH_PASSWORD", "env-pass")
+	defer os.Unsetenv("PYRE_SSH_PASSWORD")
+
 	conn := &Connection{
 		Name: "test-fw",
 		Config: &config.FirewallConfig{
@@ -481,17 +483,17 @@ func TestConnection_getSSHConfig_LoginFallback(t *testing.T) {
 			},
 		},
 		SSHUsername: "login-admin",
-		SSHPassword: "login-pass",
 	}
 
 	cfg := conn.getSSHConfig()
 
-	// Should fall back to login credentials
+	// Should fall back to login username
 	if cfg.Username != "login-admin" {
 		t.Errorf("expected Username 'login-admin', got %q", cfg.Username)
 	}
-	if cfg.Password != "login-pass" {
-		t.Errorf("expected Password 'login-pass', got %q", cfg.Password)
+	// Password should come from env var
+	if cfg.Password != "env-pass" {
+		t.Errorf("expected Password 'env-pass', got %q", cfg.Password)
 	}
 }
 
@@ -500,12 +502,11 @@ func TestConnection_getSSHConfig_NilConfig(t *testing.T) {
 		Name:        "test-fw",
 		Config:      nil,
 		SSHUsername: "login-admin",
-		SSHPassword: "login-pass",
 	}
 
 	cfg := conn.getSSHConfig()
 
-	// Should use login credentials
+	// Should use login username
 	if cfg.Username != "login-admin" {
 		t.Errorf("expected Username 'login-admin', got %q", cfg.Username)
 	}

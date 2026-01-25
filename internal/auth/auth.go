@@ -2,7 +2,10 @@ package auth
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -11,6 +14,9 @@ import (
 	"github.com/jp2195/pyre/internal/models"
 	"github.com/jp2195/pyre/internal/ssh"
 )
+
+// serialPattern validates Palo Alto device serial numbers (alphanumeric, typically 12-15 chars)
+var serialPattern = regexp.MustCompile(`^[A-Za-z0-9]{8,20}$`)
 
 type Session struct {
 	mu             sync.RWMutex
@@ -28,9 +34,8 @@ type Connection struct {
 	Connected  bool
 	SSHEnabled bool
 
-	// SSH credentials from login (reused for SSH connection)
+	// SSH username from login (password must come from env var for security)
 	SSHUsername string
-	SSHPassword string
 
 	// Panorama fields
 	IsPanorama     bool
@@ -66,10 +71,13 @@ func (s *Session) SetActiveFirewall(name string) bool {
 }
 
 func (s *Session) AddConnection(name string, fwConfig *config.FirewallConfig, apiKey string) *Connection {
-	return s.AddConnectionWithSSH(name, fwConfig, apiKey, "", "")
+	return s.AddConnectionWithSSH(name, fwConfig, apiKey, "", nil)
 }
 
-func (s *Session) AddConnectionWithSSH(name string, fwConfig *config.FirewallConfig, apiKey, sshUsername, sshPassword string) *Connection {
+// AddConnectionWithSSH creates a new connection with SSH username and optional pre-established SSH client.
+// If sshClient is provided, it will be used directly. Otherwise, SSH can be established later
+// using credentials from environment variables.
+func (s *Session) AddConnectionWithSSH(name string, fwConfig *config.FirewallConfig, apiKey, sshUsername string, sshClient *ssh.Client) *Connection {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -81,7 +89,8 @@ func (s *Session) AddConnectionWithSSH(name string, fwConfig *config.FirewallCon
 		Client:      client,
 		Connected:   true,
 		SSHUsername: sshUsername,
-		SSHPassword: sshPassword,
+		SSHClient:   sshClient,
+		SSHEnabled:  sshClient != nil,
 	}
 	s.Connections[name] = conn
 
@@ -133,14 +142,19 @@ type Credentials struct {
 func ResolveCredentials(cfg *config.Config, flags config.CLIFlags) *Credentials {
 	creds := &Credentials{}
 
+	// CLI flags take highest priority
 	if flags.Host != "" {
 		creds.Host = flags.Host
-		creds.Insecure = flags.Insecure
 	}
 	if flags.APIKey != "" {
 		creds.APIKey = flags.APIKey
 	}
+	// If --insecure flag is explicitly true, use it
+	if flags.Insecure {
+		creds.Insecure = true
+	}
 
+	// Environment variables (if not set by flags)
 	if envHost := os.Getenv("PYRE_HOST"); envHost != "" && creds.Host == "" {
 		creds.Host = envHost
 	}
@@ -151,10 +165,14 @@ func ResolveCredentials(cfg *config.Config, flags config.CLIFlags) *Credentials 
 		creds.Insecure = true
 	}
 
+	// Config file defaults (if not set by flags or env)
 	if creds.Host == "" {
 		if name, fw, ok := cfg.GetDefaultFirewall(); ok {
 			creds.Host = fw.Host
-			creds.Insecure = fw.Insecure
+			// Use config insecure if not already set by flags or env
+			if !creds.Insecure && fw.Insecure {
+				creds.Insecure = true
+			}
 
 			envKey := os.Getenv("PYRE_" + name + "_API_KEY")
 			if envKey != "" && creds.APIKey == "" {
@@ -178,18 +196,53 @@ func (c *Credentials) NeedsInteractiveAuth() bool {
 	return c.Host == "" || c.APIKey == ""
 }
 
+// validateSerial checks if the serial number has a valid format.
+func validateSerial(serial string) error {
+	if serial == "" {
+		return nil
+	}
+	if !serialPattern.MatchString(serial) {
+		return fmt.Errorf("invalid serial number format: %s", serial)
+	}
+	return nil
+}
+
+// validateIP checks if the IP address is valid.
+func validateIP(ip string) error {
+	if ip == "" {
+		return nil
+	}
+	if net.ParseIP(ip) == nil {
+		return fmt.Errorf("invalid IP address: %s", ip)
+	}
+	return nil
+}
+
 // SetTarget sets the current target device for Panorama.
 // Pass nil to target Panorama itself.
-func (c *Connection) SetTarget(device *models.ManagedDevice) {
+// Returns an error if the device serial or IP is invalid.
+func (c *Connection) SetTarget(device *models.ManagedDevice) error {
 	if device == nil {
 		c.TargetSerial = ""
 		c.TargetIP = ""
 		c.Client.ClearTarget()
-	} else {
-		c.TargetSerial = device.Serial
-		c.TargetIP = device.IPAddress
-		c.Client.SetTarget(device.Serial)
+		return nil
 	}
+
+	// Validate serial number format
+	if err := validateSerial(device.Serial); err != nil {
+		return err
+	}
+
+	// Validate IP address format
+	if err := validateIP(device.IPAddress); err != nil {
+		return err
+	}
+
+	c.TargetSerial = device.Serial
+	c.TargetIP = device.IPAddress
+	c.Client.SetTarget(device.Serial)
+	return nil
 }
 
 // GetTargetDevice returns the currently targeted managed device, or nil if targeting Panorama.
@@ -247,6 +300,10 @@ func (c *Connection) ConnectSSH(ctx context.Context) error {
 	// For Panorama with a target device, connect to the target's IP
 	host := c.Config.Host
 	if c.IsPanorama && c.TargetIP != "" {
+		// Validate target IP before using it
+		if err := validateIP(c.TargetIP); err != nil {
+			return fmt.Errorf("invalid target IP for SSH: %w", err)
+		}
 		host = c.TargetIP
 	}
 
@@ -282,6 +339,7 @@ func (c *Connection) HasSSH() bool {
 }
 
 // getSSHConfig returns the SSH configuration, combining config file, env vars, and login credentials.
+// Note: SSH passwords must come from environment variables (PYRE_SSH_PASSWORD) for security.
 func (c *Connection) getSSHConfig() config.SSHConfig {
 	var sshCfg config.SSHConfig
 	if c.Config != nil {
@@ -291,10 +349,9 @@ func (c *Connection) getSSHConfig() config.SSHConfig {
 	// Apply environment variable overrides
 	sshCfg = resolveSSHCredentials(c.Name, sshCfg)
 
-	// Use login credentials if no username configured yet
+	// Use login username if no username configured yet
 	if sshCfg.Username == "" && c.SSHUsername != "" {
 		sshCfg.Username = c.SSHUsername
-		sshCfg.Password = c.SSHPassword
 	}
 
 	return sshCfg
@@ -311,6 +368,9 @@ func resolveSSHCredentials(fwName string, cfg config.SSHConfig) config.SSHConfig
 	}
 	if envKey := os.Getenv("PYRE_SSH_KEY_PATH"); envKey != "" && cfg.PrivateKeyPath == "" {
 		cfg.PrivateKeyPath = envKey
+	}
+	if os.Getenv("PYRE_SSH_INSECURE") == "true" {
+		cfg.Insecure = true
 	}
 
 	// Per-firewall SSH password: PYRE_<FIREWALL>_SSH_PASSWORD

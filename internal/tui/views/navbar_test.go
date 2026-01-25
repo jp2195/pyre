@@ -166,8 +166,8 @@ func TestNavbarModel_SetActiveByID(t *testing.T) {
 		t.Errorf("expected activeItem=2, got %d", nav.activeItem)
 	}
 
-	// Set to tools/troubleshoot
-	nav = nav.SetActiveByID("tools", "troubleshoot")
+	// Set to tools/config
+	nav = nav.SetActiveByID("tools", "config")
 	if nav.activeGroup != 2 {
 		t.Errorf("expected activeGroup=2, got %d", nav.activeGroup)
 	}

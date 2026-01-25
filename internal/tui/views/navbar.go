@@ -59,8 +59,7 @@ func NewNavbarModel() NavbarModel {
 				Label: "Tools",
 				Key:   "3",
 				Items: []NavItem{
-					{ID: "troubleshoot", Label: "Troubleshoot", Key: "1"},
-					{ID: "config", Label: "Config", Key: "2"},
+					{ID: "config", Label: "Config", Key: "1"},
 				},
 			},
 			{

@@ -8,12 +8,12 @@ import (
 )
 
 type MockPANOS struct {
-	Server      *httptest.Server
-	Hostname    string
-	Model       string
-	Serial      string
-	Version     string
-	IsPanorama  bool
+	Server     *httptest.Server
+	Hostname   string
+	Model      string
+	Serial     string
+	Version    string
+	IsPanorama bool
 }
 
 func NewMockPANOS() *MockPANOS {
@@ -57,7 +57,16 @@ func (m *MockPANOS) Host() string {
 }
 
 func (m *MockPANOS) handleAPI(w http.ResponseWriter, r *http.Request) {
+	// Parse form for POST requests (keygen uses POST with form body)
+	if r.Method == http.MethodPost {
+		r.ParseForm()
+	}
+
+	// Get type from query string or form
 	apiType := r.URL.Query().Get("type")
+	if apiType == "" {
+		apiType = r.FormValue("type")
+	}
 	cmd := r.URL.Query().Get("cmd")
 
 	w.Header().Set("Content-Type", "application/xml")
@@ -75,8 +84,15 @@ func (m *MockPANOS) handleAPI(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *MockPANOS) handleKeygen(w http.ResponseWriter, r *http.Request) {
+	// Get user/password from query string or form (POST uses form body)
 	user := r.URL.Query().Get("user")
+	if user == "" {
+		user = r.FormValue("user")
+	}
 	password := r.URL.Query().Get("password")
+	if password == "" {
+		password = r.FormValue("password")
+	}
 
 	if user == "admin" && password == "admin" {
 		w.Write([]byte(`<response status="success"><result><key>LUFRPT1234567890abcdef==</key></result></response>`))

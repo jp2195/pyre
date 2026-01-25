@@ -3,13 +3,16 @@ package ssh
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 
 	"github.com/jp2195/pyre/internal/config"
 )
@@ -86,10 +89,15 @@ func NewClient(host string, cfg config.SSHConfig) (*Client, error) {
 		return nil, fmt.Errorf("no authentication method provided")
 	}
 
+	hostKeyCallback, err := getHostKeyCallback(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("setting up host key verification: %w", err)
+	}
+
 	sshConfig := &ssh.ClientConfig{
 		User:            cfg.Username,
 		Auth:            authMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: hostKeyCallback,
 		Timeout:         timeout,
 	}
 
@@ -267,4 +275,83 @@ func expandPath(path string) string {
 		}
 	}
 	return path
+}
+
+// getHostKeyCallback returns the appropriate host key callback based on configuration.
+// If cfg.Insecure is true, it returns an insecure callback that accepts any host key.
+// Otherwise, it uses the known_hosts file for verification.
+func getHostKeyCallback(cfg config.SSHConfig) (ssh.HostKeyCallback, error) {
+	if cfg.Insecure {
+		return ssh.InsecureIgnoreHostKey(), nil
+	}
+
+	// Determine known_hosts path
+	knownHostsPath := cfg.KnownHostsPath
+	if knownHostsPath == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("getting home directory: %w", err)
+		}
+		knownHostsPath = filepath.Join(home, ".ssh", "known_hosts")
+	} else {
+		knownHostsPath = expandPath(knownHostsPath)
+	}
+
+	// Ensure .ssh directory exists
+	sshDir := filepath.Dir(knownHostsPath)
+	if err := os.MkdirAll(sshDir, 0700); err != nil {
+		return nil, fmt.Errorf("creating .ssh directory: %w", err)
+	}
+
+	// Create known_hosts file if it doesn't exist
+	if _, err := os.Stat(knownHostsPath); os.IsNotExist(err) {
+		f, err := os.OpenFile(knownHostsPath, os.O_CREATE|os.O_WRONLY, 0600)
+		if err != nil {
+			return nil, fmt.Errorf("creating known_hosts file: %w", err)
+		}
+		f.Close()
+	}
+
+	// Create host key callback from known_hosts
+	callback, err := knownhosts.New(knownHostsPath)
+	if err != nil {
+		return nil, fmt.Errorf("parsing known_hosts: %w", err)
+	}
+
+	// Wrap the callback to provide a more helpful error message and optionally add new hosts
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		err := callback(hostname, remote, key)
+		if err != nil {
+			var keyErr *knownhosts.KeyError
+			if errors.As(err, &keyErr) {
+				if len(keyErr.Want) > 0 {
+					// Host key has changed - this could be a MITM attack
+					return fmt.Errorf("WARNING: host key for %s has changed! This could indicate a MITM attack. "+
+						"If you trust this host, remove the old key from %s and try again", hostname, knownHostsPath)
+				}
+				// Host not in known_hosts - add it
+				if addErr := addHostKey(knownHostsPath, hostname, remote, key); addErr != nil {
+					return fmt.Errorf("host key verification failed and could not add to known_hosts: %w", addErr)
+				}
+				// Return nil to allow connection after adding the key
+				return nil
+			}
+			return err
+		}
+		return nil
+	}, nil
+}
+
+// addHostKey appends a host key to the known_hosts file.
+func addHostKey(knownHostsPath, hostname string, remote net.Addr, key ssh.PublicKey) error {
+	f, err := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// Format the known_hosts line
+	line := knownhosts.Line([]string{hostname}, key)
+	_, err = fmt.Fprintln(f, line)
+	return err
 }
