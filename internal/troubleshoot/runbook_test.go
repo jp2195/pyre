@@ -211,6 +211,15 @@ func TestRunbook_Fields(t *testing.T) {
 	if runbook.Name != "Test Name" {
 		t.Errorf("expected Name 'Test Name', got %q", runbook.Name)
 	}
+	if runbook.Description != "Test Description" {
+		t.Errorf("expected Description 'Test Description', got %q", runbook.Description)
+	}
+	if runbook.Category != "test-category" {
+		t.Errorf("expected Category 'test-category', got %q", runbook.Category)
+	}
+	if len(runbook.Tags) != 2 || runbook.Tags[0] != "tag1" {
+		t.Errorf("expected Tags ['tag1', 'tag2'], got %v", runbook.Tags)
+	}
 	if !runbook.RequiresSSH {
 		t.Error("expected RequiresSSH to be true")
 	}
@@ -249,8 +258,17 @@ func TestStep_Fields(t *testing.T) {
 	if step.ID != "step-id" {
 		t.Errorf("expected ID 'step-id', got %q", step.ID)
 	}
+	if step.Name != "Step Name" {
+		t.Errorf("expected Name 'Step Name', got %q", step.Name)
+	}
+	if step.Description != "Step description" {
+		t.Errorf("expected Description 'Step description', got %q", step.Description)
+	}
 	if step.Type != StepTypeSSH {
 		t.Errorf("expected type SSH, got %s", step.Type)
+	}
+	if step.Command != "show clock" {
+		t.Errorf("expected Command 'show clock', got %q", step.Command)
 	}
 	if !step.Required {
 		t.Error("expected Required to be true")
@@ -274,8 +292,20 @@ func TestPattern_Fields(t *testing.T) {
 	if pattern.ID != "pattern-id" {
 		t.Errorf("expected ID 'pattern-id', got %q", pattern.ID)
 	}
+	if pattern.Name != "Pattern Name" {
+		t.Errorf("expected Name 'Pattern Name', got %q", pattern.Name)
+	}
+	if pattern.Regex != `error\s+\d+` {
+		t.Errorf("expected Regex 'error\\s+\\d+', got %q", pattern.Regex)
+	}
 	if pattern.Severity != SeverityCritical {
 		t.Errorf("expected severity Critical, got %s", pattern.Severity)
+	}
+	if pattern.Message != "Critical error found" {
+		t.Errorf("expected Message 'Critical error found', got %q", pattern.Message)
+	}
+	if pattern.Remediation != "Follow KB001 to resolve" {
+		t.Errorf("expected Remediation 'Follow KB001 to resolve', got %q", pattern.Remediation)
 	}
 	if len(pattern.KBArticles) != 2 {
 		t.Errorf("expected 2 KB articles, got %d", len(pattern.KBArticles))

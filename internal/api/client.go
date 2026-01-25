@@ -26,7 +26,7 @@ func WithInsecure(insecure bool) ClientOption {
 	return func(c *Client) {
 		if insecure {
 			c.httpClient.Transport = &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // G402: InsecureSkipVerify required for self-signed firewall certificates when user enables --insecure
 			}
 		}
 	}
@@ -120,7 +120,7 @@ func (c *Client) request(ctx context.Context, params url.Values) (*XMLResponse, 
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }() //nolint:errcheck // best effort cleanup
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

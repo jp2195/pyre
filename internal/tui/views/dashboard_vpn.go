@@ -187,14 +187,18 @@ func (m VPNDashboardModel) renderIPSecTunnels(width int) string {
 		tunnel := m.tunnels[i]
 
 		// State indicator
-		stateStyle := errorStyle()
-		stateIcon := "x"
-		if tunnel.State == "up" {
+		var stateStyle lipgloss.Style
+		var stateIcon string
+		switch tunnel.State {
+		case "up":
 			stateStyle = highlightStyle()
 			stateIcon = "o"
-		} else if tunnel.State == "init" {
+		case "init":
 			stateStyle = warningStyle()
 			stateIcon = "~"
+		default:
+			stateStyle = errorStyle()
+			stateIcon = "x"
 		}
 
 		name := truncateEllipsis(tunnel.Name, nameWidth)

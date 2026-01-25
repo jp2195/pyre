@@ -33,7 +33,7 @@ func GenerateAPIKey(ctx context.Context, host, username, password string, insecu
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure}, //nolint:gosec // G402: InsecureSkipVerify required for self-signed firewall certificates when user enables --insecure
 		},
 	}
 
@@ -54,7 +54,7 @@ func GenerateAPIKey(ctx context.Context, host, username, password string, insecu
 	if err != nil {
 		return nil, fmt.Errorf("keygen request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }() //nolint:errcheck // best effort cleanup
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

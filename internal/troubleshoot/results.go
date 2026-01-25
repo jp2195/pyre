@@ -9,12 +9,12 @@ import (
 type StepStatus string
 
 const (
-	StepStatusPending  StepStatus = "pending"
-	StepStatusRunning  StepStatus = "running"
-	StepStatusPassed   StepStatus = "passed"
-	StepStatusFailed   StepStatus = "failed"
-	StepStatusSkipped  StepStatus = "skipped"
-	StepStatusError    StepStatus = "error"
+	StepStatusPending StepStatus = "pending"
+	StepStatusRunning StepStatus = "running"
+	StepStatusPassed  StepStatus = "passed"
+	StepStatusFailed  StepStatus = "failed"
+	StepStatusSkipped StepStatus = "skipped"
+	StepStatusError   StepStatus = "error"
 )
 
 // RunbookResult contains the complete result of a runbook execution.

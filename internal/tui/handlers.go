@@ -3,6 +3,7 @@ package tui
 import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/jp2195/pyre/internal/auth"
 	"github.com/jp2195/pyre/internal/tui/views"
 )

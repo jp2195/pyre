@@ -98,7 +98,7 @@ func (c *Client) GetSessions(ctx context.Context, filter string) ([]models.Sessi
 		var startTime time.Time
 		// Ignore parse error - time format may vary, zero time acceptable
 		if e.StartTime != "" {
-			startTime, _ = time.Parse("Mon Jan 2 15:04:05 2006", e.StartTime)
+			startTime, _ = time.Parse("Mon Jan 2 15:04:05 2006", e.StartTime) //nolint:errcheck // intentional - zero time acceptable
 		}
 		// Convert protocol number to name
 		proto := protoToName(e.Proto)

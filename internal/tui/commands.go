@@ -2,6 +2,7 @@ package tui
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/jp2195/pyre/internal/api"
 	"github.com/jp2195/pyre/internal/auth"
 	"github.com/jp2195/pyre/internal/tui/views"
@@ -244,6 +245,7 @@ func (m Model) fetchDiskUsage(conn *auth.Connection) tea.Cmd {
 	}
 }
 
+//nolint:misspell // "environmentals" is the PAN-OS XML API tag name
 func (m Model) fetchEnvironmentals(conn *auth.Connection) tea.Cmd {
 	ctx := m.ctx
 	return func() tea.Msg {

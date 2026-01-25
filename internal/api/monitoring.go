@@ -182,7 +182,7 @@ func (c *Client) GetJobs(ctx context.Context) ([]models.Job, error) {
 
 		// Parse progress - ignore error, zero value acceptable for non-numeric progress
 		if e.Progress != "" {
-			job.Progress, _ = strconv.Atoi(strings.TrimSuffix(e.Progress, "%"))
+			job.Progress, _ = strconv.Atoi(strings.TrimSuffix(e.Progress, "%")) //nolint:errcheck // intentional - default to 0 on parse error
 		}
 
 		// Parse timestamps - PAN-OS typically uses format like "2024/01/15 10:30:45"
@@ -248,7 +248,7 @@ func (c *Client) GetDiskUsage(ctx context.Context) ([]models.DiskUsage, error) {
 		fields := strings.Fields(line)
 		if len(fields) >= 6 {
 			pctStr := strings.TrimSuffix(fields[4], "%")
-			pct, _ := strconv.ParseFloat(pctStr, 64)
+			pct, _ := strconv.ParseFloat(pctStr, 64) //nolint:errcheck // intentional - default to 0 on parse error
 
 			disk := models.DiskUsage{
 				Filesystem: fields[0],
@@ -266,6 +266,8 @@ func (c *Client) GetDiskUsage(ctx context.Context) ([]models.DiskUsage, error) {
 }
 
 // GetEnvironmentals retrieves hardware environmental sensor data
+//
+//nolint:misspell // "environmentals" is the PAN-OS XML API tag name
 func (c *Client) GetEnvironmentals(ctx context.Context) ([]models.Environmental, error) {
 	resp, err := c.Op(ctx, "<show><system><environmentals></environmentals></system></show>")
 	if err != nil {

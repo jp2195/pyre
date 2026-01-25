@@ -143,6 +143,7 @@ type DiskUsageMsg struct {
 	Err   error
 }
 
+//nolint:misspell // "environmentals" is the PAN-OS XML API tag name
 type EnvironmentalsMsg struct {
 	Environmentals []models.Environmental
 	Err            error

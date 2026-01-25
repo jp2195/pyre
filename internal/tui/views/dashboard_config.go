@@ -126,9 +126,10 @@ func (m ConfigDashboardModel) renderPolicyStats(width int) string {
 		if !rule.Disabled {
 			enabledRules++
 		}
-		if rule.Action == "allow" {
+		switch rule.Action {
+		case "allow":
 			allowRules++
-		} else if rule.Action == "deny" || rule.Action == "drop" {
+		case "deny", "drop":
 			denyRules++
 		}
 		if rule.HitCount == 0 && !rule.Disabled {
@@ -311,11 +312,14 @@ func (m ConfigDashboardModel) renderZeroHitRules(width int) string {
 		rule := zeroHitRules[i]
 		name := truncateEllipsis(rule.Name, nameWidth)
 
-		actionStyle := dimStyle()
-		if rule.Action == "allow" {
+		var actionStyle lipgloss.Style
+		switch rule.Action {
+		case "allow":
 			actionStyle = highlightStyle()
-		} else if rule.Action == "deny" || rule.Action == "drop" {
+		case "deny", "drop":
 			actionStyle = errorStyle()
+		default:
+			actionStyle = dimStyle()
 		}
 
 		b.WriteString(labelStyle().Render(fmt.Sprintf("%3d. ", rule.Position)))
@@ -378,11 +382,14 @@ func (m ConfigDashboardModel) renderMostHitRules(width int) string {
 
 		name := truncateEllipsis(rule.Name, nameWidth)
 
-		actionStyle := dimStyle()
-		if rule.Action == "allow" {
+		var actionStyle lipgloss.Style
+		switch rule.Action {
+		case "allow":
 			actionStyle = highlightStyle()
-		} else if rule.Action == "deny" || rule.Action == "drop" {
+		case "deny", "drop":
 			actionStyle = errorStyle()
+		default:
+			actionStyle = dimStyle()
 		}
 
 		b.WriteString(valueStyle().Render(fmt.Sprintf("%-*s ", nameWidth, name)))

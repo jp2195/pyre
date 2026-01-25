@@ -214,9 +214,9 @@ func (c *Client) GetSystemResources(ctx context.Context) (*models.Resources, err
 	// Parse load average using regex
 	// Ignore parse errors - optional fields, zero value acceptable if parsing fails
 	if matches := loadAvgRegex.FindStringSubmatch(output); len(matches) >= 4 {
-		resources.Load1, _ = strconv.ParseFloat(matches[1], 64)
-		resources.Load5, _ = strconv.ParseFloat(matches[2], 64)
-		resources.Load15, _ = strconv.ParseFloat(matches[3], 64)
+		resources.Load1, _ = strconv.ParseFloat(matches[1], 64)  //nolint:errcheck // intentional - zero value acceptable
+		resources.Load5, _ = strconv.ParseFloat(matches[2], 64)  //nolint:errcheck // intentional - zero value acceptable
+		resources.Load15, _ = strconv.ParseFloat(matches[3], 64) //nolint:errcheck // intentional - zero value acceptable
 	}
 
 	lines := strings.Split(output, "\n")
@@ -278,10 +278,10 @@ func (c *Client) GetSystemResources(ctx context.Context) (*models.Resources, err
 				// Ignore parse errors - fields may have unexpected format, zero value acceptable
 				cleanField := strings.TrimRight(f, ",%")
 				if (cleanField == "total" || f == "total," || f == "total") && i > 0 {
-					total, _ = strconv.ParseFloat(strings.TrimRight(fields[i-1], ",%"), 64)
+					total, _ = strconv.ParseFloat(strings.TrimRight(fields[i-1], ",%"), 64) //nolint:errcheck // intentional
 				}
 				if (cleanField == "used" || f == "used," || f == "used") && i > 0 {
-					used, _ = strconv.ParseFloat(strings.TrimRight(fields[i-1], ",%"), 64)
+					used, _ = strconv.ParseFloat(strings.TrimRight(fields[i-1], ",%"), 64) //nolint:errcheck // intentional
 				}
 			}
 			if total > 0 {

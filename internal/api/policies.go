@@ -35,8 +35,8 @@ func (c *Client) GetSecurityPolicies(ctx context.Context) ([]models.SecurityRule
 	if err != nil {
 		return nil, err
 	}
-	if err := CheckResponse(resp); err != nil {
-		return nil, err
+	if checkErr := CheckResponse(resp); checkErr != nil {
+		return nil, checkErr
 	}
 
 	// Handle empty result
@@ -116,14 +116,14 @@ func (c *Client) GetSecurityPolicies(ctx context.Context) ([]models.SecurityRule
 	var withWrapper struct {
 		Entry []ruleEntry `xml:"rules>entry"`
 	}
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &withWrapper); err == nil && len(withWrapper.Entry) > 0 {
+	if unmarshalErr := xml.Unmarshal(WrapInner(resp.Result.Inner), &withWrapper); unmarshalErr == nil && len(withWrapper.Entry) > 0 {
 		entries = withWrapper.Entry
 	} else {
 		// Try parsing without wrapper (entries directly in result)
 		var withoutWrapper struct {
 			Entry []ruleEntry `xml:"entry"`
 		}
-		if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &withoutWrapper); err == nil {
+		if unmarshalErr := xml.Unmarshal(WrapInner(resp.Result.Inner), &withoutWrapper); unmarshalErr == nil {
 			entries = withoutWrapper.Entry
 		}
 	}
@@ -230,17 +230,17 @@ func (c *Client) GetSecurityPolicies(ctx context.Context) ([]models.SecurityRule
 			for _, h := range hitResult.Entry {
 				stats := hitStats{count: h.HitCount}
 				if h.LastHit != "" && h.LastHit != "0" {
-					if ts, _ := strconv.ParseInt(h.LastHit, 10, 64); ts > 0 {
+					if ts, _ := strconv.ParseInt(h.LastHit, 10, 64); ts > 0 { //nolint:errcheck // intentional - default to zero time on parse error
 						stats.lastHit = time.Unix(ts, 0)
 					}
 				}
 				if h.FirstHit != "" && h.FirstHit != "0" {
-					if ts, _ := strconv.ParseInt(h.FirstHit, 10, 64); ts > 0 {
+					if ts, _ := strconv.ParseInt(h.FirstHit, 10, 64); ts > 0 { //nolint:errcheck // intentional - default to zero time on parse error
 						stats.firstHit = time.Unix(ts, 0)
 					}
 				}
 				if h.LastReset != "" && h.LastReset != "0" {
-					if ts, _ := strconv.ParseInt(h.LastReset, 10, 64); ts > 0 {
+					if ts, _ := strconv.ParseInt(h.LastReset, 10, 64); ts > 0 { //nolint:errcheck // intentional - default to zero time on parse error
 						stats.lastReset = time.Unix(ts, 0)
 					}
 				}
@@ -286,8 +286,8 @@ func (c *Client) GetNATRules(ctx context.Context) ([]models.NATRule, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := CheckResponse(resp); err != nil {
-		return nil, err
+	if checkErr := CheckResponse(resp); checkErr != nil {
+		return nil, checkErr
 	}
 
 	// Handle empty result
@@ -357,14 +357,14 @@ func (c *Client) GetNATRules(ctx context.Context) ([]models.NATRule, error) {
 	var withWrapper struct {
 		Entry []natEntry `xml:"rules>entry"`
 	}
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &withWrapper); err == nil && len(withWrapper.Entry) > 0 {
+	if unmarshalErr := xml.Unmarshal(WrapInner(resp.Result.Inner), &withWrapper); unmarshalErr == nil && len(withWrapper.Entry) > 0 {
 		entries = withWrapper.Entry
 	} else {
 		// Try parsing without wrapper
 		var withoutWrapper struct {
 			Entry []natEntry `xml:"entry"`
 		}
-		if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &withoutWrapper); err == nil {
+		if unmarshalErr := xml.Unmarshal(WrapInner(resp.Result.Inner), &withoutWrapper); unmarshalErr == nil {
 			entries = withoutWrapper.Entry
 		}
 	}
@@ -443,17 +443,17 @@ func (c *Client) GetNATRules(ctx context.Context) ([]models.NATRule, error) {
 			for _, h := range hitResult.Entry {
 				stats := hitStats{count: h.HitCount}
 				if h.LastHit != "" && h.LastHit != "0" {
-					if ts, _ := strconv.ParseInt(h.LastHit, 10, 64); ts > 0 {
+					if ts, _ := strconv.ParseInt(h.LastHit, 10, 64); ts > 0 { //nolint:errcheck // intentional - default to zero time on parse error
 						stats.lastHit = time.Unix(ts, 0)
 					}
 				}
 				if h.FirstHit != "" && h.FirstHit != "0" {
-					if ts, _ := strconv.ParseInt(h.FirstHit, 10, 64); ts > 0 {
+					if ts, _ := strconv.ParseInt(h.FirstHit, 10, 64); ts > 0 { //nolint:errcheck // intentional - default to zero time on parse error
 						stats.firstHit = time.Unix(ts, 0)
 					}
 				}
 				if h.LastReset != "" && h.LastReset != "0" {
-					if ts, _ := strconv.ParseInt(h.LastReset, 10, 64); ts > 0 {
+					if ts, _ := strconv.ParseInt(h.LastReset, 10, 64); ts > 0 { //nolint:errcheck // intentional - default to zero time on parse error
 						stats.lastReset = time.Unix(ts, 0)
 					}
 				}

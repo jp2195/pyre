@@ -123,7 +123,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	// Create SSH connection on top of TCP connection
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, c.config)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close() //nolint:errcheck // best effort cleanup
 		return fmt.Errorf("failed to establish SSH connection: %w", err)
 	}
 
@@ -160,7 +160,7 @@ func (c *Client) Execute(ctx context.Context, cmd string) (*CommandResult, error
 			Error:    fmt.Errorf("failed to create session: %w", err),
 		}, nil
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }() //nolint:errcheck // best effort cleanup
 
 	var stdout, stderr bytes.Buffer
 	session.Stdout = &stdout
@@ -174,7 +174,7 @@ func (c *Client) Execute(ctx context.Context, cmd string) (*CommandResult, error
 
 	select {
 	case <-ctx.Done():
-		session.Signal(ssh.SIGTERM)
+		_ = session.Signal(ssh.SIGTERM) //nolint:errcheck // best effort signal
 		return &CommandResult{
 			Command:  cmd,
 			Duration: time.Since(start),
@@ -282,7 +282,7 @@ func expandPath(path string) string {
 // Otherwise, it uses the known_hosts file for verification.
 func getHostKeyCallback(cfg config.SSHConfig) (ssh.HostKeyCallback, error) {
 	if cfg.Insecure {
-		return ssh.InsecureIgnoreHostKey(), nil
+		return ssh.InsecureIgnoreHostKey(), nil //nolint:gosec // G106: InsecureIgnoreHostKey used when user explicitly disables host key verification
 	}
 
 	// Determine known_hosts path
@@ -309,7 +309,7 @@ func getHostKeyCallback(cfg config.SSHConfig) (ssh.HostKeyCallback, error) {
 		if err != nil {
 			return nil, fmt.Errorf("creating known_hosts file: %w", err)
 		}
-		f.Close()
+		_ = f.Close() //nolint:errcheck // best effort cleanup
 	}
 
 	// Create host key callback from known_hosts
@@ -348,7 +348,7 @@ func addHostKey(knownHostsPath, hostname string, remote net.Addr, key ssh.Public
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }() //nolint:errcheck // best effort cleanup
 
 	// Format the known_hosts line
 	line := knownhosts.Line([]string{hostname}, key)

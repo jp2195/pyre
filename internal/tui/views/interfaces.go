@@ -132,7 +132,7 @@ func (m InterfacesModel) Update(msg tea.Msg) (InterfacesModel, tea.Cmd) {
 
 		// Delegate to TableBase for common navigation
 		visible := m.visibleCards()
-		base, handled, cmd := m.TableBase.HandleNavigation(msg, len(m.filtered), visible)
+		base, handled, cmd := m.HandleNavigation(msg, len(m.filtered), visible)
 		if handled {
 			m.TableBase = base
 			return m, cmd
@@ -142,7 +142,7 @@ func (m InterfacesModel) Update(msg tea.Msg) (InterfacesModel, tea.Cmd) {
 }
 
 func (m InterfacesModel) updateFilterMode(msg tea.Msg) (InterfacesModel, tea.Cmd) {
-	base, exited, cmd := m.TableBase.HandleFilterMode(msg)
+	base, exited, cmd := m.HandleFilterMode(msg)
 	m.TableBase = base
 	if exited {
 		m.applyFilter()
@@ -500,7 +500,7 @@ func (m InterfacesModel) renderHelp() string {
 		{"r", "refresh"},
 	}
 
-	var parts []string
+	parts := make([]string, 0, len(keys))
 	for _, k := range keys {
 		parts = append(parts, keyStyle.Render(k.key)+descStyle.Render(":"+k.desc))
 	}

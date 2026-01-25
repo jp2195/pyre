@@ -442,7 +442,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.dashboard = m.dashboard.SetDiskUsage(msg.Disks, msg.Err)
 
 	case EnvironmentalsMsg:
-		m.dashboard = m.dashboard.SetEnvironmentals(msg.Environmentals, msg.Err)
+		m.dashboard = m.dashboard.SetEnvironmentals(msg.Environmentals, msg.Err) //nolint:misspell // "environmentals" is the PAN-OS XML API tag name
 
 	case CertificatesMsg:
 		m.dashboard = m.dashboard.SetCertificates(msg.Certificates, msg.Err)

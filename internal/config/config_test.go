@@ -164,7 +164,7 @@ settings:
   theme: dark
   default_view: policies
 `
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		t.Fatalf("failed to write test config: %v", err)
 	}
 
@@ -208,7 +208,7 @@ func TestLoadWithFlags_InvalidConfig(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "invalid.yaml")
 
 	// Write invalid YAML
-	if err := os.WriteFile(configPath, []byte("invalid: yaml: content:"), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte("invalid: yaml: content:"), 0600); err != nil {
 		t.Fatalf("failed to write test config: %v", err)
 	}
 
@@ -243,7 +243,7 @@ firewalls:
   config-fw:
     host: 10.0.0.1
 `
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		t.Fatalf("failed to write test config: %v", err)
 	}
 
@@ -294,7 +294,7 @@ firewalls:
       private_key_path: /path/to/key
       timeout: 60
 `
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		t.Fatalf("failed to write test config: %v", err)
 	}
 
@@ -338,7 +338,7 @@ firewalls:
   firewall:
     host: 10.0.0.2
 `
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		t.Fatalf("failed to write test config: %v", err)
 	}
 
@@ -380,7 +380,7 @@ func TestConfig_NilFirewallsAfterLoad(t *testing.T) {
 settings:
   refresh_interval: 10s
 `
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		t.Fatalf("failed to write test config: %v", err)
 	}
 
@@ -471,7 +471,7 @@ firewalls:
       private_key_path: /path/to/key
       timeout: 120
 `
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		t.Fatalf("failed to write test config: %v", err)
 	}
 
