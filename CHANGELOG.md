@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/jp2195/pyre/compare/v1.0.0...v1.0.1) (2026-01-25)
+
+
+### Bug Fixes
+
+* **ci:** use merge-multiple for artifact download ([402a8fb](https://github.com/jp2195/pyre/commit/402a8fb78d87c9224e593f398350d75b9bf8dd53))
+
 ## 1.0.0 (2026-01-25)
 
 
