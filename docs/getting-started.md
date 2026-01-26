@@ -38,6 +38,8 @@ go build -o pyre ./cmd/pyre
 
 There are four ways to connect to a firewall. Choose the method that fits your workflow.
 
+NOTE: If the .exe was not renamed, the command will be pyre-windows-amd64.exe
+
 ### Option 1: CLI Flags
 
 Best for quick one-off connections:
