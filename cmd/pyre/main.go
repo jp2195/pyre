@@ -21,6 +21,7 @@ var (
 func main() {
 	var (
 		host       = flag.String("host", "", "Firewall hostname or IP address")
+		user       = flag.String("user", "", "Username for authentication (prompts for password)")
 		apiKey     = flag.String("api-key", "", "API key for authentication")
 		insecure   = flag.Bool("insecure", false, "Skip TLS certificate verification (for self-signed certs)")
 		configPath = flag.String("config", "", "Path to config file (default: ~/.pyre.yaml)")
@@ -40,6 +41,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  PYRE_INSECURE  Skip TLS verification (true/false)\n")
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
 		fmt.Fprintf(os.Stderr, "  pyre --host 10.0.0.1\n")
+		fmt.Fprintf(os.Stderr, "  pyre --host fw.example.com --user admin --insecure  # Prompts for password\n")
 		fmt.Fprintf(os.Stderr, "  pyre --host fw.example.com --api-key LUFRPT...\n")
 		fmt.Fprintf(os.Stderr, "  PYRE_HOST=10.0.0.1 PYRE_API_KEY=LUFRPT... pyre\n")
 	}
@@ -58,6 +60,7 @@ func main() {
 
 	flags := config.CLIFlags{
 		Host:     *host,
+		Username: *user,
 		APIKey:   *apiKey,
 		Insecure: *insecure,
 		Config:   *configPath,

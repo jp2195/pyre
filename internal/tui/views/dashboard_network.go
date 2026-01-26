@@ -13,13 +13,17 @@ import (
 
 // NetworkDashboardModel represents the network-focused dashboard
 type NetworkDashboardModel struct {
-	interfaces []models.Interface
-	arpTable   []models.ARPEntry
-	routes     []models.RouteEntry
+	interfaces    []models.Interface
+	arpTable      []models.ARPEntry
+	routes        []models.RouteEntry
+	bgpNeighbors  []models.BGPNeighbor
+	ospfNeighbors []models.OSPFNeighbor
 
 	ifaceErr error
 	arpErr   error
 	routeErr error
+	bgpErr   error
+	ospfErr  error
 
 	width  int
 	height int
@@ -58,6 +62,20 @@ func (m NetworkDashboardModel) SetRoutingTable(routes []models.RouteEntry, err e
 	return m
 }
 
+// SetBGPNeighbors sets the BGP neighbor data
+func (m NetworkDashboardModel) SetBGPNeighbors(neighbors []models.BGPNeighbor, err error) NetworkDashboardModel {
+	m.bgpNeighbors = neighbors
+	m.bgpErr = err
+	return m
+}
+
+// SetOSPFNeighbors sets the OSPF neighbor data
+func (m NetworkDashboardModel) SetOSPFNeighbors(neighbors []models.OSPFNeighbor, err error) NetworkDashboardModel {
+	m.ospfNeighbors = neighbors
+	m.ospfErr = err
+	return m
+}
+
 // Update handles key events
 func (m NetworkDashboardModel) Update(msg tea.Msg) (NetworkDashboardModel, tea.Cmd) {
 	return m, nil
@@ -84,10 +102,11 @@ func (m NetworkDashboardModel) View() string {
 	}
 	leftCol := lipgloss.JoinVertical(lipgloss.Left, leftPanels...)
 
-	// Right column: ARP and routing
+	// Right column: ARP, routing, and neighbors
 	rightPanels := []string{
 		m.renderARPSummary(rightColWidth),
 		m.renderRoutingSummary(rightColWidth),
+		m.renderNeighborsSummary(rightColWidth),
 	}
 	rightCol := lipgloss.JoinVertical(lipgloss.Left, rightPanels...)
 
@@ -100,6 +119,7 @@ func (m NetworkDashboardModel) renderSingleColumn(width int) string {
 		m.renderInterfaceErrors(width),
 		m.renderARPSummary(width),
 		m.renderRoutingSummary(width),
+		m.renderNeighborsSummary(width),
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, panels...)
 }
@@ -358,6 +378,137 @@ func (m NetworkDashboardModel) renderRoutingSummary(width int) string {
 			b.WriteString(dimStyle().Render(fmt.Sprintf("  %-12s ", proto)))
 			b.WriteString(valueStyle().Render(fmt.Sprintf("%d", count)))
 			b.WriteString("\n")
+		}
+	}
+
+	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+}
+
+func (m NetworkDashboardModel) renderNeighborsSummary(width int) string {
+	var b strings.Builder
+	b.WriteString(titleStyle().Render("Routing Neighbors"))
+	b.WriteString("\n")
+
+	hasBGP := m.bgpNeighbors != nil && len(m.bgpNeighbors) > 0
+	hasOSPF := m.ospfNeighbors != nil && len(m.ospfNeighbors) > 0
+
+	// Both are still loading
+	if m.bgpNeighbors == nil && m.ospfNeighbors == nil && m.bgpErr == nil && m.ospfErr == nil {
+		b.WriteString(dimStyle().Render("Loading..."))
+		return panelStyle().Width(width).Render(b.String())
+	}
+
+	if !hasBGP && !hasOSPF {
+		b.WriteString(dimStyle().Render("No BGP or OSPF neighbors"))
+		return panelStyle().Width(width).Render(b.String())
+	}
+
+	// BGP Neighbors
+	if hasBGP {
+		b.WriteString(subtitleStyle().Render("BGP Peers:"))
+		b.WriteString("\n")
+
+		// Count established
+		established := 0
+		for _, n := range m.bgpNeighbors {
+			state := strings.ToLower(n.State)
+			if state == "established" || state == "openconfirm" {
+				established++
+			}
+		}
+		b.WriteString(dimStyle().Render("  "))
+		b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", established)))
+		b.WriteString(dimStyle().Render(fmt.Sprintf("/%d established", len(m.bgpNeighbors))))
+		b.WriteString("\n")
+
+		// Show up to 4 peers
+		maxShow := 4
+		if len(m.bgpNeighbors) < maxShow {
+			maxShow = len(m.bgpNeighbors)
+		}
+		for i := 0; i < maxShow; i++ {
+			n := m.bgpNeighbors[i]
+			state := strings.ToLower(n.State)
+			stateStyle := dimStyle()
+			stateIcon := "x"
+			if state == "established" || state == "openconfirm" {
+				stateStyle = highlightStyle()
+				stateIcon = "o"
+			} else if state == "connect" || state == "active" || state == "opensent" {
+				stateStyle = warningStyle()
+				stateIcon = "~"
+			}
+
+			peer := truncateEllipsis(n.PeerAddress, 15)
+			b.WriteString("  ")
+			b.WriteString(stateStyle.Render(stateIcon))
+			b.WriteString(" ")
+			b.WriteString(valueStyle().Render(fmt.Sprintf("%-15s", peer)))
+			b.WriteString(dimStyle().Render(fmt.Sprintf(" AS%d", n.PeerAS)))
+			if n.PrefixesReceived > 0 {
+				b.WriteString(dimStyle().Render(fmt.Sprintf(" (%d pfx)", n.PrefixesReceived)))
+			}
+			b.WriteString("\n")
+		}
+		if len(m.bgpNeighbors) > maxShow {
+			b.WriteString(dimStyle().Render(fmt.Sprintf("  ... and %d more\n", len(m.bgpNeighbors)-maxShow)))
+		}
+	}
+
+	// OSPF Neighbors
+	if hasOSPF {
+		if hasBGP {
+			b.WriteString("\n")
+		}
+		b.WriteString(subtitleStyle().Render("OSPF Neighbors:"))
+		b.WriteString("\n")
+
+		// Count full adjacencies
+		full := 0
+		for _, n := range m.ospfNeighbors {
+			state := strings.ToLower(n.State)
+			if state == "full" {
+				full++
+			}
+		}
+		b.WriteString(dimStyle().Render("  "))
+		b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", full)))
+		b.WriteString(dimStyle().Render(fmt.Sprintf("/%d full adjacency", len(m.ospfNeighbors))))
+		b.WriteString("\n")
+
+		// Show up to 4 neighbors
+		maxShow := 4
+		if len(m.ospfNeighbors) < maxShow {
+			maxShow = len(m.ospfNeighbors)
+		}
+		for i := 0; i < maxShow; i++ {
+			n := m.ospfNeighbors[i]
+			state := strings.ToLower(n.State)
+			stateStyle := dimStyle()
+			stateIcon := "x"
+			if state == "full" {
+				stateStyle = highlightStyle()
+				stateIcon = "o"
+			} else if state == "2-way" || state == "exstart" || state == "exchange" || state == "loading" {
+				stateStyle = warningStyle()
+				stateIcon = "~"
+			}
+
+			neighborID := truncateEllipsis(n.NeighborID, 15)
+			b.WriteString("  ")
+			b.WriteString(stateStyle.Render(stateIcon))
+			b.WriteString(" ")
+			b.WriteString(valueStyle().Render(fmt.Sprintf("%-15s", neighborID)))
+			if n.Interface != "" {
+				b.WriteString(dimStyle().Render(fmt.Sprintf(" %s", truncateEllipsis(n.Interface, 12))))
+			}
+			if n.Area != "" {
+				b.WriteString(dimStyle().Render(fmt.Sprintf(" area %s", n.Area)))
+			}
+			b.WriteString("\n")
+		}
+		if len(m.ospfNeighbors) > maxShow {
+			b.WriteString(dimStyle().Render(fmt.Sprintf("  ... and %d more\n", len(m.ospfNeighbors)-maxShow)))
 		}
 	}
 

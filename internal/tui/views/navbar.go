@@ -186,7 +186,6 @@ func (m NavbarModel) RenderSubTabs() string {
 	// Styles
 	itemInactive := StatusMutedStyle.Padding(0, 1)
 	itemActive := StatusActiveStyle.Padding(0, 1)
-	keyHint := NavKeyHintStyle
 
 	var items []string
 	for i, item := range group.Items {
@@ -194,9 +193,7 @@ func (m NavbarModel) RenderSubTabs() string {
 		if i == m.activeItem {
 			items = append(items, itemActive.Render(label))
 		} else {
-			// Show key hint for inactive items
-			hint := keyHint.Render("(" + item.Key + ")")
-			items = append(items, itemInactive.Render(label)+hint)
+			items = append(items, itemInactive.Render(label))
 		}
 	}
 

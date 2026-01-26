@@ -45,6 +45,11 @@ func (m NATPoliciesModel) SetLoading(loading bool) NATPoliciesModel {
 	return m
 }
 
+// HasData returns true if NAT rules have been loaded.
+func (m NATPoliciesModel) HasData() bool {
+	return m.rules != nil
+}
+
 func (m NATPoliciesModel) SetRules(rules []models.NATRule, err error) NATPoliciesModel {
 	m.rules = rules
 	m.Err = err
@@ -188,8 +193,8 @@ func (m NATPoliciesModel) View() string {
 	panelStyle := ViewPanelStyle.Width(m.Width - 4)
 
 	var b strings.Builder
-	title := fmt.Sprintf("NAT Policies (%d rules)", len(m.filtered))
-	sortInfo := BannerInfoStyle.Render(fmt.Sprintf("  [Sort: %s | s: change | /: filter | enter: details]", m.sortLabel()))
+	title := "NAT Policies"
+	sortInfo := BannerInfoStyle.Render(fmt.Sprintf(" [%d rules | Sort: %s | s: change | /: filter | enter: details]", len(m.filtered), m.sortLabel()))
 	b.WriteString(titleStyle.Render(title) + sortInfo)
 	b.WriteString("\n")
 
@@ -209,7 +214,7 @@ func (m NATPoliciesModel) View() string {
 	}
 
 	if m.Loading || m.rules == nil {
-		b.WriteString(LoadingMsgStyle.Render("Loading NAT rules..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading NAT rules..."))
 		return panelStyle.Render(b.String())
 	}
 

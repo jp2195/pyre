@@ -76,35 +76,35 @@ func (m Model) renderHeader() string {
 func (m Model) currentViewName() string {
 	switch m.currentView {
 	case ViewDashboard:
-		// Use friendly names without "Dashboard" suffix
+		// Use breadcrumb format: Monitor/SubView
 		switch m.currentDashboard {
 		case views.DashboardMain:
-			return "Overview"
+			return "Monitor/Overview"
 		case views.DashboardNetwork:
-			return "Network"
+			return "Monitor/Network"
 		case views.DashboardSecurity:
-			return "Security"
+			return "Monitor/Security"
 		case views.DashboardVPN:
-			return "VPN"
+			return "Monitor/VPN"
 		case views.DashboardConfig:
-			return "Config"
+			return "Monitor/Config"
 		default:
-			return "Overview"
+			return "Monitor/Overview"
 		}
 	case ViewPolicies:
-		return "Policies"
+		return "Analyze/Policies"
 	case ViewNATPolicies:
-		return "NAT Policies"
+		return "Analyze/NAT"
 	case ViewSessions:
-		return "Sessions"
+		return "Analyze/Sessions"
 	case ViewInterfaces:
-		return "Interfaces"
+		return "Tools/Interfaces"
 	case ViewLogs:
-		return "Logs"
+		return "Analyze/Logs"
 	case ViewPicker:
 		return "Connections"
 	case ViewDevicePicker:
-		return "Devices"
+		return "Connections/Devices"
 	case ViewCommandPalette:
 		return "Commands"
 	default:
@@ -129,7 +129,7 @@ func (m Model) renderFooter() string {
 	}
 
 	help := navHint +
-		HelpKeyStyle.Render("  Tab") + HelpDescStyle.Render(" next") +
+		HelpKeyStyle.Render("  Tab/S-Tab") + HelpDescStyle.Render(" next/prev") +
 		HelpKeyStyle.Render("  r") + HelpDescStyle.Render(" refresh") +
 		HelpKeyStyle.Render("  Ctrl+P") + HelpDescStyle.Render(" search") +
 		HelpKeyStyle.Render("  ?") + HelpDescStyle.Render(" help") +

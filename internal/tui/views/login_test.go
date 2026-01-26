@@ -13,8 +13,8 @@ func TestNewLoginModel(t *testing.T) {
 	creds := &auth.Credentials{}
 	m := NewLoginModel(creds)
 
-	if m.focusedField != fieldHost {
-		t.Errorf("expected focusedField=fieldHost, got %d", m.focusedField)
+	if m.FocusedField() != FieldHost {
+		t.Errorf("expected focusedField=FieldHost, got %d", m.FocusedField())
 	}
 	if m.Host() != "" {
 		t.Error("expected empty host")
@@ -28,7 +28,7 @@ func TestNewLoginModel_WithHost(t *testing.T) {
 	if m.Host() != "10.0.0.1" {
 		t.Errorf("expected host '10.0.0.1', got %q", m.Host())
 	}
-	if m.focusedField != fieldUsername {
+	if m.FocusedField() != FieldUsername {
 		t.Error("expected focus to move to username when host is pre-filled")
 	}
 }
@@ -63,26 +63,32 @@ func TestLoginModel_NextField(t *testing.T) {
 	m := NewLoginModel(creds)
 
 	// Start at host
-	if m.focusedField != fieldHost {
-		t.Errorf("expected fieldHost, got %d", m.focusedField)
+	if m.FocusedField() != FieldHost {
+		t.Errorf("expected FieldHost, got %d", m.FocusedField())
 	}
 
 	// Next to username
 	m = m.NextField()
-	if m.focusedField != fieldUsername {
-		t.Errorf("expected fieldUsername, got %d", m.focusedField)
+	if m.FocusedField() != FieldUsername {
+		t.Errorf("expected FieldUsername, got %d", m.FocusedField())
 	}
 
 	// Next to password
 	m = m.NextField()
-	if m.focusedField != fieldPassword {
-		t.Errorf("expected fieldPassword, got %d", m.focusedField)
+	if m.FocusedField() != FieldPassword {
+		t.Errorf("expected FieldPassword, got %d", m.FocusedField())
+	}
+
+	// Next to insecure
+	m = m.NextField()
+	if m.FocusedField() != FieldInsecure {
+		t.Errorf("expected FieldInsecure, got %d", m.FocusedField())
 	}
 
 	// Next wraps to host
 	m = m.NextField()
-	if m.focusedField != fieldHost {
-		t.Errorf("expected fieldHost after wrap, got %d", m.focusedField)
+	if m.FocusedField() != FieldHost {
+		t.Errorf("expected FieldHost after wrap, got %d", m.FocusedField())
 	}
 }
 
@@ -186,14 +192,17 @@ func TestLoginModel_View_WithError(t *testing.T) {
 }
 
 func TestLoginField_Constants(t *testing.T) {
-	if fieldHost != 0 {
-		t.Errorf("expected fieldHost=0, got %d", fieldHost)
+	if FieldHost != 0 {
+		t.Errorf("expected FieldHost=0, got %d", FieldHost)
 	}
-	if fieldUsername != 1 {
-		t.Errorf("expected fieldUsername=1, got %d", fieldUsername)
+	if FieldUsername != 1 {
+		t.Errorf("expected FieldUsername=1, got %d", FieldUsername)
 	}
-	if fieldPassword != 2 {
-		t.Errorf("expected fieldPassword=2, got %d", fieldPassword)
+	if FieldPassword != 2 {
+		t.Errorf("expected FieldPassword=2, got %d", FieldPassword)
+	}
+	if FieldInsecure != 3 {
+		t.Errorf("expected FieldInsecure=3, got %d", FieldInsecure)
 	}
 }
 

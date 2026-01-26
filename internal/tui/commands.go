@@ -83,6 +83,8 @@ func (m Model) fetchNetworkDashboardData() tea.Cmd {
 		m.fetchInterfaces(),
 		m.fetchARPTable(conn),
 		m.fetchRoutingTable(conn),
+		m.fetchBGPNeighbors(conn),
+		m.fetchOSPFNeighbors(conn),
 	)
 }
 
@@ -278,6 +280,22 @@ func (m Model) fetchRoutingTable(conn *auth.Connection) tea.Cmd {
 	}
 }
 
+func (m Model) fetchBGPNeighbors(conn *auth.Connection) tea.Cmd {
+	ctx := m.ctx
+	return func() tea.Msg {
+		neighbors, err := conn.Client.GetBGPNeighbors(ctx)
+		return BGPNeighborsMsg{Neighbors: neighbors, Err: err}
+	}
+}
+
+func (m Model) fetchOSPFNeighbors(conn *auth.Connection) tea.Cmd {
+	ctx := m.ctx
+	return func() tea.Msg {
+		neighbors, err := conn.Client.GetOSPFNeighbors(ctx)
+		return OSPFNeighborsMsg{Neighbors: neighbors, Err: err}
+	}
+}
+
 func (m Model) fetchIPSecTunnels(conn *auth.Connection) tea.Cmd {
 	ctx := m.ctx
 	return func() tea.Msg {
@@ -349,6 +367,19 @@ func (m Model) fetchSessions() tea.Cmd {
 	}
 }
 
+func (m Model) fetchSessionDetail(id int64) tea.Cmd {
+	conn := m.session.GetActiveConnection()
+	if conn == nil {
+		return nil
+	}
+
+	ctx := m.ctx
+	return func() tea.Msg {
+		detail, err := conn.Client.GetSessionByID(ctx, id)
+		return SessionDetailMsg{Detail: detail, Err: err}
+	}
+}
+
 func (m Model) fetchLogs() tea.Cmd {
 	conn := m.session.GetActiveConnection()
 	if conn == nil {
@@ -397,6 +428,10 @@ func (m Model) refreshCurrentView() tea.Cmd {
 	case ViewSessions:
 		return m.fetchSessions()
 	case ViewInterfaces:
+		conn := m.session.GetActiveConnection()
+		if conn != nil {
+			return tea.Batch(m.fetchInterfaces(), m.fetchARPTable(conn))
+		}
 		return m.fetchInterfaces()
 	case ViewLogs:
 		return m.fetchLogs()

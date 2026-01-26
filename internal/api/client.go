@@ -26,7 +26,8 @@ func WithInsecure(insecure bool) ClientOption {
 	return func(c *Client) {
 		if insecure {
 			c.httpClient.Transport = &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // #nosec G402 -- InsecureSkipVerify required for self-signed firewall certificates when user enables --insecure
+				// #nosec G402 -- InsecureSkipVerify required for self-signed firewall certificates when user enables --insecure
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
 			}
 		}
 	}

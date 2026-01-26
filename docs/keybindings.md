@@ -102,7 +102,8 @@ When in filter mode, type your search query. Filters support partial matching.
 
 | Key | Action |
 |-----|--------|
-| `Tab` | Cycle log types (System, Traffic, Threat) |
+| `]` | Next log type (System -> Traffic -> Threat) |
+| `[` | Previous log type (System -> Threat -> Traffic) |
 | `/` | Filter log entries |
 | `s` | Cycle sort field |
 | `S` | Toggle sort direction |

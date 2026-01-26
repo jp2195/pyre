@@ -132,11 +132,12 @@ func (s *Session) IsConnected(name string) bool {
 }
 
 type Credentials struct {
-	Host     string
-	APIKey   string
-	Username string
-	Password string
-	Insecure bool
+	Host              string
+	APIKey            string
+	Username          string
+	Password          string
+	Insecure          bool
+	PromptForPassword bool // True when host/user are set but no API key, so prompt for password
 }
 
 func ResolveCredentials(cfg *config.Config, flags config.CLIFlags) *Credentials {
@@ -145,6 +146,9 @@ func ResolveCredentials(cfg *config.Config, flags config.CLIFlags) *Credentials 
 	// CLI flags take highest priority
 	if flags.Host != "" {
 		creds.Host = flags.Host
+	}
+	if flags.Username != "" {
+		creds.Username = flags.Username
 	}
 	if flags.APIKey != "" {
 		creds.APIKey = flags.APIKey
@@ -179,6 +183,11 @@ func ResolveCredentials(cfg *config.Config, flags config.CLIFlags) *Credentials 
 				creds.APIKey = envKey
 			}
 		}
+	}
+
+	// If we have host but no API key, signal that we need to prompt for password
+	if creds.Host != "" && creds.APIKey == "" {
+		creds.PromptForPassword = true
 	}
 
 	return creds

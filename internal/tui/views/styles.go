@@ -97,6 +97,9 @@ var (
 	// Special indicator styles
 	PanoramaStyle     lipgloss.Style
 	SubtitleBoldStyle lipgloss.Style
+
+	// Loading spinner style
+	LoadingSpinnerStyle lipgloss.Style
 )
 
 // InitStyles initializes all view styles using the current theme colors.
@@ -347,6 +350,9 @@ func InitStyles() {
 	SubtitleBoldStyle = lipgloss.NewStyle().
 		Foreground(c.Primary).
 		Bold(true)
+
+	LoadingSpinnerStyle = lipgloss.NewStyle().
+		Foreground(c.Primary)
 }
 
 // SeverityStyle returns the appropriate style for a severity level

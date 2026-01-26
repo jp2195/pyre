@@ -168,6 +168,112 @@ func parseAdvancedRoutingJSON(inner []byte) ([]models.RouteEntry, error) {
 	return routes, nil
 }
 
+// GetBGPNeighbors retrieves BGP neighbor information
+func (c *Client) GetBGPNeighbors(ctx context.Context) ([]models.BGPNeighbor, error) {
+	resp, err := c.Op(ctx, "<show><routing><protocol><bgp><peer></peer></bgp></protocol></routing></show>")
+	if err != nil {
+		return nil, err
+	}
+	if err := CheckResponse(resp); err != nil {
+		return nil, err
+	}
+
+	if len(resp.Result.Inner) == 0 {
+		return []models.BGPNeighbor{}, nil
+	}
+
+	var result struct {
+		Entry []struct {
+			Peer             string `xml:"peer"`
+			PeerAddress      string `xml:"peer-address"`
+			RemoteAS         int    `xml:"remote-as"`
+			LocalAS          int    `xml:"local-as"`
+			RouterID         string `xml:"peer-router-id"`
+			Status           string `xml:"status"`
+			StatusMsg        string `xml:"status-msg"`
+			PrefixCounter    int    `xml:"prefix-counter"`
+			PrefixAdvertised int    `xml:"prefix-advertised"`
+			Uptime           string `xml:"status-duration"`
+			VR               string `xml:"vr"`
+			PeerGroup        string `xml:"peer-group"`
+		} `xml:"entry"`
+	}
+
+	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+		return []models.BGPNeighbor{}, nil
+	}
+
+	neighbors := make([]models.BGPNeighbor, 0, len(result.Entry))
+	for _, e := range result.Entry {
+		state := e.Status
+		if state == "" {
+			state = e.StatusMsg
+		}
+		neighbors = append(neighbors, models.BGPNeighbor{
+			PeerAddress:      e.PeerAddress,
+			PeerAS:           e.RemoteAS,
+			LocalAS:          e.LocalAS,
+			RouterID:         e.RouterID,
+			State:            state,
+			PrefixesReceived: e.PrefixCounter,
+			PrefixesSent:     e.PrefixAdvertised,
+			Uptime:           e.Uptime,
+			VirtualRouter:    e.VR,
+			PeerGroup:        e.PeerGroup,
+		})
+	}
+
+	return neighbors, nil
+}
+
+// GetOSPFNeighbors retrieves OSPF neighbor information
+func (c *Client) GetOSPFNeighbors(ctx context.Context) ([]models.OSPFNeighbor, error) {
+	resp, err := c.Op(ctx, "<show><routing><protocol><ospf><neighbor></neighbor></ospf></protocol></routing></show>")
+	if err != nil {
+		return nil, err
+	}
+	if err := CheckResponse(resp); err != nil {
+		return nil, err
+	}
+
+	if len(resp.Result.Inner) == 0 {
+		return []models.OSPFNeighbor{}, nil
+	}
+
+	var result struct {
+		Entry []struct {
+			NeighborID string `xml:"neighbor-router-id"`
+			Address    string `xml:"neighbor-address"`
+			State      string `xml:"status"`
+			Interface  string `xml:"interface-name"`
+			Area       string `xml:"area-id"`
+			Priority   int    `xml:"priority"`
+			DeadTime   string `xml:"dead-time"`
+			VR         string `xml:"virtual-router"`
+		} `xml:"entry"`
+	}
+
+	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+		return []models.OSPFNeighbor{}, nil
+	}
+
+	neighbors := make([]models.OSPFNeighbor, 0, len(result.Entry))
+	for _, e := range result.Entry {
+		neighbors = append(neighbors, models.OSPFNeighbor{
+			NeighborID:    e.NeighborID,
+			Address:       e.Address,
+			State:         e.State,
+			Interface:     e.Interface,
+			Area:          e.Area,
+			Priority:      e.Priority,
+			DeadTime:      e.DeadTime,
+			VirtualRouter: e.VR,
+		})
+	}
+
+	return neighbors, nil
+}
+
 // parseLegacyRoutingXML parses the XML format from legacy routing mode
 func parseLegacyRoutingXML(inner []byte) ([]models.RouteEntry, error) {
 	// Define entry structure supporting multiple PAN-OS response formats

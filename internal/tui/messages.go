@@ -27,6 +27,11 @@ type SessionsMsg struct {
 	Err      error
 }
 
+type SessionDetailMsg struct {
+	Detail *models.SessionDetail
+	Err    error
+}
+
 type PoliciesMsg struct {
 	Policies []models.SecurityRule
 	Err      error
@@ -162,6 +167,16 @@ type ARPTableMsg struct {
 type RoutingTableMsg struct {
 	Routes []models.RouteEntry
 	Err    error
+}
+
+type BGPNeighborsMsg struct {
+	Neighbors []models.BGPNeighbor
+	Err       error
+}
+
+type OSPFNeighborsMsg struct {
+	Neighbors []models.OSPFNeighbor
+	Err       error
 }
 
 type IPSecTunnelsMsg struct {

@@ -16,13 +16,29 @@ func (m Model) handleLoginKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case msg.String() == "enter":
+		// On insecure field, toggle checkbox on enter
+		if m.login.FocusedField() == views.FieldInsecure {
+			m.login = m.login.ToggleInsecure()
+			return m, nil
+		}
 		if m.login.CanSubmit() {
 			m.loading = true
 			return m, m.doLogin()
 		}
 
+	case msg.String() == " ":
+		// Space toggles insecure checkbox when focused
+		if m.login.FocusedField() == views.FieldInsecure {
+			m.login = m.login.ToggleInsecure()
+			return m, nil
+		}
+
 	case msg.String() == "tab":
 		m.login = m.login.NextField()
+		return m, nil
+
+	case msg.String() == "shift+tab":
+		m.login = m.login.PrevField()
 		return m, nil
 	}
 

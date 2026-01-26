@@ -10,19 +10,21 @@ import (
 	"github.com/jp2195/pyre/internal/auth"
 )
 
-type loginField int
+// LoginField represents which input field is currently focused.
+type LoginField int
 
 const (
-	fieldHost loginField = iota
-	fieldUsername
-	fieldPassword
+	FieldHost LoginField = iota
+	FieldUsername
+	FieldPassword
+	FieldInsecure
 )
 
 type LoginModel struct {
 	hostInput     textinput.Model
 	usernameInput textinput.Model
 	passwordInput textinput.Model
-	focusedField  loginField
+	focusedField  LoginField
 	err           error
 	width         int
 	height        int
@@ -42,6 +44,9 @@ func NewLoginModel(creds *auth.Credentials) LoginModel {
 	username.Placeholder = "admin"
 	username.CharLimit = 64
 	username.Width = 40
+	if creds.Username != "" {
+		username.SetValue(creds.Username)
+	}
 
 	password := textinput.New()
 	password.Placeholder = "password"
@@ -54,12 +59,17 @@ func NewLoginModel(creds *auth.Credentials) LoginModel {
 		hostInput:     host,
 		usernameInput: username,
 		passwordInput: password,
-		focusedField:  fieldHost,
+		focusedField:  FieldHost,
 		insecure:      creds.Insecure,
 	}
 
-	if creds.Host != "" {
-		m.focusedField = fieldUsername
+	// Set initial focus based on what's already filled
+	if creds.Host != "" && creds.Username != "" {
+		// Both host and username provided, focus on password
+		m.focusedField = FieldPassword
+	} else if creds.Host != "" {
+		// Only host provided, focus on username
+		m.focusedField = FieldUsername
 	}
 
 	m.updateFocus()
@@ -72,12 +82,13 @@ func (m *LoginModel) updateFocus() {
 	m.passwordInput.Blur()
 
 	switch m.focusedField {
-	case fieldHost:
+	case FieldHost:
 		m.hostInput.Focus()
-	case fieldUsername:
+	case FieldUsername:
 		m.usernameInput.Focus()
-	case fieldPassword:
+	case FieldPassword:
 		m.passwordInput.Focus()
+		// FieldInsecure doesn't need focus - it's a checkbox
 	}
 }
 
@@ -93,9 +104,27 @@ func (m LoginModel) SetError(err error) LoginModel {
 }
 
 func (m LoginModel) NextField() LoginModel {
-	m.focusedField = (m.focusedField + 1) % 3
+	m.focusedField = (m.focusedField + 1) % 4
 	m.updateFocus()
 	return m
+}
+
+// PrevField moves focus to the previous input field (for Shift+Tab).
+func (m LoginModel) PrevField() LoginModel {
+	m.focusedField = (m.focusedField + 3) % 4 // +3 is equivalent to -1 mod 4
+	m.updateFocus()
+	return m
+}
+
+// ToggleInsecure toggles the insecure checkbox value.
+func (m LoginModel) ToggleInsecure() LoginModel {
+	m.insecure = !m.insecure
+	return m
+}
+
+// FocusedField returns the currently focused field.
+func (m LoginModel) FocusedField() LoginField {
+	return m.focusedField
 }
 
 func (m LoginModel) Host() string {
@@ -129,12 +158,13 @@ func (m LoginModel) Update(msg tea.Msg) (LoginModel, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch m.focusedField {
-	case fieldHost:
+	case FieldHost:
 		m.hostInput, cmd = m.hostInput.Update(msg)
-	case fieldUsername:
+	case FieldUsername:
 		m.usernameInput, cmd = m.usernameInput.Update(msg)
-	case fieldPassword:
+	case FieldPassword:
 		m.passwordInput, cmd = m.passwordInput.Update(msg)
+		// FieldInsecure doesn't need text input updates
 	}
 
 	return m, cmd
@@ -157,7 +187,7 @@ func (m LoginModel) View() string {
 
 	b.WriteString(labelStyle.Render("Firewall Host"))
 	b.WriteString("\n")
-	if m.focusedField == fieldHost {
+	if m.focusedField == FieldHost {
 		b.WriteString(focusedInputStyle.Render(m.hostInput.View()))
 	} else {
 		b.WriteString(inputStyle.Render(m.hostInput.View()))
@@ -166,7 +196,7 @@ func (m LoginModel) View() string {
 
 	b.WriteString(labelStyle.Render("Username"))
 	b.WriteString("\n")
-	if m.focusedField == fieldUsername {
+	if m.focusedField == FieldUsername {
 		b.WriteString(focusedInputStyle.Render(m.usernameInput.View()))
 	} else {
 		b.WriteString(inputStyle.Render(m.usernameInput.View()))
@@ -175,10 +205,23 @@ func (m LoginModel) View() string {
 
 	b.WriteString(labelStyle.Render("Password"))
 	b.WriteString("\n")
-	if m.focusedField == fieldPassword {
+	if m.focusedField == FieldPassword {
 		b.WriteString(focusedInputStyle.Render(m.passwordInput.View()))
 	} else {
 		b.WriteString(inputStyle.Render(m.passwordInput.View()))
+	}
+	b.WriteString("\n")
+
+	// Insecure checkbox
+	checkboxChar := "[ ]"
+	if m.insecure {
+		checkboxChar = "[x]"
+	}
+	checkboxLabel := checkboxChar + " Skip TLS verification (insecure)"
+	if m.focusedField == FieldInsecure {
+		b.WriteString(focusedInputStyle.Render(checkboxLabel))
+	} else {
+		b.WriteString(inputStyle.Render(checkboxLabel))
 	}
 
 	if m.err != nil {
@@ -187,7 +230,7 @@ func (m LoginModel) View() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("Tab: next field  Enter: connect  Ctrl+C: quit"))
+	b.WriteString(helpStyle.Render("Tab: next  Space: toggle  Enter: connect  Ctrl+C: quit"))
 
 	content := b.String()
 

@@ -95,6 +95,7 @@ func (c *Config) GetDefaultFirewall() (string, FirewallConfig, bool) {
 
 type CLIFlags struct {
 	Host     string
+	Username string
 	APIKey   string
 	Insecure bool
 	Config   string

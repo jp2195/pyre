@@ -263,12 +263,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.NavGroup4):
 			return m.handleNavGroupKey(3)
 
-		// Tab cycles through items in current group
+		// Tab cycles forward through items in current group
 		case key.Matches(msg, m.keys.Tab):
 			group := m.navbar.ActiveGroup()
 			if group != nil && len(group.Items) > 0 {
 				nextItem := (m.navbar.ActiveItemIndex() + 1) % len(group.Items)
 				m.navbar = m.navbar.SetActiveItem(nextItem)
+				return m.navigateToCurrentItem()
+			}
+
+		// Shift+Tab cycles backward through items in current group
+		case key.Matches(msg, m.keys.ShiftTab):
+			group := m.navbar.ActiveGroup()
+			if group != nil && len(group.Items) > 0 {
+				prevItem := m.navbar.ActiveItemIndex() - 1
+				if prevItem < 0 {
+					prevItem = len(group.Items) - 1 // Wrap to end
+				}
+				m.navbar = m.navbar.SetActiveItem(prevItem)
 				return m.navigateToCurrentItem()
 			}
 		}
@@ -279,6 +291,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)
+
+		// Share spinner frame with all table views
+		frame := m.spinner.View()
+		m.policies.TableBase.SpinnerFrame = frame
+		m.natPolicies.TableBase.SpinnerFrame = frame
+		m.sessions.TableBase.SpinnerFrame = frame
+		m.interfaces.TableBase.SpinnerFrame = frame
+		m.logs.TableBase.SpinnerFrame = frame
 
 	case LoginSuccessMsg:
 		m.loading = false
@@ -356,6 +376,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SessionsMsg:
 		m.sessions = m.sessions.SetSessions(msg.Sessions, msg.Err)
 
+	case SessionDetailMsg:
+		m.sessions = m.sessions.SetDetail(msg.Detail, msg.Err)
+
+	case views.FetchDetailCmd:
+		return m, m.fetchSessionDetail(msg.SessionID)
+
 	case PanoramaDetectedMsg:
 		conn := m.session.GetActiveConnection()
 		if conn != nil {
@@ -392,19 +418,34 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case ViewDashboard:
 			return m, m.fetchCurrentDashboardData()
 		case ViewPolicies:
-			m.policies = m.policies.SetLoading(true)
-			return m, m.fetchPolicies()
+			if !m.policies.HasData() {
+				m.policies = m.policies.SetLoading(true)
+				return m, m.fetchPolicies()
+			}
 		case ViewNATPolicies:
-			m.natPolicies = m.natPolicies.SetLoading(true)
-			return m, m.fetchNATPolicies()
+			if !m.natPolicies.HasData() {
+				m.natPolicies = m.natPolicies.SetLoading(true)
+				return m, m.fetchNATPolicies()
+			}
 		case ViewSessions:
-			m.sessions = m.sessions.SetLoading(true)
-			return m, m.fetchSessions()
+			if !m.sessions.HasData() {
+				m.sessions = m.sessions.SetLoading(true)
+				return m, m.fetchSessions()
+			}
 		case ViewInterfaces:
-			return m, m.fetchInterfaces()
+			if !m.interfaces.HasData() {
+				m.interfaces = m.interfaces.SetLoading(true)
+				conn := m.session.GetActiveConnection()
+				if conn != nil {
+					return m, tea.Batch(m.fetchInterfaces(), m.fetchARPTable(conn))
+				}
+				return m, m.fetchInterfaces()
+			}
 		case ViewLogs:
-			m.logs = m.logs.SetLoading(true)
-			return m, m.fetchLogs()
+			if !m.logs.HasData() {
+				m.logs = m.logs.SetLoading(true)
+				return m, m.fetchLogs()
+			}
 		}
 		return m, nil
 
@@ -449,9 +490,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ARPTableMsg:
 		m.networkDashboard = m.networkDashboard.SetARPTable(msg.Entries, msg.Err)
+		if msg.Err == nil {
+			m.interfaces = m.interfaces.SetARPTable(msg.Entries)
+		}
 
 	case RoutingTableMsg:
 		m.networkDashboard = m.networkDashboard.SetRoutingTable(msg.Routes, msg.Err)
+
+	case BGPNeighborsMsg:
+		m.networkDashboard = m.networkDashboard.SetBGPNeighbors(msg.Neighbors, msg.Err)
+
+	case OSPFNeighborsMsg:
+		m.networkDashboard = m.networkDashboard.SetOSPFNeighbors(msg.Neighbors, msg.Err)
 
 	case IPSecTunnelsMsg:
 		m.vpnDashboard = m.vpnDashboard.SetIPSecTunnels(msg.Tunnels, msg.Err)

@@ -25,10 +25,11 @@ type KeyMap struct {
 	End      key.Binding
 
 	// Actions
-	Enter  key.Binding
-	Filter key.Binding
-	Escape key.Binding
-	Tab    key.Binding
+	Enter    key.Binding
+	Filter   key.Binding
+	Escape   key.Binding
+	Tab      key.Binding
+	ShiftTab key.Binding
 }
 
 func DefaultKeyMap() KeyMap {
@@ -112,6 +113,10 @@ func DefaultKeyMap() KeyMap {
 		Tab: key.NewBinding(
 			key.WithKeys("tab"),
 			key.WithHelp("tab", "next field"),
+		),
+		ShiftTab: key.NewBinding(
+			key.WithKeys("shift+tab"),
+			key.WithHelp("shift+tab", "prev field"),
 		),
 	}
 }
