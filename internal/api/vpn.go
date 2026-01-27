@@ -25,17 +25,21 @@ func (c *Client) GetIPSecTunnels(ctx context.Context) ([]models.IPSecTunnel, err
 
 	var result struct {
 		Entry []struct {
-			Name       string `xml:"name"`
-			Gateway    string `xml:"gateway"`
-			LocalSPI   string `xml:"local-spi"`
-			RemoteSPI  string `xml:"peer-spi"`
-			Protocol   string `xml:"protocol"`
-			Encryption string `xml:"enc-algo"`
-			Auth       string `xml:"auth-algo"`
-			TunnelIf   string `xml:"tunnel-interface"`
-			State      string `xml:"state"`
-			Lifesize   string `xml:"lifesize"`
-			Lifetime   string `xml:"lifetime"`
+			Name         string `xml:"name"`
+			Gateway      string `xml:"gateway"`
+			LocalSPI     string `xml:"local-spi"`
+			RemoteSPI    string `xml:"peer-spi"`
+			Protocol     string `xml:"protocol"`
+			Encryption   string `xml:"enc-algo"`
+			Auth         string `xml:"auth-algo"`
+			TunnelIf     string `xml:"tunnel-interface"`
+			State        string `xml:"state"`
+			Lifesize     string `xml:"lifesize"`
+			Lifetime     string `xml:"lifetime"`
+			EncapBytes   int64  `xml:"encap-bytes"`
+			DecapBytes   int64  `xml:"decap-bytes"`
+			EncapPackets int64  `xml:"encap-pkts"`
+			DecapPackets int64  `xml:"decap-pkts"`
 		} `xml:"entries>entry"`
 	}
 
@@ -45,10 +49,13 @@ func (c *Client) GetIPSecTunnels(ctx context.Context) ([]models.IPSecTunnel, err
 
 	tunnels := make([]models.IPSecTunnel, 0, len(result.Entry))
 	for _, e := range result.Entry {
+		lowerState := strings.ToLower(e.State)
 		state := "down"
-		if strings.Contains(strings.ToLower(e.State), "active") || strings.Contains(strings.ToLower(e.State), "up") {
+		if strings.Contains(lowerState, "active") ||
+			strings.Contains(lowerState, "up") ||
+			strings.Contains(lowerState, "established") {
 			state = "up"
-		} else if strings.Contains(strings.ToLower(e.State), "init") {
+		} else if strings.Contains(lowerState, "init") {
 			state = "init"
 		}
 
@@ -62,6 +69,10 @@ func (c *Client) GetIPSecTunnels(ctx context.Context) ([]models.IPSecTunnel, err
 			Encryption: e.Encryption,
 			Auth:       e.Auth,
 			Uptime:     e.Lifetime,
+			BytesOut:   e.EncapBytes, // Encap = outbound traffic
+			BytesIn:    e.DecapBytes, // Decap = inbound traffic
+			PacketsOut: e.EncapPackets,
+			PacketsIn:  e.DecapPackets,
 		})
 	}
 

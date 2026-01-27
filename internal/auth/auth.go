@@ -26,8 +26,8 @@ type Session struct {
 }
 
 type Connection struct {
-	Name       string
-	Config     *config.FirewallConfig
+	Host       string // Host/IP is the primary identifier
+	Config     *config.ConnectionConfig
 	APIKey     string
 	Client     *api.Client
 	SSHClient  *ssh.Client
@@ -70,21 +70,21 @@ func (s *Session) SetActiveFirewall(name string) bool {
 	return false
 }
 
-func (s *Session) AddConnection(name string, fwConfig *config.FirewallConfig, apiKey string) *Connection {
-	return s.AddConnectionWithSSH(name, fwConfig, apiKey, "", nil)
+func (s *Session) AddConnection(host string, connConfig *config.ConnectionConfig, apiKey string) *Connection {
+	return s.AddConnectionWithSSH(host, connConfig, apiKey, "", nil)
 }
 
 // AddConnectionWithSSH creates a new connection with SSH username and optional pre-established SSH client.
 // If sshClient is provided, it will be used directly. Otherwise, SSH can be established later
 // using credentials from environment variables.
-func (s *Session) AddConnectionWithSSH(name string, fwConfig *config.FirewallConfig, apiKey, sshUsername string, sshClient *ssh.Client) *Connection {
+func (s *Session) AddConnectionWithSSH(host string, connConfig *config.ConnectionConfig, apiKey, sshUsername string, sshClient *ssh.Client) *Connection {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	client := api.NewClient(fwConfig.Host, apiKey, api.WithInsecure(fwConfig.Insecure))
+	client := api.NewClient(host, apiKey, api.WithInsecure(connConfig.Insecure))
 	conn := &Connection{
-		Name:        name,
-		Config:      fwConfig,
+		Host:        host,
+		Config:      connConfig,
 		APIKey:      apiKey,
 		Client:      client,
 		Connected:   true,
@@ -92,23 +92,23 @@ func (s *Session) AddConnectionWithSSH(name string, fwConfig *config.FirewallCon
 		SSHClient:   sshClient,
 		SSHEnabled:  sshClient != nil,
 	}
-	s.Connections[name] = conn
+	s.Connections[host] = conn
 
 	if s.ActiveFirewall == "" {
-		s.ActiveFirewall = name
+		s.ActiveFirewall = host
 	}
 
 	return conn
 }
 
-func (s *Session) RemoveConnection(name string) {
+func (s *Session) RemoveConnection(host string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.Connections, name)
-	if s.ActiveFirewall == name {
+	delete(s.Connections, host)
+	if s.ActiveFirewall == host {
 		s.ActiveFirewall = ""
-		for n := range s.Connections {
-			s.ActiveFirewall = n
+		for h := range s.Connections {
+			s.ActiveFirewall = h
 			break
 		}
 	}
@@ -124,19 +124,20 @@ func (s *Session) ListConnections() []*Connection {
 	return conns
 }
 
-func (s *Session) IsConnected(name string) bool {
+func (s *Session) IsConnected(host string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	conn, ok := s.Connections[name]
+	conn, ok := s.Connections[host]
 	return ok && conn.Connected
 }
 
 type Credentials struct {
-	Host     string
-	APIKey   string
-	Username string
-	Password string
-	Insecure bool
+	Host              string
+	APIKey            string
+	Username          string
+	Password          string
+	Insecure          bool
+	PromptForPassword bool // True when host/user are set but no API key, so prompt for password
 }
 
 func ResolveCredentials(cfg *config.Config, flags config.CLIFlags) *Credentials {
@@ -145,6 +146,9 @@ func ResolveCredentials(cfg *config.Config, flags config.CLIFlags) *Credentials 
 	// CLI flags take highest priority
 	if flags.Host != "" {
 		creds.Host = flags.Host
+	}
+	if flags.Username != "" {
+		creds.Username = flags.Username
 	}
 	if flags.APIKey != "" {
 		creds.APIKey = flags.APIKey
@@ -167,18 +171,25 @@ func ResolveCredentials(cfg *config.Config, flags config.CLIFlags) *Credentials 
 
 	// Config file defaults (if not set by flags or env)
 	if creds.Host == "" {
-		if name, fw, ok := cfg.GetDefaultFirewall(); ok {
-			creds.Host = fw.Host
+		if host, conn, ok := cfg.GetDefaultConnection(); ok {
+			creds.Host = host
 			// Use config insecure if not already set by flags or env
-			if !creds.Insecure && fw.Insecure {
+			if !creds.Insecure && conn.Insecure {
 				creds.Insecure = true
 			}
 
-			envKey := os.Getenv("PYRE_" + name + "_API_KEY")
+			// Try host-based env var for API key (normalize host to valid env var name)
+			envName := strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(host, "-", "_"), ".", "_"))
+			envKey := os.Getenv("PYRE_" + envName + "_API_KEY")
 			if envKey != "" && creds.APIKey == "" {
 				creds.APIKey = envKey
 			}
 		}
+	}
+
+	// If we have host but no API key, signal that we need to prompt for password
+	if creds.Host != "" && creds.APIKey == "" {
+		creds.PromptForPassword = true
 	}
 
 	return creds
@@ -298,7 +309,7 @@ func (c *Connection) ConnectSSH(ctx context.Context) error {
 	}
 
 	// For Panorama with a target device, connect to the target's IP
-	host := c.Config.Host
+	host := c.Host
 	if c.IsPanorama && c.TargetIP != "" {
 		// Validate target IP before using it
 		if err := validateIP(c.TargetIP); err != nil {
@@ -347,7 +358,7 @@ func (c *Connection) getSSHConfig() config.SSHConfig {
 	}
 
 	// Apply environment variable overrides
-	sshCfg = resolveSSHCredentials(c.Name, sshCfg)
+	sshCfg = resolveSSHCredentials(sshCfg)
 
 	// Use login username if no username configured yet
 	if sshCfg.Username == "" && c.SSHUsername != "" {
@@ -358,7 +369,7 @@ func (c *Connection) getSSHConfig() config.SSHConfig {
 }
 
 // resolveSSHCredentials applies environment variable overrides to SSH config.
-func resolveSSHCredentials(fwName string, cfg config.SSHConfig) config.SSHConfig {
+func resolveSSHCredentials(cfg config.SSHConfig) config.SSHConfig {
 	// Global SSH env vars
 	if envUser := os.Getenv("PYRE_SSH_USERNAME"); envUser != "" && cfg.Username == "" {
 		cfg.Username = envUser
@@ -371,12 +382,6 @@ func resolveSSHCredentials(fwName string, cfg config.SSHConfig) config.SSHConfig
 	}
 	if os.Getenv("PYRE_SSH_INSECURE") == "true" {
 		cfg.Insecure = true
-	}
-
-	// Per-firewall SSH password: PYRE_<FIREWALL>_SSH_PASSWORD
-	envName := strings.ToUpper(strings.ReplaceAll(fwName, "-", "_"))
-	if envPass := os.Getenv("PYRE_" + envName + "_SSH_PASSWORD"); envPass != "" {
-		cfg.Password = envPass
 	}
 
 	return cfg

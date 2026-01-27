@@ -13,21 +13,32 @@ import (
 
 // NetworkDashboardModel represents the network-focused dashboard
 type NetworkDashboardModel struct {
-	interfaces []models.Interface
-	arpTable   []models.ARPEntry
-	routes     []models.RouteEntry
+	interfaces    []models.Interface
+	arpTable      []models.ARPEntry
+	routes        []models.RouteEntry
+	bgpNeighbors  []models.BGPNeighbor
+	ospfNeighbors []models.OSPFNeighbor
 
 	ifaceErr error
 	arpErr   error
 	routeErr error
+	bgpErr   error
+	ospfErr  error
 
-	width  int
-	height int
+	width        int
+	height       int
+	SpinnerFrame string
 }
 
 // NewNetworkDashboardModel creates a new network dashboard model
 func NewNetworkDashboardModel() NetworkDashboardModel {
 	return NetworkDashboardModel{}
+}
+
+// SetSpinnerFrame sets the current spinner animation frame
+func (m NetworkDashboardModel) SetSpinnerFrame(frame string) NetworkDashboardModel {
+	m.SpinnerFrame = frame
+	return m
 }
 
 // SetSize sets the terminal dimensions
@@ -58,15 +69,46 @@ func (m NetworkDashboardModel) SetRoutingTable(routes []models.RouteEntry, err e
 	return m
 }
 
+// SetBGPNeighbors sets the BGP neighbor data
+func (m NetworkDashboardModel) SetBGPNeighbors(neighbors []models.BGPNeighbor, err error) NetworkDashboardModel {
+	m.bgpNeighbors = neighbors
+	m.bgpErr = err
+	return m
+}
+
+// SetOSPFNeighbors sets the OSPF neighbor data
+func (m NetworkDashboardModel) SetOSPFNeighbors(neighbors []models.OSPFNeighbor, err error) NetworkDashboardModel {
+	m.ospfNeighbors = neighbors
+	m.ospfErr = err
+	return m
+}
+
 // Update handles key events
 func (m NetworkDashboardModel) Update(msg tea.Msg) (NetworkDashboardModel, tea.Cmd) {
 	return m, nil
 }
 
+// HasData returns true if the dashboard has already loaded its data
+func (m NetworkDashboardModel) HasData() bool {
+	// Check if any of the network-specific data has been loaded
+	// We need to check multiple sources since this dashboard shows:
+	// - interfaces (shared with main dashboard)
+	// - ARP table
+	// - routing table
+	// - BGP/OSPF neighbors
+	hasInterfaces := m.interfaces != nil
+	hasARP := m.arpTable != nil || m.arpErr != nil
+	hasRoutes := m.routes != nil || m.routeErr != nil
+	hasNeighbors := m.bgpNeighbors != nil || m.bgpErr != nil || m.ospfNeighbors != nil || m.ospfErr != nil
+
+	// Only consider data loaded if we have interfaces AND at least tried to load the others
+	return hasInterfaces && hasARP && hasRoutes && hasNeighbors
+}
+
 // View renders the network dashboard
 func (m NetworkDashboardModel) View() string {
 	if m.width == 0 {
-		return "Loading..."
+		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
 	totalWidth := m.width - 4
@@ -84,10 +126,11 @@ func (m NetworkDashboardModel) View() string {
 	}
 	leftCol := lipgloss.JoinVertical(lipgloss.Left, leftPanels...)
 
-	// Right column: ARP and routing
+	// Right column: ARP, routing, and neighbors
 	rightPanels := []string{
 		m.renderARPSummary(rightColWidth),
 		m.renderRoutingSummary(rightColWidth),
+		m.renderNeighborsSummary(rightColWidth),
 	}
 	rightCol := lipgloss.JoinVertical(lipgloss.Left, rightPanels...)
 
@@ -100,6 +143,7 @@ func (m NetworkDashboardModel) renderSingleColumn(width int) string {
 		m.renderInterfaceErrors(width),
 		m.renderARPSummary(width),
 		m.renderRoutingSummary(width),
+		m.renderNeighborsSummary(width),
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, panels...)
 }
@@ -114,7 +158,7 @@ func (m NetworkDashboardModel) renderTopInterfaces(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.interfaces == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -171,7 +215,7 @@ func (m NetworkDashboardModel) renderInterfaceErrors(width int) string {
 	b.WriteString("\n")
 
 	if m.ifaceErr != nil || m.interfaces == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -229,7 +273,7 @@ func (m NetworkDashboardModel) renderARPSummary(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.arpTable == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -238,11 +282,9 @@ func (m NetworkDashboardModel) renderARPSummary(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 
-	// Count by interface
-	ifaceCounts := make(map[string]int)
+	// Count complete entries
 	completeCount := 0
 	for _, entry := range m.arpTable {
-		ifaceCounts[entry.Interface]++
 		if strings.ToLower(entry.Status) == "complete" || strings.ToLower(entry.Status) == "c" {
 			completeCount++
 		}
@@ -250,40 +292,11 @@ func (m NetworkDashboardModel) renderARPSummary(width int) string {
 
 	// Summary
 	b.WriteString(valueStyle().Render(fmt.Sprintf("%d", len(m.arpTable))))
-	b.WriteString(dimStyle().Render(" entries ("))
-	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", completeCount)))
-	b.WriteString(dimStyle().Render(" complete)"))
-	b.WriteString("\n\n")
-
-	// Per-interface breakdown
-	b.WriteString(subtitleStyle().Render("By Interface:"))
-	b.WriteString("\n")
-
-	// Sort interfaces by count
-	type ifaceCount struct {
-		name  string
-		count int
-	}
-	counts := make([]ifaceCount, 0, len(ifaceCounts))
-	for name, count := range ifaceCounts {
-		counts = append(counts, ifaceCount{name, count})
-	}
-	sort.Slice(counts, func(i, j int) bool {
-		return counts[i].count > counts[j].count
-	})
-
-	maxShow := 6
-	if len(counts) < maxShow {
-		maxShow = len(counts)
-	}
-	for i := 0; i < maxShow; i++ {
-		ic := counts[i]
-		name := truncateEllipsis(ic.name, 16)
-		b.WriteString(labelStyle().Render(fmt.Sprintf("  %-16s ", name)))
-		b.WriteString(valueStyle().Render(fmt.Sprintf("%d", ic.count)))
-		if i < maxShow-1 {
-			b.WriteString("\n")
-		}
+	b.WriteString(dimStyle().Render(" entries"))
+	if completeCount > 0 {
+		b.WriteString(dimStyle().Render(" ("))
+		b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", completeCount)))
+		b.WriteString(dimStyle().Render(" complete)"))
 	}
 
 	return panelStyle().Width(width).Render(b.String())
@@ -299,7 +312,7 @@ func (m NetworkDashboardModel) renderRoutingSummary(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.routes == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -321,45 +334,87 @@ func (m NetworkDashboardModel) renderRoutingSummary(width int) string {
 	// Total routes
 	b.WriteString(valueStyle().Render(fmt.Sprintf("%d", len(m.routes))))
 	b.WriteString(dimStyle().Render(" routes"))
-	b.WriteString("\n\n")
-
-	// By protocol breakdown
-	b.WriteString(subtitleStyle().Render("By Protocol:"))
 	b.WriteString("\n")
 
-	protocols := []string{"connected", "static", "bgp", "ospf"}
+	// By protocol breakdown (compact)
+	var parts []string
+	protocols := []string{"connected", "local", "static", "bgp", "ospf"}
 	for _, proto := range protocols {
 		if count, ok := protocolCounts[proto]; ok && count > 0 {
-			protoStyle := dimStyle()
+			var abbrev string
 			switch proto {
 			case "connected":
-				protoStyle = highlightStyle()
+				abbrev = "C"
+			case "local":
+				abbrev = "L"
+			case "static":
+				abbrev = "S"
 			case "bgp":
-				protoStyle = accentStyle()
+				abbrev = "B"
 			case "ospf":
-				protoStyle = warningStyle()
+				abbrev = "O"
+			default:
+				abbrev = proto[:1]
 			}
-			b.WriteString(protoStyle.Render(fmt.Sprintf("  %-12s ", proto)))
-			b.WriteString(valueStyle().Render(fmt.Sprintf("%d", count)))
+			parts = append(parts, fmt.Sprintf("%s:%d", abbrev, count))
+		}
+	}
+	if len(parts) > 0 {
+		b.WriteString(dimStyle().Render(strings.Join(parts, " ")))
+	}
+
+	return panelStyle().Width(width).Render(b.String())
+}
+
+func (m NetworkDashboardModel) renderNeighborsSummary(width int) string {
+	var b strings.Builder
+	b.WriteString(titleStyle().Render("Routing Neighbors"))
+	b.WriteString("\n")
+
+	hasBGP := len(m.bgpNeighbors) > 0
+	hasOSPF := len(m.ospfNeighbors) > 0
+
+	// Both are still loading
+	if m.bgpNeighbors == nil && m.ospfNeighbors == nil && m.bgpErr == nil && m.ospfErr == nil {
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
+		return panelStyle().Width(width).Render(b.String())
+	}
+
+	if !hasBGP && !hasOSPF {
+		b.WriteString(dimStyle().Render("No BGP or OSPF neighbors"))
+		return panelStyle().Width(width).Render(b.String())
+	}
+
+	// BGP Neighbors - just count
+	if hasBGP {
+		established := 0
+		for _, n := range m.bgpNeighbors {
+			state := strings.ToLower(n.State)
+			if state == "established" || state == "openconfirm" {
+				established++
+			}
+		}
+		b.WriteString(dimStyle().Render("BGP: "))
+		b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", established)))
+		b.WriteString(dimStyle().Render(fmt.Sprintf("/%d up", len(m.bgpNeighbors))))
+		if hasOSPF {
 			b.WriteString("\n")
 		}
 	}
 
-	// Show any other protocols
-	for proto, count := range protocolCounts {
-		found := false
-		for _, p := range protocols {
-			if p == proto {
-				found = true
-				break
+	// OSPF Neighbors - just count
+	if hasOSPF {
+		full := 0
+		for _, n := range m.ospfNeighbors {
+			state := strings.ToLower(n.State)
+			if state == "full" {
+				full++
 			}
 		}
-		if !found && count > 0 {
-			b.WriteString(dimStyle().Render(fmt.Sprintf("  %-12s ", proto)))
-			b.WriteString(valueStyle().Render(fmt.Sprintf("%d", count)))
-			b.WriteString("\n")
-		}
+		b.WriteString(dimStyle().Render("OSPF: "))
+		b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", full)))
+		b.WriteString(dimStyle().Render(fmt.Sprintf("/%d full", len(m.ospfNeighbors))))
 	}
 
-	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+	return panelStyle().Width(width).Render(b.String())
 }

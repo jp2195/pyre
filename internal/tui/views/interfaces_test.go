@@ -2,6 +2,7 @@ package views
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -131,16 +132,16 @@ func TestInterfacesModel_Update_Navigation(t *testing.T) {
 	}
 	m = m.SetInterfaces(interfaces, nil)
 
-	// Move down
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	if m.Cursor != 1 {
-		t.Errorf("expected Cursor=1 after j, got %d", m.Cursor)
+	// Move down (table uses down arrow or j)
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if m.TableCursor() != 1 {
+		t.Errorf("expected TableCursor=1 after down, got %d", m.TableCursor())
 	}
 
 	// Move up
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
-	if m.Cursor != 0 {
-		t.Errorf("expected Cursor=0 after k, got %d", m.Cursor)
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if m.TableCursor() != 0 {
+		t.Errorf("expected TableCursor=0 after up, got %d", m.TableCursor())
 	}
 }
 
@@ -171,8 +172,8 @@ func TestInterfacesModel_View_ZeroWidth(t *testing.T) {
 	// Don't set size
 
 	view := m.View()
-	if view != "Loading..." {
-		t.Errorf("expected 'Loading...' with zero width, got %q", view)
+	if !strings.Contains(view, "Loading...") {
+		t.Errorf("expected view to contain 'Loading...' with zero width, got %q", view)
 	}
 }
 
@@ -188,5 +189,41 @@ func TestInterfaceSortField_Constants(t *testing.T) {
 	}
 	if InterfaceSortIP != 3 {
 		t.Errorf("expected InterfaceSortIP=3, got %d", InterfaceSortIP)
+	}
+}
+
+func TestInterfacesModel_SetSize_ClampsCursor(t *testing.T) {
+	m := NewInterfacesModel()
+
+	// Set up interfaces and move cursor to end
+	interfaces := []models.Interface{
+		{Name: "ethernet1/1"},
+		{Name: "ethernet1/2"},
+		{Name: "ethernet1/3"},
+		{Name: "ethernet1/4"},
+		{Name: "ethernet1/5"},
+	}
+	m = m.SetSize(100, 50) // Large enough for all
+	m = m.SetInterfaces(interfaces, nil)
+
+	// Move cursor to end using table navigation
+	for i := 0; i < 4; i++ {
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+	if m.TableCursor() != 4 {
+		t.Errorf("expected cursor at 4, got %d", m.TableCursor())
+	}
+
+	// Apply filter that reduces items
+	m.Filter.SetValue("ethernet1/1")
+	m.applyFilter()
+	m.updateTableRows()
+
+	// Now resize - cursor should be clamped
+	m = m.SetSize(100, 50)
+
+	// Cursor should be clamped to valid range (0 since only 1 item matches)
+	if m.TableCursor() >= len(m.filtered) {
+		t.Errorf("cursor %d should be less than filtered count %d after resize", m.TableCursor(), len(m.filtered))
 	}
 }

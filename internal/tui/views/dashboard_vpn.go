@@ -18,13 +18,20 @@ type VPNDashboardModel struct {
 	tunnelErr error
 	gpErr     error
 
-	width  int
-	height int
+	width        int
+	height       int
+	SpinnerFrame string
 }
 
 // NewVPNDashboardModel creates a new VPN dashboard model
 func NewVPNDashboardModel() VPNDashboardModel {
 	return VPNDashboardModel{}
+}
+
+// SetSpinnerFrame sets the current spinner animation frame
+func (m VPNDashboardModel) SetSpinnerFrame(frame string) VPNDashboardModel {
+	m.SpinnerFrame = frame
+	return m
 }
 
 // SetSize sets the terminal dimensions
@@ -53,10 +60,15 @@ func (m VPNDashboardModel) Update(msg tea.Msg) (VPNDashboardModel, tea.Cmd) {
 	return m, nil
 }
 
+// HasData returns true if the dashboard has already loaded its data
+func (m VPNDashboardModel) HasData() bool {
+	return m.tunnels != nil
+}
+
 // View renders the VPN dashboard
 func (m VPNDashboardModel) View() string {
 	if m.width == 0 {
-		return "Loading..."
+		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
 	totalWidth := m.width - 4
@@ -104,7 +116,7 @@ func (m VPNDashboardModel) renderIPSecSummary(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.tunnels == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -164,7 +176,7 @@ func (m VPNDashboardModel) renderIPSecTunnels(width int) string {
 	b.WriteString("\n")
 
 	if m.tunnelErr != nil || m.tunnels == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -244,7 +256,7 @@ func (m VPNDashboardModel) renderGlobalProtectSummary(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.gpUsers == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -288,7 +300,7 @@ func (m VPNDashboardModel) renderGlobalProtectUsers(width int) string {
 	b.WriteString("\n")
 
 	if m.gpErr != nil || m.gpUsers == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 

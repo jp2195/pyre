@@ -37,12 +37,30 @@ func NewPoliciesModel() PoliciesModel {
 
 func (m PoliciesModel) SetSize(width, height int) PoliciesModel {
 	m.TableBase = m.TableBase.SetSize(width, height)
+
+	// Clamp cursor to valid range after resize
+	count := len(m.filtered)
+	if m.Cursor >= count && count > 0 {
+		m.Cursor = count - 1
+	}
+
+	// Adjust offset to keep cursor visible
+	visibleRows := m.visibleRows()
+	if visibleRows > 0 && m.Cursor >= m.Offset+visibleRows {
+		m.Offset = m.Cursor - visibleRows + 1
+	}
+
 	return m
 }
 
 func (m PoliciesModel) SetLoading(loading bool) PoliciesModel {
 	m.TableBase = m.TableBase.SetLoading(loading)
 	return m
+}
+
+// HasData returns true if policies have been loaded.
+func (m PoliciesModel) HasData() bool {
+	return m.policies != nil
 }
 
 func (m PoliciesModel) SetPolicies(policies []models.SecurityRule, err error) PoliciesModel {
@@ -190,15 +208,15 @@ func (m PoliciesModel) visibleRows() int {
 
 func (m PoliciesModel) View() string {
 	if m.Width == 0 {
-		return "Loading..."
+		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
 	titleStyle := ViewTitleStyle.MarginBottom(1)
 	panelStyle := ViewPanelStyle.Width(m.Width - 4)
 
 	var b strings.Builder
-	title := fmt.Sprintf("Security Policies (%d rules)", len(m.filtered))
-	sortInfo := BannerInfoStyle.Render(fmt.Sprintf("  [Sort: %s | s: change | /: filter | enter: details]", m.sortLabel()))
+	title := "Security Policies"
+	sortInfo := BannerInfoStyle.Render(fmt.Sprintf(" [%d rules | Sort: %s | s: change | /: filter | enter: details]", len(m.filtered), m.sortLabel()))
 	b.WriteString(titleStyle.Render(title) + sortInfo)
 	b.WriteString("\n")
 
@@ -218,7 +236,7 @@ func (m PoliciesModel) View() string {
 	}
 
 	if m.Loading || m.policies == nil {
-		b.WriteString(LoadingMsgStyle.Render("Loading policies..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading policies..."))
 		return panelStyle.Render(b.String())
 	}
 

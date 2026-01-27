@@ -31,18 +31,17 @@ func TestSession_AddConnection(t *testing.T) {
 	cfg := config.DefaultConfig()
 	session := NewSession(cfg)
 
-	fwConfig := &config.FirewallConfig{
-		Host:     "10.0.0.1",
+	fwConfig := &config.ConnectionConfig{
 		Insecure: true,
 	}
 
-	conn := session.AddConnection("test-fw", fwConfig, "test-api-key")
+	conn := session.AddConnection("10.0.0.1", fwConfig, "test-api-key")
 
 	if conn == nil {
 		t.Fatal("expected non-nil connection")
 	}
-	if conn.Name != "test-fw" {
-		t.Errorf("expected name 'test-fw', got %q", conn.Name)
+	if conn.Host != "10.0.0.1" {
+		t.Errorf("expected host '10.0.0.1', got %q", conn.Host)
 	}
 	if conn.APIKey != "test-api-key" {
 		t.Errorf("expected API key 'test-api-key', got %q", conn.APIKey)
@@ -50,8 +49,8 @@ func TestSession_AddConnection(t *testing.T) {
 	if !conn.Connected {
 		t.Error("expected Connected to be true")
 	}
-	if session.ActiveFirewall != "test-fw" {
-		t.Errorf("expected ActiveFirewall 'test-fw', got %q", session.ActiveFirewall)
+	if session.ActiveFirewall != "10.0.0.1" {
+		t.Errorf("expected ActiveFirewall '10.0.0.1', got %q", session.ActiveFirewall)
 	}
 }
 
@@ -59,14 +58,13 @@ func TestSession_AddConnectionWithSSH(t *testing.T) {
 	cfg := config.DefaultConfig()
 	session := NewSession(cfg)
 
-	fwConfig := &config.FirewallConfig{
-		Host:     "10.0.0.1",
+	fwConfig := &config.ConnectionConfig{
 		Insecure: true,
 	}
 
 	// Note: SSH client is passed directly (established during login)
 	// Password is no longer stored - SSH must be established while credentials are in memory
-	conn := session.AddConnectionWithSSH("test-fw", fwConfig, "test-api-key", "admin", nil)
+	conn := session.AddConnectionWithSSH("10.0.0.1", fwConfig, "test-api-key", "admin", nil)
 
 	if conn == nil {
 		t.Fatal("expected non-nil connection")
@@ -87,15 +85,15 @@ func TestSession_GetActiveConnection(t *testing.T) {
 	}
 
 	// Add a connection
-	fwConfig := &config.FirewallConfig{Host: "10.0.0.1"}
-	session.AddConnection("test-fw", fwConfig, "api-key")
+	fwConfig := &config.ConnectionConfig{}
+	session.AddConnection("10.0.0.1", fwConfig, "api-key")
 
 	conn = session.GetActiveConnection()
 	if conn == nil {
 		t.Fatal("expected non-nil active connection")
 	}
-	if conn.Name != "test-fw" {
-		t.Errorf("expected name 'test-fw', got %q", conn.Name)
+	if conn.Host != "10.0.0.1" {
+		t.Errorf("expected host '10.0.0.1', got %q", conn.Host)
 	}
 }
 
@@ -103,17 +101,17 @@ func TestSession_SetActiveFirewall(t *testing.T) {
 	cfg := config.DefaultConfig()
 	session := NewSession(cfg)
 
-	fwConfig := &config.FirewallConfig{Host: "10.0.0.1"}
-	session.AddConnection("fw1", fwConfig, "key1")
-	session.AddConnection("fw2", fwConfig, "key2")
+	fwConfig := &config.ConnectionConfig{}
+	session.AddConnection("10.0.0.1", fwConfig, "key1")
+	session.AddConnection("10.0.0.2", fwConfig, "key2")
 
-	// Set active to fw2
-	ok := session.SetActiveFirewall("fw2")
+	// Set active to second host
+	ok := session.SetActiveFirewall("10.0.0.2")
 	if !ok {
 		t.Error("expected SetActiveFirewall to succeed")
 	}
-	if session.ActiveFirewall != "fw2" {
-		t.Errorf("expected ActiveFirewall 'fw2', got %q", session.ActiveFirewall)
+	if session.ActiveFirewall != "10.0.0.2" {
+		t.Errorf("expected ActiveFirewall '10.0.0.2', got %q", session.ActiveFirewall)
 	}
 
 	// Try to set non-existent firewall
@@ -121,9 +119,9 @@ func TestSession_SetActiveFirewall(t *testing.T) {
 	if ok {
 		t.Error("expected SetActiveFirewall to fail for nonexistent firewall")
 	}
-	// Active should remain fw2
-	if session.ActiveFirewall != "fw2" {
-		t.Errorf("expected ActiveFirewall to remain 'fw2', got %q", session.ActiveFirewall)
+	// Active should remain 10.0.0.2
+	if session.ActiveFirewall != "10.0.0.2" {
+		t.Errorf("expected ActiveFirewall to remain '10.0.0.2', got %q", session.ActiveFirewall)
 	}
 }
 
@@ -131,23 +129,23 @@ func TestSession_RemoveConnection(t *testing.T) {
 	cfg := config.DefaultConfig()
 	session := NewSession(cfg)
 
-	fwConfig := &config.FirewallConfig{Host: "10.0.0.1"}
-	session.AddConnection("fw1", fwConfig, "key1")
-	session.AddConnection("fw2", fwConfig, "key2")
+	fwConfig := &config.ConnectionConfig{}
+	session.AddConnection("10.0.0.1", fwConfig, "key1")
+	session.AddConnection("10.0.0.2", fwConfig, "key2")
 
 	// Remove active connection
-	session.RemoveConnection("fw1")
+	session.RemoveConnection("10.0.0.1")
 
-	if _, ok := session.Connections["fw1"]; ok {
-		t.Error("expected fw1 to be removed")
+	if _, ok := session.Connections["10.0.0.1"]; ok {
+		t.Error("expected 10.0.0.1 to be removed")
 	}
 	// Active should switch to remaining connection
-	if session.ActiveFirewall != "fw2" {
-		t.Errorf("expected ActiveFirewall to switch to 'fw2', got %q", session.ActiveFirewall)
+	if session.ActiveFirewall != "10.0.0.2" {
+		t.Errorf("expected ActiveFirewall to switch to '10.0.0.2', got %q", session.ActiveFirewall)
 	}
 
 	// Remove last connection
-	session.RemoveConnection("fw2")
+	session.RemoveConnection("10.0.0.2")
 	if session.ActiveFirewall != "" {
 		t.Errorf("expected ActiveFirewall to be empty, got %q", session.ActiveFirewall)
 	}
@@ -164,9 +162,9 @@ func TestSession_ListConnections(t *testing.T) {
 	}
 
 	// Add connections
-	fwConfig := &config.FirewallConfig{Host: "10.0.0.1"}
-	session.AddConnection("fw1", fwConfig, "key1")
-	session.AddConnection("fw2", fwConfig, "key2")
+	fwConfig := &config.ConnectionConfig{}
+	session.AddConnection("10.0.0.1", fwConfig, "key1")
+	session.AddConnection("10.0.0.2", fwConfig, "key2")
 
 	conns = session.ListConnections()
 	if len(conns) != 2 {
@@ -179,15 +177,15 @@ func TestSession_IsConnected(t *testing.T) {
 	session := NewSession(cfg)
 
 	// Not connected
-	if session.IsConnected("fw1") {
+	if session.IsConnected("10.0.0.1") {
 		t.Error("expected IsConnected to be false for nonexistent firewall")
 	}
 
 	// Add connection
-	fwConfig := &config.FirewallConfig{Host: "10.0.0.1"}
-	session.AddConnection("fw1", fwConfig, "key1")
+	fwConfig := &config.ConnectionConfig{}
+	session.AddConnection("10.0.0.1", fwConfig, "key1")
 
-	if !session.IsConnected("fw1") {
+	if !session.IsConnected("10.0.0.1") {
 		t.Error("expected IsConnected to be true")
 	}
 }
@@ -244,9 +242,8 @@ func TestResolveCredentials_EnvVars(t *testing.T) {
 
 func TestResolveCredentials_ConfigDefault(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfg.DefaultFirewall = "default-fw"
-	cfg.Firewalls["default-fw"] = config.FirewallConfig{
-		Host:     "config-host",
+	cfg.Default = "config-host"
+	cfg.Connections["config-host"] = config.ConnectionConfig{
 		Insecure: true,
 	}
 
@@ -317,7 +314,7 @@ func TestCredentials_Methods(t *testing.T) {
 
 func TestConnection_GetTargetDevice(t *testing.T) {
 	conn := &Connection{
-		Name:         "test-conn",
+		Host:         "10.0.0.1",
 		TargetSerial: "",
 		ManagedDevices: []models.ManagedDevice{
 			{Serial: "serial1", Hostname: "fw1", IPAddress: "10.0.0.1"},
@@ -368,8 +365,8 @@ func TestConnection_ConnectedDeviceCount(t *testing.T) {
 func TestConnection_HasSSH(t *testing.T) {
 	// No SSH config
 	conn := &Connection{
-		Name:   "test-conn",
-		Config: &config.FirewallConfig{},
+		Host:   "10.0.0.1",
+		Config: &config.ConnectionConfig{},
 	}
 
 	if conn.HasSSH() {
@@ -377,7 +374,7 @@ func TestConnection_HasSSH(t *testing.T) {
 	}
 
 	// With SSH username in config
-	conn.Config = &config.FirewallConfig{
+	conn.Config = &config.ConnectionConfig{
 		SSH: config.SSHConfig{
 			Username: "admin",
 		},
@@ -388,7 +385,7 @@ func TestConnection_HasSSH(t *testing.T) {
 	}
 
 	// With SSH username from login credentials
-	conn.Config = &config.FirewallConfig{}
+	conn.Config = &config.ConnectionConfig{}
 	conn.SSHUsername = "admin"
 
 	if !conn.HasSSH() {
@@ -401,23 +398,20 @@ func TestResolveSSHCredentials(t *testing.T) {
 	os.Setenv("PYRE_SSH_USERNAME", "env-user")
 	os.Setenv("PYRE_SSH_PASSWORD", "env-pass")
 	os.Setenv("PYRE_SSH_KEY_PATH", "/env/key/path")
-	os.Setenv("PYRE_TEST_FW_SSH_PASSWORD", "fw-specific-pass")
 	defer func() {
 		os.Unsetenv("PYRE_SSH_USERNAME")
 		os.Unsetenv("PYRE_SSH_PASSWORD")
 		os.Unsetenv("PYRE_SSH_KEY_PATH")
-		os.Unsetenv("PYRE_TEST_FW_SSH_PASSWORD")
 	}()
 
 	cfg := config.SSHConfig{}
-	result := resolveSSHCredentials("test-fw", cfg)
+	result := resolveSSHCredentials(cfg)
 
 	if result.Username != "env-user" {
 		t.Errorf("expected Username 'env-user', got %q", result.Username)
 	}
-	// Per-firewall password should override global
-	if result.Password != "fw-specific-pass" {
-		t.Errorf("expected Password 'fw-specific-pass', got %q", result.Password)
+	if result.Password != "env-pass" {
+		t.Errorf("expected Password 'env-pass', got %q", result.Password)
 	}
 	if result.PrivateKeyPath != "/env/key/path" {
 		t.Errorf("expected PrivateKeyPath '/env/key/path', got %q", result.PrivateKeyPath)
@@ -433,7 +427,7 @@ func TestResolveSSHCredentials_ConfigTakesPrecedence(t *testing.T) {
 	cfg := config.SSHConfig{
 		Username: "config-user",
 	}
-	result := resolveSSHCredentials("test-fw", cfg)
+	result := resolveSSHCredentials(cfg)
 
 	// Config should be preserved, env should not override
 	if result.Username != "config-user" {
@@ -443,8 +437,8 @@ func TestResolveSSHCredentials_ConfigTakesPrecedence(t *testing.T) {
 
 func TestConnection_getSSHConfig(t *testing.T) {
 	conn := &Connection{
-		Name: "test-fw",
-		Config: &config.FirewallConfig{
+		Host: "10.0.0.1",
+		Config: &config.ConnectionConfig{
 			SSH: config.SSHConfig{
 				Port:     2222,
 				Username: "config-admin",
@@ -475,8 +469,8 @@ func TestConnection_getSSHConfig_LoginFallback(t *testing.T) {
 	defer os.Unsetenv("PYRE_SSH_PASSWORD")
 
 	conn := &Connection{
-		Name: "test-fw",
-		Config: &config.FirewallConfig{
+		Host: "10.0.0.1",
+		Config: &config.ConnectionConfig{
 			SSH: config.SSHConfig{
 				Port: 22,
 				// No username
@@ -499,7 +493,7 @@ func TestConnection_getSSHConfig_LoginFallback(t *testing.T) {
 
 func TestConnection_getSSHConfig_NilConfig(t *testing.T) {
 	conn := &Connection{
-		Name:        "test-fw",
+		Host:        "10.0.0.1",
 		Config:      nil,
 		SSHUsername: "login-admin",
 	}

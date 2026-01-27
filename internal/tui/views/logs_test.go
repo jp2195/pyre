@@ -2,6 +2,7 @@ package views
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -202,8 +203,8 @@ func TestLogsModel_View_ZeroWidth(t *testing.T) {
 	// Don't set size
 
 	view := m.View()
-	if view != "Loading..." {
-		t.Errorf("expected 'Loading...' with zero width, got %q", view)
+	if !strings.Contains(view, "Loading...") {
+		t.Errorf("expected view to contain 'Loading...' with zero width, got %q", view)
 	}
 }
 
@@ -219,5 +220,94 @@ func TestLogSortField_Constants(t *testing.T) {
 	}
 	if LogSortAction != 3 {
 		t.Errorf("expected LogSortAction=3, got %d", LogSortAction)
+	}
+}
+
+func TestLogsModel_Update_LogTypeCycleForward(t *testing.T) {
+	m := NewLogsModel()
+	m = m.SetSize(100, 50)
+
+	// Default should be System
+	if m.activeLogType != models.LogTypeSystem {
+		t.Errorf("expected default log type System, got %v", m.activeLogType)
+	}
+
+	// Press ] to cycle forward: System -> Traffic
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("]")})
+	if m.activeLogType != models.LogTypeTraffic {
+		t.Errorf("expected Traffic after ], got %v", m.activeLogType)
+	}
+
+	// Press ] again: Traffic -> Threat
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("]")})
+	if m.activeLogType != models.LogTypeThreat {
+		t.Errorf("expected Threat after ], got %v", m.activeLogType)
+	}
+
+	// Press ] again: Threat -> System (wraps around)
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("]")})
+	if m.activeLogType != models.LogTypeSystem {
+		t.Errorf("expected System after ] (wrap), got %v", m.activeLogType)
+	}
+}
+
+func TestLogsModel_Update_LogTypeCycleBackward(t *testing.T) {
+	m := NewLogsModel()
+	m = m.SetSize(100, 50)
+
+	// Default should be System
+	if m.activeLogType != models.LogTypeSystem {
+		t.Errorf("expected default log type System, got %v", m.activeLogType)
+	}
+
+	// Press [ to cycle backward: System -> Threat
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[")})
+	if m.activeLogType != models.LogTypeThreat {
+		t.Errorf("expected Threat after [, got %v", m.activeLogType)
+	}
+
+	// Press [ again: Threat -> Traffic
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[")})
+	if m.activeLogType != models.LogTypeTraffic {
+		t.Errorf("expected Traffic after [, got %v", m.activeLogType)
+	}
+
+	// Press [ again: Traffic -> System (wraps around)
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[")})
+	if m.activeLogType != models.LogTypeSystem {
+		t.Errorf("expected System after [ (wrap), got %v", m.activeLogType)
+	}
+}
+
+func TestLogsModel_SetSize_ClampsCursor(t *testing.T) {
+	m := NewLogsModel()
+	m = m.SetSize(100, 50)
+
+	// Add some logs
+	logs := []models.SystemLogEntry{
+		{Time: time.Now(), Description: "Log 1"},
+		{Time: time.Now(), Description: "Log 2"},
+		{Time: time.Now(), Description: "Log 3"},
+		{Time: time.Now(), Description: "Log 4"},
+		{Time: time.Now(), Description: "Log 5"},
+	}
+	m = m.SetSystemLogs(logs, nil)
+
+	// Move cursor to end
+	m.Cursor = 4
+	if m.Cursor != 4 {
+		t.Errorf("expected cursor at 4, got %d", m.Cursor)
+	}
+
+	// Filter to reduce items
+	m.Filter.SetValue("Log 1")
+	m.applyFilter()
+
+	// Resize - should clamp cursor
+	m = m.SetSize(100, 50)
+
+	// Cursor should be clamped to valid range
+	if m.Cursor >= m.filteredCount() {
+		t.Errorf("cursor %d should be less than filtered count %d after resize", m.Cursor, m.filteredCount())
 	}
 }

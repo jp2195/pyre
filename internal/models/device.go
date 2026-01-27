@@ -277,3 +277,29 @@ type NATPoolInfo struct {
 	Available int64   // Available addresses/ports
 	Percent   float64 // Utilization percentage
 }
+
+// BGPNeighbor represents a BGP neighbor/peer
+type BGPNeighbor struct {
+	PeerAddress      string // Peer IP address
+	PeerAS           int    // Peer autonomous system number
+	LocalAS          int    // Local autonomous system number
+	RouterID         string // Peer router ID
+	State            string // BGP state (Established, Idle, Connect, Active, etc.)
+	PrefixesReceived int    // Number of prefixes received
+	PrefixesSent     int    // Number of prefixes advertised
+	Uptime           string // Uptime/last state change
+	VirtualRouter    string // Virtual router name
+	PeerGroup        string // Peer group name
+}
+
+// OSPFNeighbor represents an OSPF neighbor
+type OSPFNeighbor struct {
+	NeighborID    string // Neighbor router ID
+	Address       string // Neighbor IP address
+	State         string // OSPF state (Full, 2-Way, Init, Down, etc.)
+	Interface     string // Local interface name
+	Area          string // OSPF area
+	Priority      int    // Neighbor priority
+	DeadTime      string // Dead timer remaining
+	VirtualRouter string // Virtual router name
+}

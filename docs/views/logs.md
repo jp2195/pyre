@@ -4,7 +4,7 @@ The Logs view displays system, traffic, and threat logs from the firewall. Acces
 
 ## Log Types
 
-Use `Tab` to switch between log types:
+Use `]` to cycle forward or `[` to cycle backward between log types:
 
 ### System Logs
 
@@ -99,7 +99,8 @@ Press `Enter` again or `Esc` to collapse.
 
 | Key | Action |
 |-----|--------|
-| `Tab` | Cycle log type (System/Traffic/Threat) |
+| `]` | Next log type (System -> Traffic -> Threat) |
+| `[` | Previous log type (System -> Threat -> Traffic) |
 | `j` / `Down` | Move cursor down |
 | `k` / `Up` | Move cursor up |
 | `g` / `Home` | Jump to first entry |
@@ -117,7 +118,7 @@ Press `Enter` again or `Esc` to collapse.
 
 ### Investigating Security Events
 
-1. Switch to Threat logs with `Tab`
+1. Switch to Threat logs with `]` (press twice from System)
 2. Sort by Severity to see critical threats first
 3. Expand entries to see full threat details
 4. Note the source IP and rule that triggered

@@ -47,11 +47,6 @@ pyre/
 │   │   ├── nat.go         # NATRule
 │   │   ├── session.go     # Session, SessionInfo
 │   │   └── logs.go        # LogEntry types
-│   ├── ssh/               # SSH client for troubleshooting
-│   │   └── client.go      # SSH connection and command execution
-│   ├── troubleshoot/      # Troubleshooting runbooks
-│   │   ├── engine.go      # Runbook execution engine
-│   │   └── patterns.go    # Output parsing patterns
 │   └── tui/               # Bubbletea TUI
 │       ├── app.go         # Main model, view switching
 │       ├── keys.go        # Keybindings
@@ -70,21 +65,19 @@ pyre/
 │           ├── navbar.go
 │           ├── picker.go
 │           ├── policies.go
-│           ├── sessions.go
-│           └── troubleshoot.go
+│           └── sessions.go
 ├── docs/                  # Documentation
 │   ├── getting-started.md
 │   ├── navigation.md
 │   ├── keybindings.md
 │   ├── configuration.md
 │   ├── panorama.md
-│   ├── ssh-setup.md
 │   └── views/             # Per-view documentation
 ```
 
 ## Running with pyre-demo
 
-The `pyre-demo` command starts mock API and SSH servers for development without a real firewall:
+The `pyre-demo` command starts a mock API server for development without a real firewall:
 
 ```bash
 # Build and run the demo server
@@ -98,7 +91,6 @@ go build -o pyre-demo ./cmd/pyre-demo
 The demo server provides:
 - Mock PAN-OS XML API responses
 - Simulated system info, policies, sessions, logs
-- Mock SSH server for troubleshooting
 
 ## Adding New Views
 
@@ -148,31 +140,6 @@ func (m MyViewModel) View() string {
 5. Add keybinding in `internal/tui/keys.go` if needed
 
 6. Document the view in `docs/views/`
-
-## Adding New Runbooks
-
-Troubleshooting runbooks are defined in `internal/troubleshoot/runbooks/`. Each runbook is a YAML file:
-
-```yaml
-name: My Runbook
-description: Description of what this runbook does
-category: network  # network, security, system, vpn
-
-steps:
-  - name: Step Name
-    description: What this step does
-    command: show system info
-    parse: text  # text, table, or custom parser name
-
-  - name: Conditional Step
-    description: Only runs if condition met
-    command: show interface {{ .interface }}
-    condition: "{{ .previous.status }} == 'down'"
-    inputs:
-      - name: interface
-        prompt: "Enter interface name"
-        default: ethernet1/1
-```
 
 ## Code Style
 

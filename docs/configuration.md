@@ -1,98 +1,58 @@
 # Configuration
 
-pyre uses a YAML configuration file for managing firewall connections and settings.
+pyre uses a YAML configuration file for managing connections and settings.
 
-## Configuration File Locations
+## Configuration File Location
 
-pyre looks for configuration in this order:
+pyre looks for configuration at `~/.pyre.yaml`.
 
-1. `$PYRE_CONFIG` environment variable (if set)
-2. `~/.pyre.yaml`
-3. `~/.config/pyre/config.yaml`
+You can specify a custom path with the `--config` flag:
+
+```bash
+pyre --config /path/to/config.yaml
+```
 
 ## Full Configuration Example
 
 ```yaml
-# Default firewall to connect to on startup
-default_firewall: prod-fw01
+# Default connection (host/IP)
+default: 10.0.0.1
 
-# Firewall definitions
-firewalls:
-  prod-fw01:
-    host: fw1.example.com        # Hostname or IP
-    port: 443                    # API port (default: 443)
-    api_key: LUFRPT...           # Direct API key
-    insecure: false              # Verify TLS certificate
-    ssh_user: admin              # SSH username for troubleshooting
-    ssh_port: 22                 # SSH port (default: 22)
-    ssh_key_file: ~/.ssh/fw_key  # SSH private key path
-    ssh_password_env: FW1_SSH_PASS  # Env var for SSH password
-
-  prod-fw02:
-    host: fw2.example.com
-    api_key_env: FW2_API_KEY     # Read API key from environment
+# Connections keyed by host/IP
+connections:
+  10.0.0.1:
+    username: admin              # Username for login
+    type: firewall               # "firewall" or "panorama"
     insecure: true               # Skip TLS verification
 
-  panorama:
-    host: panorama.example.com
-    api_key_env: PANORAMA_API_KEY
+  panorama.example.com:
+    type: panorama
     insecure: true
 
 # Global settings
 settings:
-  refresh_interval: 5s          # Auto-refresh interval
   session_page_size: 50         # Sessions per page
-  log_page_size: 100            # Log entries per page
-  theme: dark                   # Color theme (see Theme Options)
+  theme: dark                   # Color theme
   default_view: dashboard       # Initial view on connect
-  ssh_known_hosts: ~/.ssh/known_hosts  # Known hosts file
 ```
 
-## Firewall Entry Options
+## Connection Options
+
+Connections are keyed by host/IP address. Each connection supports:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `host` | string | required | Hostname or IP address |
-| `port` | int | 443 | API port number |
-| `api_key` | string | | API key (direct value) |
-| `api_key_env` | string | | Environment variable containing API key |
+| `username` | string | | Username for API/login authentication |
+| `type` | string | firewall | Connection type: `firewall` or `panorama` |
 | `insecure` | bool | false | Skip TLS certificate verification |
-| `ssh_user` | string | | SSH username for troubleshooting |
-| `ssh_port` | int | 22 | SSH port number |
-| `ssh_key_file` | string | | Path to SSH private key |
-| `ssh_password_env` | string | | Env var containing SSH password |
-
-### API Key Options
-
-You can specify the API key in two ways:
-
-**Direct value:**
-```yaml
-firewalls:
-  myfw:
-    host: firewall.example.com
-    api_key: LUFRPT14ZlpoYTNwL2...
-```
-
-**Environment variable reference:**
-```yaml
-firewalls:
-  myfw:
-    host: firewall.example.com
-    api_key_env: MY_FW_API_KEY
-```
-
-Using `api_key_env` is recommended for security, as the key isn't stored in the config file.
 
 ### TLS Certificate Verification
 
 Set `insecure: true` to skip TLS certificate verification. This is common for firewalls with self-signed certificates:
 
 ```yaml
-firewalls:
-  myfw:
-    host: firewall.example.com
-    api_key_env: MY_FW_API_KEY
+connections:
+  10.0.0.1:
     insecure: true
 ```
 
@@ -100,20 +60,9 @@ firewalls:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `refresh_interval` | duration | 5s | How often to auto-refresh data |
 | `session_page_size` | int | 50 | Number of sessions per page |
-| `log_page_size` | int | 100 | Number of log entries per page |
 | `theme` | string | dark | Color theme (see Theme Options) |
 | `default_view` | string | dashboard | Initial view on connect |
-| `ssh_known_hosts` | string | ~/.ssh/known_hosts | SSH known hosts file |
-
-### Duration Format
-
-Duration values use Go's duration format:
-- `5s` - 5 seconds
-- `1m` - 1 minute
-- `30s` - 30 seconds
-- `1m30s` - 1 minute 30 seconds
 
 ### Default View Options
 
@@ -145,7 +94,7 @@ Example:
 
 ```yaml
 settings:
-  theme: "catppuccin"
+  theme: catppuccin
 ```
 
 ## Configuration Precedence
@@ -163,9 +112,20 @@ This means CLI flags override everything, and environment variables override con
 
 | Variable | Description |
 |----------|-------------|
-| `PYRE_CONFIG` | Path to configuration file |
 | `PYRE_HOST` | Firewall hostname or IP |
-| `PYRE_API_KEY` | API key |
+| `PYRE_API_KEY` | API key for authentication |
+| `PYRE_INSECURE` | Skip TLS verification (true/false) |
+
+## CLI Flags
+
+| Flag | Description |
+|------|-------------|
+| `--host` | Firewall hostname or IP |
+| `--user` | Username for login |
+| `--api-key` | API key for authentication |
+| `--insecure` | Skip TLS verification |
+| `--config` | Path to config file |
+| `-c` | Connect to a saved connection by host |
 
 ## Examples
 
@@ -174,67 +134,66 @@ This means CLI flags override everything, and environment variables override con
 Connect to a single firewall:
 
 ```yaml
-firewalls:
-  main:
-    host: 192.168.1.1
-    api_key_env: FW_API_KEY
+connections:
+  192.168.1.1:
     insecure: true
 ```
 
-### Multiple Firewalls
+Then connect with:
 
-Manage several firewalls with different credentials:
+```bash
+export PYRE_API_KEY=YOUR_API_KEY
+pyre -c 192.168.1.1
+```
+
+### Multiple Connections
+
+Manage several firewalls:
 
 ```yaml
-default_firewall: prod-dc1
+default: 10.1.0.1
 
-firewalls:
-  prod-dc1:
-    host: 10.1.0.1
-    api_key_env: DC1_API_KEY
-    ssh_user: admin
-    ssh_key_file: ~/.ssh/palo_key
+connections:
+  10.1.0.1:
+    username: admin
+    insecure: true
 
-  prod-dc2:
-    host: 10.2.0.1
-    api_key_env: DC2_API_KEY
-    ssh_user: admin
-    ssh_key_file: ~/.ssh/palo_key
+  10.2.0.1:
+    username: admin
+    insecure: true
 
-  lab:
-    host: 192.168.100.1
-    api_key_env: LAB_API_KEY
+  192.168.100.1:
+    username: labadmin
     insecure: true
 ```
 
-### Panorama with Managed Firewalls
+### Panorama
 
-Connect through Panorama:
+Connect to Panorama and target managed firewalls:
 
 ```yaml
-default_firewall: panorama
+default: panorama.example.com
 
-firewalls:
-  panorama:
-    host: panorama.example.com
-    api_key_env: PANORAMA_API_KEY
+connections:
+  panorama.example.com:
+    type: panorama
     insecure: true
 ```
 
 Use `D` in pyre to select a managed firewall to target.
 
-### SSH for Troubleshooting
+## Connection Hub
 
-Enable SSH for troubleshooting runbooks:
+When you run `pyre` without flags and have connections configured, you'll see the Connection Hub. This lets you:
 
-```yaml
-firewalls:
-  prod-fw01:
-    host: firewall.example.com
-    api_key_env: FW_API_KEY
-    ssh_user: admin
-    ssh_key_file: ~/.ssh/palo_alto_key
-    ssh_port: 22
-```
+- View all saved connections
+- See last connected time and user
+- Connect to any saved connection
+- Add new connections
+- Delete connections
 
-See [SSH Setup](ssh-setup.md) for more details.
+Press `n` to add a new connection or `Enter` to connect to the selected one.
+
+## State File
+
+pyre stores connection state (last connected time, user) in `~/.pyre/state.json`. This file is managed automatically and doesn't need to be edited.

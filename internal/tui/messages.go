@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/jp2195/pyre/internal/config"
 	"github.com/jp2195/pyre/internal/models"
 	"github.com/jp2195/pyre/internal/tui/views"
 )
@@ -25,6 +26,11 @@ type SessionInfoMsg struct {
 type SessionsMsg struct {
 	Sessions []models.Session
 	Err      error
+}
+
+type SessionDetailMsg struct {
+	Detail *models.SessionDetail
+	Err    error
 }
 
 type PoliciesMsg struct {
@@ -73,7 +79,7 @@ type JobsMsg struct {
 }
 
 type LoginSuccessMsg struct {
-	Name     string
+	Host     string
 	APIKey   string
 	Username string
 	Insecure bool
@@ -164,6 +170,16 @@ type RoutingTableMsg struct {
 	Err    error
 }
 
+type BGPNeighborsMsg struct {
+	Neighbors []models.BGPNeighbor
+	Err       error
+}
+
+type OSPFNeighborsMsg struct {
+	Neighbors []models.OSPFNeighbor
+	Err       error
+}
+
 type IPSecTunnelsMsg struct {
 	Tunnels []models.IPSecTunnel
 	Err     error
@@ -182,4 +198,45 @@ type PendingChangesMsg struct {
 type NATPoolMsg struct {
 	Pools []models.NATPoolInfo
 	Err   error
+}
+
+// Connection Hub messages
+
+// ConnectionSelectedMsg is sent when a connection is selected from the hub
+type ConnectionSelectedMsg struct {
+	Host   string
+	Config config.ConnectionConfig
+}
+
+// ConnectionFormSubmitMsg is sent when the connection form is submitted
+type ConnectionFormSubmitMsg struct {
+	Host         string
+	Config       config.ConnectionConfig
+	SaveToConfig bool
+	Mode         views.FormMode
+}
+
+// ConnectionDeletedMsg is sent when a connection is deleted
+type ConnectionDeletedMsg struct {
+	Host string
+}
+
+// ConfigSavedMsg is sent after config is saved
+type ConfigSavedMsg struct {
+	Err error
+}
+
+// StateSavedMsg is sent after state is saved
+type StateSavedMsg struct {
+	Err error
+}
+
+// ShowConnectionHubMsg requests showing the connection hub
+type ShowConnectionHubMsg struct{}
+
+// ShowConnectionFormMsg requests showing the connection form
+type ShowConnectionFormMsg struct {
+	Mode   views.FormMode
+	Host   string                  // For edit mode
+	Config config.ConnectionConfig // For edit mode
 }

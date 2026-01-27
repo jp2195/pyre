@@ -48,12 +48,30 @@ func NewLogsModel() LogsModel {
 
 func (m LogsModel) SetSize(width, height int) LogsModel {
 	m.TableBase = m.TableBase.SetSize(width, height)
+
+	// Clamp cursor to valid range after resize
+	count := m.filteredCount()
+	if m.Cursor >= count && count > 0 {
+		m.Cursor = count - 1
+	}
+
+	// Adjust offset to keep cursor visible
+	visibleRows := m.visibleRows()
+	if visibleRows > 0 && m.Cursor >= m.Offset+visibleRows {
+		m.Offset = m.Cursor - visibleRows + 1
+	}
+
 	return m
 }
 
 func (m LogsModel) SetLoading(loading bool) LogsModel {
 	m.TableBase = m.TableBase.SetLoading(loading)
 	return m
+}
+
+// HasData returns true if any logs have been loaded.
+func (m LogsModel) HasData() bool {
+	return m.systemLogs != nil || m.trafficLogs != nil || m.threatLogs != nil
 }
 
 func (m LogsModel) SetSystemLogs(logs []models.SystemLogEntry, err error) LogsModel {
@@ -300,8 +318,8 @@ func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
 			m.SortAsc = !m.SortAsc
 			m.applySort()
 			return m, nil
-		case "tab":
-			// Cycle through log types
+		case "]":
+			// Cycle forward through log types: System -> Traffic -> Threat -> System
 			switch m.activeLogType {
 			case models.LogTypeSystem:
 				m.activeLogType = models.LogTypeTraffic
@@ -309,6 +327,20 @@ func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
 				m.activeLogType = models.LogTypeThreat
 			case models.LogTypeThreat:
 				m.activeLogType = models.LogTypeSystem
+			}
+			m.Cursor = 0
+			m.Offset = 0
+			m.Expanded = false
+			return m, nil
+		case "[":
+			// Cycle backward through log types: System -> Threat -> Traffic -> System
+			switch m.activeLogType {
+			case models.LogTypeSystem:
+				m.activeLogType = models.LogTypeThreat
+			case models.LogTypeTraffic:
+				m.activeLogType = models.LogTypeSystem
+			case models.LogTypeThreat:
+				m.activeLogType = models.LogTypeTraffic
 			}
 			m.Cursor = 0
 			m.Offset = 0
@@ -362,7 +394,7 @@ func (m LogsModel) visibleRows() int {
 
 func (m LogsModel) View() string {
 	if m.Width == 0 {
-		return "Loading..."
+		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
 	var sections []string
@@ -401,13 +433,7 @@ func (m LogsModel) View() string {
 }
 
 func (m LogsModel) renderLoadingBanner() string {
-	banner := LoadingBannerStyle.Render(" Loading logs... ")
-
-	padding := (m.Width - lipgloss.Width(banner)) / 2
-	if padding < 0 {
-		padding = 0
-	}
-	return strings.Repeat(" ", padding) + banner
+	return RenderLoadingBanner(m.SpinnerFrame, "Loading logs...", m.Width)
 }
 
 func (m LogsModel) renderTabBar() string {
@@ -811,7 +837,7 @@ func (m LogsModel) renderHelp() string {
 	}
 
 	keys := []struct{ key, desc string }{
-		{"tab", "log type"},
+		{"[/]", "log type"},
 		{"j/k", "scroll"},
 		{"enter", expandText},
 		{"/", "filter"},

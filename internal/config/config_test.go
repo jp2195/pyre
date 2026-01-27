@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 )
 
 func TestDefaultConfig(t *testing.T) {
@@ -14,12 +13,8 @@ func TestDefaultConfig(t *testing.T) {
 		t.Fatal("expected non-nil config")
 	}
 
-	if cfg.Firewalls == nil {
-		t.Error("expected Firewalls map to be initialized")
-	}
-
-	if cfg.Settings.RefreshInterval != 5*time.Second {
-		t.Errorf("expected RefreshInterval 5s, got %v", cfg.Settings.RefreshInterval)
+	if cfg.Connections == nil {
+		t.Error("expected Connections map to be initialized")
 	}
 
 	if cfg.Settings.SessionPageSize != 50 {
@@ -35,66 +30,58 @@ func TestDefaultConfig(t *testing.T) {
 	}
 }
 
-func TestConfig_GetFirewall(t *testing.T) {
+func TestConfig_GetConnection(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Firewalls["test-fw"] = FirewallConfig{
-		Host:     "192.168.1.1",
+	// Host is now the key
+	cfg.Connections["192.168.1.1"] = ConnectionConfig{
 		Insecure: true,
 	}
 
-	// Test existing firewall
-	fw, ok := cfg.GetFirewall("test-fw")
+	// Test existing connection
+	conn, ok := cfg.GetConnection("192.168.1.1")
 	if !ok {
-		t.Error("expected to find test-fw")
+		t.Error("expected to find 192.168.1.1")
 	}
-	if fw.Host != "192.168.1.1" {
-		t.Errorf("expected host 192.168.1.1, got %q", fw.Host)
-	}
-	if !fw.Insecure {
+	if !conn.Insecure {
 		t.Error("expected Insecure to be true")
 	}
 
-	// Test non-existing firewall
-	_, ok = cfg.GetFirewall("nonexistent")
+	// Test non-existing connection
+	_, ok = cfg.GetConnection("nonexistent")
 	if ok {
-		t.Error("expected not to find nonexistent firewall")
+		t.Error("expected not to find nonexistent connection")
 	}
 }
 
-func TestConfig_GetDefaultFirewall(t *testing.T) {
+func TestConfig_GetDefaultConnection(t *testing.T) {
 	cfg := DefaultConfig()
 
 	// Test with no default set
-	name, fw, ok := cfg.GetDefaultFirewall()
+	host, _, ok := cfg.GetDefaultConnection()
 	if ok {
-		t.Error("expected no default firewall")
+		t.Error("expected no default connection")
 	}
-	if name != "" {
-		t.Errorf("expected empty name, got %q", name)
+	if host != "" {
+		t.Errorf("expected empty host, got %q", host)
 	}
 
-	// Test with default set
-	cfg.Firewalls["prod-fw"] = FirewallConfig{
-		Host: "10.0.0.1",
-	}
-	cfg.DefaultFirewall = "prod-fw"
+	// Test with default set (host is now the key)
+	cfg.Connections["10.0.0.1"] = ConnectionConfig{}
+	cfg.Default = "10.0.0.1"
 
-	name, fw, ok = cfg.GetDefaultFirewall()
+	host, _, ok = cfg.GetDefaultConnection()
 	if !ok {
-		t.Error("expected to find default firewall")
+		t.Error("expected to find default connection")
 	}
-	if name != "prod-fw" {
-		t.Errorf("expected name 'prod-fw', got %q", name)
-	}
-	if fw.Host != "10.0.0.1" {
-		t.Errorf("expected host '10.0.0.1', got %q", fw.Host)
+	if host != "10.0.0.1" {
+		t.Errorf("expected host '10.0.0.1', got %q", host)
 	}
 
 	// Test with invalid default
-	cfg.DefaultFirewall = "nonexistent"
-	_, _, ok = cfg.GetDefaultFirewall()
+	cfg.Default = "nonexistent"
+	_, _, ok = cfg.GetDefaultConnection()
 	if ok {
-		t.Error("expected not to find invalid default firewall")
+		t.Error("expected not to find invalid default connection")
 	}
 }
 
@@ -104,8 +91,8 @@ func TestConfig_ApplyFlags(t *testing.T) {
 	// Test with no flags
 	flags := CLIFlags{}
 	cfg.ApplyFlags(flags)
-	if cfg.DefaultFirewall != "" {
-		t.Error("expected no default firewall with empty flags")
+	if cfg.Default != "" {
+		t.Error("expected no default connection with empty flags")
 	}
 
 	// Test with host flag
@@ -115,18 +102,16 @@ func TestConfig_ApplyFlags(t *testing.T) {
 	}
 	cfg.ApplyFlags(flags)
 
-	if cfg.DefaultFirewall != "cli" {
-		t.Errorf("expected default firewall 'cli', got %q", cfg.DefaultFirewall)
+	// Default should now be the host itself
+	if cfg.Default != "192.168.1.100" {
+		t.Errorf("expected default connection '192.168.1.100', got %q", cfg.Default)
 	}
 
-	fw, ok := cfg.GetFirewall("cli")
+	conn, ok := cfg.GetConnection("192.168.1.100")
 	if !ok {
-		t.Error("expected to find 'cli' firewall")
+		t.Error("expected to find '192.168.1.100' connection")
 	}
-	if fw.Host != "192.168.1.100" {
-		t.Errorf("expected host '192.168.1.100', got %q", fw.Host)
-	}
-	if !fw.Insecure {
+	if !conn.Insecure {
 		t.Error("expected Insecure to be true")
 	}
 }
@@ -142,8 +127,8 @@ func TestLoad_NoConfigFile(t *testing.T) {
 		t.Fatal("expected non-nil config")
 	}
 	// Should return default config
-	if cfg.Settings.RefreshInterval != 5*time.Second {
-		t.Errorf("expected default RefreshInterval, got %v", cfg.Settings.RefreshInterval)
+	if cfg.Settings.SessionPageSize != 50 {
+		t.Errorf("expected default SessionPageSize 50, got %d", cfg.Settings.SessionPageSize)
 	}
 }
 
@@ -152,14 +137,13 @@ func TestLoadWithFlags_CustomConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "test-pyre.yaml")
 
+	// Host is now the key in the YAML
 	configContent := `
-default_firewall: test-fw
-firewalls:
-  test-fw:
-    host: 10.0.0.1
+default: 10.0.0.1
+connections:
+  10.0.0.1:
     insecure: true
 settings:
-  refresh_interval: 10s
   session_page_size: 100
   theme: dark
   default_view: policies
@@ -177,21 +161,18 @@ settings:
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if cfg.DefaultFirewall != "test-fw" {
-		t.Errorf("expected DefaultFirewall 'test-fw', got %q", cfg.DefaultFirewall)
+	if cfg.Default != "10.0.0.1" {
+		t.Errorf("expected Default '10.0.0.1', got %q", cfg.Default)
 	}
 
-	fw, ok := cfg.GetFirewall("test-fw")
+	conn, ok := cfg.GetConnection("10.0.0.1")
 	if !ok {
-		t.Error("expected to find test-fw")
+		t.Error("expected to find 10.0.0.1")
 	}
-	if fw.Host != "10.0.0.1" {
-		t.Errorf("expected host '10.0.0.1', got %q", fw.Host)
+	if !conn.Insecure {
+		t.Error("expected Insecure to be true")
 	}
 
-	if cfg.Settings.RefreshInterval != 10*time.Second {
-		t.Errorf("expected RefreshInterval 10s, got %v", cfg.Settings.RefreshInterval)
-	}
 	if cfg.Settings.SessionPageSize != 100 {
 		t.Errorf("expected SessionPageSize 100, got %d", cfg.Settings.SessionPageSize)
 	}
@@ -238,10 +219,10 @@ func TestLoadWithFlags_FlagsOverrideConfig(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "test.yaml")
 
 	configContent := `
-default_firewall: config-fw
-firewalls:
-  config-fw:
-    host: 10.0.0.1
+default: 10.0.0.1
+connections:
+  10.0.0.1:
+    insecure: false
 `
 	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		t.Fatalf("failed to write test config: %v", err)
@@ -259,23 +240,23 @@ firewalls:
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Default should be "cli" from flags, not "config-fw" from file
-	if cfg.DefaultFirewall != "cli" {
-		t.Errorf("expected flags to override default, got %q", cfg.DefaultFirewall)
+	// Default should be the host from flags
+	if cfg.Default != "192.168.1.1" {
+		t.Errorf("expected flags to override default, got %q", cfg.Default)
 	}
 
-	// Both firewalls should exist
-	_, ok := cfg.GetFirewall("config-fw")
+	// Both connections should exist
+	_, ok := cfg.GetConnection("10.0.0.1")
 	if !ok {
-		t.Error("expected config-fw to still exist")
+		t.Error("expected 10.0.0.1 to still exist")
 	}
 
-	fw, ok := cfg.GetFirewall("cli")
+	conn, ok := cfg.GetConnection("192.168.1.1")
 	if !ok {
-		t.Error("expected cli firewall from flags")
+		t.Error("expected 192.168.1.1 connection from flags")
 	}
-	if fw.Host != "192.168.1.1" {
-		t.Errorf("expected host from flags, got %q", fw.Host)
+	if !conn.Insecure {
+		t.Error("expected Insecure from flags to be true")
 	}
 }
 
@@ -284,9 +265,8 @@ func TestSSHConfig(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "ssh-test.yaml")
 
 	configContent := `
-firewalls:
-  ssh-fw:
-    host: 10.0.0.1
+connections:
+  10.0.0.1:
     ssh:
       port: 2222
       username: admin
@@ -304,39 +284,38 @@ firewalls:
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	fw, ok := cfg.GetFirewall("ssh-fw")
+	conn, ok := cfg.GetConnection("10.0.0.1")
 	if !ok {
-		t.Fatal("expected to find ssh-fw")
+		t.Fatal("expected to find 10.0.0.1")
 	}
 
-	if fw.SSH.Port != 2222 {
-		t.Errorf("expected SSH port 2222, got %d", fw.SSH.Port)
+	if conn.SSH.Port != 2222 {
+		t.Errorf("expected SSH port 2222, got %d", conn.SSH.Port)
 	}
-	if fw.SSH.Username != "admin" {
-		t.Errorf("expected SSH username 'admin', got %q", fw.SSH.Username)
+	if conn.SSH.Username != "admin" {
+		t.Errorf("expected SSH username 'admin', got %q", conn.SSH.Username)
 	}
-	if fw.SSH.Password != "secret" {
-		t.Errorf("expected SSH password 'secret', got %q", fw.SSH.Password)
+	if conn.SSH.Password != "secret" {
+		t.Errorf("expected SSH password 'secret', got %q", conn.SSH.Password)
 	}
-	if fw.SSH.PrivateKeyPath != "/path/to/key" {
-		t.Errorf("expected SSH key path '/path/to/key', got %q", fw.SSH.PrivateKeyPath)
+	if conn.SSH.PrivateKeyPath != "/path/to/key" {
+		t.Errorf("expected SSH key path '/path/to/key', got %q", conn.SSH.PrivateKeyPath)
 	}
-	if fw.SSH.Timeout != 60 {
-		t.Errorf("expected SSH timeout 60, got %d", fw.SSH.Timeout)
+	if conn.SSH.Timeout != 60 {
+		t.Errorf("expected SSH timeout 60, got %d", conn.SSH.Timeout)
 	}
 }
 
-func TestFirewallType(t *testing.T) {
+func TestConnectionType(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "type-test.yaml")
 
 	configContent := `
-firewalls:
-  panorama:
-    host: 10.0.0.1
+connections:
+  10.0.0.1:
     type: panorama
-  firewall:
-    host: 10.0.0.2
+  10.0.0.2:
+    type: firewall
 `
 	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		t.Fatalf("failed to write test config: %v", err)
@@ -348,14 +327,14 @@ firewalls:
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	panorama, _ := cfg.GetFirewall("panorama")
+	panorama, _ := cfg.GetConnection("10.0.0.1")
 	if panorama.Type != "panorama" {
 		t.Errorf("expected type 'panorama', got %q", panorama.Type)
 	}
 
-	firewall, _ := cfg.GetFirewall("firewall")
-	if firewall.Type != "" {
-		t.Errorf("expected empty type for auto-detect, got %q", firewall.Type)
+	firewall, _ := cfg.GetConnection("10.0.0.2")
+	if firewall.Type != "firewall" {
+		t.Errorf("expected type 'firewall', got %q", firewall.Type)
 	}
 }
 
@@ -371,14 +350,14 @@ func TestLoadWithFlags_DefaultLoad(t *testing.T) {
 	}
 }
 
-func TestConfig_NilFirewallsAfterLoad(t *testing.T) {
+func TestConfig_NilConnectionsAfterLoad(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "minimal.yaml")
 
-	// Config with no firewalls section
+	// Config with no connections section
 	configContent := `
 settings:
-  refresh_interval: 10s
+  session_page_size: 100
 `
 	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		t.Fatalf("failed to write test config: %v", err)
@@ -390,9 +369,9 @@ settings:
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Firewalls should be initialized even if not in config
-	if cfg.Firewalls == nil {
-		t.Error("expected Firewalls map to be initialized")
+	// Connections should be initialized even if not in config
+	if cfg.Connections == nil {
+		t.Error("expected Connections map to be initialized")
 	}
 }
 
@@ -412,10 +391,11 @@ func TestLoad_ReadError(t *testing.T) {
 
 func TestCLIFlags_AllFields(t *testing.T) {
 	flags := CLIFlags{
-		Host:     "10.0.0.1",
-		APIKey:   "test-key",
-		Insecure: true,
-		Config:   "/path/to/config",
+		Host:       "10.0.0.1",
+		APIKey:     "test-key",
+		Insecure:   true,
+		Config:     "/path/to/config",
+		Connection: "my-fw",
 	}
 
 	if flags.Host != "10.0.0.1" {
@@ -430,19 +410,18 @@ func TestCLIFlags_AllFields(t *testing.T) {
 	if flags.Config != "/path/to/config" {
 		t.Errorf("expected Config '/path/to/config', got %q", flags.Config)
 	}
+	if flags.Connection != "my-fw" {
+		t.Errorf("expected Connection 'my-fw', got %q", flags.Connection)
+	}
 }
 
 func TestSettings_AllFields(t *testing.T) {
 	settings := Settings{
-		RefreshInterval: 30 * time.Second,
 		SessionPageSize: 100,
 		Theme:           "dark",
 		DefaultView:     "policies",
 	}
 
-	if settings.RefreshInterval != 30*time.Second {
-		t.Errorf("expected RefreshInterval 30s, got %v", settings.RefreshInterval)
-	}
 	if settings.SessionPageSize != 100 {
 		t.Errorf("expected SessionPageSize 100, got %d", settings.SessionPageSize)
 	}
@@ -459,9 +438,8 @@ func TestSSHConfig_AllFields(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "ssh-all-fields.yaml")
 
 	configContent := `
-firewalls:
-  complete-fw:
-    host: 10.0.0.1
+connections:
+  10.0.0.1:
     insecure: true
     type: firewall
     ssh:
@@ -481,52 +459,148 @@ firewalls:
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	fw, ok := cfg.GetFirewall("complete-fw")
+	conn, ok := cfg.GetConnection("10.0.0.1")
 	if !ok {
-		t.Fatal("expected to find complete-fw")
+		t.Fatal("expected to find 10.0.0.1")
 	}
 
-	if fw.Host != "10.0.0.1" {
-		t.Errorf("expected Host '10.0.0.1', got %q", fw.Host)
-	}
-	if !fw.Insecure {
+	if !conn.Insecure {
 		t.Error("expected Insecure to be true")
 	}
-	if fw.Type != "firewall" {
-		t.Errorf("expected Type 'firewall', got %q", fw.Type)
+	if conn.Type != "firewall" {
+		t.Errorf("expected Type 'firewall', got %q", conn.Type)
 	}
-	if fw.SSH.Port != 2222 {
-		t.Errorf("expected SSH Port 2222, got %d", fw.SSH.Port)
+	if conn.SSH.Port != 2222 {
+		t.Errorf("expected SSH Port 2222, got %d", conn.SSH.Port)
 	}
-	if fw.SSH.Username != "admin" {
-		t.Errorf("expected SSH Username 'admin', got %q", fw.SSH.Username)
+	if conn.SSH.Username != "admin" {
+		t.Errorf("expected SSH Username 'admin', got %q", conn.SSH.Username)
 	}
-	if fw.SSH.Password != "secret123" {
-		t.Errorf("expected SSH Password 'secret123', got %q", fw.SSH.Password)
+	if conn.SSH.Password != "secret123" {
+		t.Errorf("expected SSH Password 'secret123', got %q", conn.SSH.Password)
 	}
-	if fw.SSH.PrivateKeyPath != "/path/to/key" {
-		t.Errorf("expected SSH PrivateKeyPath '/path/to/key', got %q", fw.SSH.PrivateKeyPath)
+	if conn.SSH.PrivateKeyPath != "/path/to/key" {
+		t.Errorf("expected SSH PrivateKeyPath '/path/to/key', got %q", conn.SSH.PrivateKeyPath)
 	}
-	if fw.SSH.Timeout != 120 {
-		t.Errorf("expected SSH Timeout 120, got %d", fw.SSH.Timeout)
+	if conn.SSH.Timeout != 120 {
+		t.Errorf("expected SSH Timeout 120, got %d", conn.SSH.Timeout)
 	}
 }
 
 func TestConfig_ApplyFlags_NoHost(t *testing.T) {
 	cfg := DefaultConfig()
 
-	// Add existing firewall
-	cfg.Firewalls["existing-fw"] = FirewallConfig{Host: "10.0.0.1"}
-	cfg.DefaultFirewall = "existing-fw"
+	// Add existing connection
+	cfg.Connections["10.0.0.1"] = ConnectionConfig{}
+	cfg.Default = "10.0.0.1"
 
 	// Apply empty flags - should not change anything
 	flags := CLIFlags{}
 	cfg.ApplyFlags(flags)
 
-	if cfg.DefaultFirewall != "existing-fw" {
-		t.Errorf("expected DefaultFirewall to remain 'existing-fw', got %q", cfg.DefaultFirewall)
+	if cfg.Default != "10.0.0.1" {
+		t.Errorf("expected Default to remain '10.0.0.1', got %q", cfg.Default)
 	}
-	if _, ok := cfg.Firewalls["cli"]; ok {
-		t.Error("expected no 'cli' firewall to be added")
+}
+
+func TestConfig_AddConnection(t *testing.T) {
+	cfg := DefaultConfig()
+
+	err := cfg.AddConnection("10.0.0.1", ConnectionConfig{Insecure: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	conn, ok := cfg.GetConnection("10.0.0.1")
+	if !ok {
+		t.Error("expected to find 10.0.0.1")
+	}
+	if !conn.Insecure {
+		t.Error("expected Insecure to be true")
+	}
+
+	// Try to add duplicate
+	err = cfg.AddConnection("10.0.0.1", ConnectionConfig{})
+	if err == nil {
+		t.Error("expected error for duplicate connection")
+	}
+}
+
+func TestConfig_UpdateConnection(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Connections["10.0.0.1"] = ConnectionConfig{}
+
+	err := cfg.UpdateConnection("10.0.0.1", ConnectionConfig{Insecure: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	conn, _ := cfg.GetConnection("10.0.0.1")
+	if !conn.Insecure {
+		t.Error("expected Insecure to be true")
+	}
+
+	// Try to update nonexistent
+	err = cfg.UpdateConnection("nonexistent", ConnectionConfig{})
+	if err == nil {
+		t.Error("expected error for nonexistent connection")
+	}
+}
+
+func TestConfig_DeleteConnection(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Connections["10.0.0.1"] = ConnectionConfig{}
+	cfg.Default = "10.0.0.1"
+
+	err := cfg.DeleteConnection("10.0.0.1")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	_, ok := cfg.GetConnection("10.0.0.1")
+	if ok {
+		t.Error("expected 10.0.0.1 to be deleted")
+	}
+
+	// Default should be cleared
+	if cfg.Default != "" {
+		t.Errorf("expected Default to be cleared, got %q", cfg.Default)
+	}
+
+	// Try to delete nonexistent
+	err = cfg.DeleteConnection("nonexistent")
+	if err == nil {
+		t.Error("expected error for nonexistent connection")
+	}
+}
+
+func TestConfig_HasConnections(t *testing.T) {
+	cfg := DefaultConfig()
+
+	if cfg.HasConnections() {
+		t.Error("expected HasConnections to be false for empty config")
+	}
+
+	cfg.Connections["10.0.0.1"] = ConnectionConfig{}
+
+	if !cfg.HasConnections() {
+		t.Error("expected HasConnections to be true")
+	}
+}
+
+func TestConfig_ConnectionHosts(t *testing.T) {
+	cfg := DefaultConfig()
+
+	hosts := cfg.ConnectionHosts()
+	if len(hosts) != 0 {
+		t.Errorf("expected 0 hosts, got %d", len(hosts))
+	}
+
+	cfg.Connections["10.0.0.1"] = ConnectionConfig{}
+	cfg.Connections["10.0.0.2"] = ConnectionConfig{}
+
+	hosts = cfg.ConnectionHosts()
+	if len(hosts) != 2 {
+		t.Errorf("expected 2 hosts, got %d", len(hosts))
 	}
 }

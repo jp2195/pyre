@@ -10,7 +10,7 @@ Press number keys `1-4` to switch between navigation groups:
 |-----|-------|-------|
 | `1` | Monitor | Overview, Network, Security, VPN |
 | `2` | Analyze | Policies, NAT, Sessions, Interfaces, Logs |
-| `3` | Tools | Troubleshoot, Config |
+| `3` | Tools | Config |
 | `4` | Connections | Switch Device |
 
 ## Navigating Within Groups
@@ -44,19 +44,34 @@ Press `Ctrl+P` to open the command palette. This provides a searchable list of a
 The command palette is organized by category:
 - **Monitor** - Dashboard views (Overview, Network, Security, VPN)
 - **Analyze** - Data views (Policies, NAT, Sessions, Interfaces, Logs)
-- **Tools** - Utilities (Troubleshoot, Config)
+- **Tools** - Utilities (Config)
 - **Connections** - Device management
 - **Actions** - Common actions (Refresh)
 - **System** - Help, Quit
 
+## Connection Hub
+
+When you launch pyre with a configuration file but no specific connection, you'll see the Connection Hub. This shows all your saved connections with:
+
+- Host/IP address
+- Connection type (firewall or panorama)
+- Last connected time
+- Last user
+
+In the Connection Hub:
+- `j`/`k` or arrow keys to navigate
+- `Enter` to connect to the selected connection
+- `n` to add a new connection
+- `d` to delete a connection
+- `e` to edit a connection
+
 ## Connection Picker
 
-Press `:` to open the connection picker (or use the command palette filtered to Connections). This shows all configured firewalls and lets you switch between them.
+Press `:` to open the connection picker when already connected. This shows all configured firewalls and lets you switch between them.
 
 In the picker:
 - `j`/`k` or arrow keys to navigate
 - `Enter` to connect
-- `a` to add a new connection
 - `x` to disconnect
 - `Esc` to cancel
 

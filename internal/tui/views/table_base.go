@@ -8,16 +8,17 @@ import (
 // TableBase provides common state and navigation handling for table-style views.
 // Views should embed this struct and delegate navigation to its methods.
 type TableBase struct {
-	Cursor     int
-	Offset     int
-	FilterMode bool
-	Filter     textinput.Model
-	Expanded   bool
-	Width      int
-	Height     int
-	SortAsc    bool
-	Loading    bool
-	Err        error
+	Cursor       int
+	Offset       int
+	FilterMode   bool
+	Filter       textinput.Model
+	Expanded     bool
+	Width        int
+	Height       int
+	SortAsc      bool
+	Loading      bool
+	Err          error
+	SpinnerFrame string // Current spinner frame from app
 }
 
 // NewTableBase creates a new TableBase with default settings.
@@ -49,6 +50,12 @@ func (t TableBase) SetLoading(loading bool) TableBase {
 func (t TableBase) SetError(err error) TableBase {
 	t.Err = err
 	t.Loading = false
+	return t
+}
+
+// SetSpinnerFrame updates the spinner frame for display.
+func (t TableBase) SetSpinnerFrame(frame string) TableBase {
+	t.SpinnerFrame = frame
 	return t
 }
 

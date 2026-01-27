@@ -69,12 +69,19 @@ type DashboardModel struct {
 	certErr     error
 	natPoolErr  error
 
-	width  int
-	height int
+	width        int
+	height       int
+	SpinnerFrame string
 }
 
 func NewDashboardModel() DashboardModel {
 	return DashboardModel{}
+}
+
+// SetSpinnerFrame sets the current spinner animation frame
+func (m DashboardModel) SetSpinnerFrame(frame string) DashboardModel {
+	m.SpinnerFrame = frame
+	return m
 }
 
 func (m DashboardModel) SetSize(width, height int) DashboardModel {
@@ -171,9 +178,14 @@ func (m DashboardModel) Update(msg tea.Msg) (DashboardModel, tea.Cmd) {
 	return m, nil
 }
 
+// HasData returns true if the dashboard has already loaded its data
+func (m DashboardModel) HasData() bool {
+	return m.systemInfo != nil
+}
+
 func (m DashboardModel) View() string {
 	if m.width == 0 {
-		return "Loading..."
+		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
 	// Calculate column widths - 50/50 split
@@ -327,7 +339,7 @@ func (m DashboardModel) renderSystemInfo(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.systemInfo == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -371,7 +383,7 @@ func (m DashboardModel) renderContentVersions(width int) string {
 	b.WriteString("\n")
 
 	if m.systemInfo == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -418,7 +430,7 @@ func (m DashboardModel) renderResourcesCompact(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.resources == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -478,7 +490,7 @@ func (m DashboardModel) renderSessionsCompact(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.sessionInfo == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -592,7 +604,7 @@ func (m DashboardModel) renderLicenses(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.licenses == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -683,7 +695,7 @@ func (m DashboardModel) renderLoggedInAdmins(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.admins == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -737,7 +749,7 @@ func (m DashboardModel) renderJobs(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.jobs == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -851,7 +863,7 @@ func (m DashboardModel) renderDiskUsage(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.diskUsage == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -912,7 +924,7 @@ func (m DashboardModel) renderEnvironmentals(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.environmentals == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -996,7 +1008,7 @@ func (m DashboardModel) renderCertificates(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.certificates == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -1085,7 +1097,7 @@ func (m DashboardModel) renderNATPoolUtilization(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.natPools == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 

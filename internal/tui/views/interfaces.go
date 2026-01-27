@@ -6,10 +6,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/jp2195/pyre/internal/models"
+	"github.com/jp2195/pyre/internal/tui/theme"
 )
 
 type InterfaceSortField int
@@ -27,18 +29,83 @@ type InterfacesModel struct {
 	filtered    []models.Interface
 	sortBy      InterfaceSortField
 	lastRefresh time.Time
+	table       table.Model
+	arpTable    []models.ARPEntry
 }
 
 func NewInterfacesModel() InterfacesModel {
 	base := NewTableBase("Filter interfaces...")
 	base.SortAsc = true
+
+	// Initialize table with columns
+	columns := []table.Column{
+		{Title: "St", Width: 2},
+		{Title: "Name", Width: 16},
+		{Title: "Type", Width: 10},
+		{Title: "Zone", Width: 12},
+		{Title: "IP", Width: 18},
+		{Title: "MAC", Width: 17},
+		{Title: "VR", Width: 12},
+	}
+
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithFocused(true),
+		table.WithHeight(10),
+	)
+
+	// Apply theme-aware styles
+	s := table.DefaultStyles()
+	c := theme.Colors()
+	s.Header = s.Header.
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(c.Border).
+		BorderBottom(true).
+		Bold(true).
+		Foreground(c.TextLabel)
+	s.Selected = s.Selected.
+		Foreground(c.White).
+		Background(c.Primary).
+		Bold(false)
+	t.SetStyles(s)
+
 	return InterfacesModel{
 		TableBase: base,
+		table:     t,
 	}
 }
 
 func (m InterfacesModel) SetSize(width, height int) InterfacesModel {
 	m.TableBase = m.TableBase.SetSize(width, height)
+
+	// Update table dimensions
+	tableHeight := height - 8 // Account for header, filter, help
+	if m.Expanded {
+		tableHeight -= 14
+	}
+	if tableHeight < 3 {
+		tableHeight = 3
+	}
+	m.table.SetHeight(tableHeight)
+
+	// Update column widths proportionally
+	availWidth := width - 4
+	columns := []table.Column{
+		{Title: "St", Width: 2},
+		{Title: "Name", Width: maxInt(12, availWidth*15/100)},
+		{Title: "Type", Width: maxInt(8, availWidth*10/100)},
+		{Title: "Zone", Width: maxInt(10, availWidth*12/100)},
+		{Title: "IP", Width: maxInt(15, availWidth*18/100)},
+		{Title: "MAC", Width: 17},
+		{Title: "VR", Width: maxInt(10, availWidth*12/100)},
+	}
+	m.table.SetColumns(columns)
+
+	// Clamp cursor to valid range after resize
+	if m.table.Cursor() >= len(m.filtered) && len(m.filtered) > 0 {
+		m.table.SetCursor(len(m.filtered) - 1)
+	}
+
 	return m
 }
 
@@ -47,16 +114,36 @@ func (m InterfacesModel) SetLoading(loading bool) InterfacesModel {
 	return m
 }
 
+// HasData returns true if interfaces have been loaded.
+func (m InterfacesModel) HasData() bool {
+	return m.interfaces != nil
+}
+
 func (m InterfacesModel) SetInterfaces(interfaces []models.Interface, err error) InterfacesModel {
 	m.interfaces = interfaces
 	m.Err = err
 	m.Loading = false
 	m.lastRefresh = time.Now()
 	m.applyFilter()
-	if m.Cursor >= len(m.filtered) && len(m.filtered) > 0 {
-		m.Cursor = len(m.filtered) - 1
-	}
+	m.updateTableRows()
 	return m
+}
+
+// SetARPTable sets the ARP table entries for display in the detail panel.
+func (m InterfacesModel) SetARPTable(entries []models.ARPEntry) InterfacesModel {
+	m.arpTable = entries
+	return m
+}
+
+// getARPEntriesForInterface returns ARP entries for a specific interface.
+func (m InterfacesModel) getARPEntriesForInterface(ifaceName string) []models.ARPEntry {
+	var result []models.ARPEntry
+	for _, entry := range m.arpTable {
+		if entry.Interface == ifaceName {
+			result = append(result, entry)
+		}
+	}
+	return result
 }
 
 func (m *InterfacesModel) applyFilter() {
@@ -107,6 +194,32 @@ func (m *InterfacesModel) applySort() {
 	})
 }
 
+func (m *InterfacesModel) updateTableRows() {
+	rows := make([]table.Row, len(m.filtered))
+	for i, iface := range m.filtered {
+		status := "○"
+		if iface.State == "up" {
+			status = "●"
+		}
+
+		ip := cleanValue(iface.IP)
+		if ip == "" {
+			ip = "—"
+		}
+
+		rows[i] = table.Row{
+			status,
+			cleanValue(iface.Name),
+			cleanValue(iface.Type),
+			cleanValue(iface.Zone),
+			ip,
+			cleanValue(iface.MAC),
+			cleanValue(iface.VirtualRouter),
+		}
+	}
+	m.table.SetRows(rows)
+}
+
 func (m InterfacesModel) Init() tea.Cmd {
 	return nil
 }
@@ -118,27 +231,33 @@ func (m InterfacesModel) Update(msg tea.Msg) (InterfacesModel, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		// Handle interface-specific keys first
 		switch msg.String() {
 		case "s":
 			m.sortBy = (m.sortBy + 1) % 4
 			m.applySort()
+			m.updateTableRows()
 			return m, nil
 		case "S":
 			m.SortAsc = !m.SortAsc
 			m.applySort()
+			m.updateTableRows()
+			return m, nil
+		case "/":
+			m.FilterMode = true
+			m.Filter.Focus()
+			return m, nil
+		case "enter":
+			m.Expanded = !m.Expanded
+			// Recalculate table height
+			m = m.SetSize(m.Width, m.Height)
 			return m, nil
 		}
-
-		// Delegate to TableBase for common navigation
-		visible := m.visibleCards()
-		base, handled, cmd := m.HandleNavigation(msg, len(m.filtered), visible)
-		if handled {
-			m.TableBase = base
-			return m, cmd
-		}
 	}
-	return m, nil
+
+	// Delegate to table for navigation
+	var cmd tea.Cmd
+	m.table, cmd = m.table.Update(msg)
+	return m, cmd
 }
 
 func (m InterfacesModel) updateFilterMode(msg tea.Msg) (InterfacesModel, tea.Cmd) {
@@ -146,26 +265,27 @@ func (m InterfacesModel) updateFilterMode(msg tea.Msg) (InterfacesModel, tea.Cmd
 	m.TableBase = base
 	if exited {
 		m.applyFilter()
+		m.updateTableRows()
 	}
 	return m, cmd
 }
 
-func (m InterfacesModel) visibleCards() int {
-	cardHeight := 4
-	available := m.Height - 6
-	if m.Expanded {
-		available -= 14 // Reserve space for detail panel
+func (m InterfacesModel) SelectedInterface() (models.Interface, bool) {
+	idx := m.table.Cursor()
+	if idx >= 0 && idx < len(m.filtered) {
+		return m.filtered[idx], true
 	}
-	result := available / cardHeight
-	if result < 1 {
-		result = 1
-	}
-	return result
+	return models.Interface{}, false
+}
+
+// TableCursor returns the current table cursor position (for testing)
+func (m InterfacesModel) TableCursor() int {
+	return m.table.Cursor()
 }
 
 func (m InterfacesModel) View() string {
 	if m.Width == 0 {
-		return "Loading..."
+		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
 	var sections []string
@@ -190,11 +310,17 @@ func (m InterfacesModel) View() string {
 	if m.Err != nil {
 		sections = append(sections, m.renderError())
 	} else if !m.Loading {
-		sections = append(sections, m.renderCards())
+		if len(m.filtered) == 0 {
+			sections = append(sections, EmptyMsgStyle.Padding(1, 0).Render("No interfaces found"))
+		} else {
+			sections = append(sections, m.table.View())
+		}
 
 		// Expanded detail panel
-		if m.Expanded && len(m.filtered) > 0 && m.Cursor < len(m.filtered) {
-			sections = append(sections, m.renderDetailPanel())
+		if m.Expanded {
+			if iface, ok := m.SelectedInterface(); ok {
+				sections = append(sections, m.renderDetailPanel(iface))
+			}
 		}
 	}
 
@@ -205,14 +331,7 @@ func (m InterfacesModel) View() string {
 }
 
 func (m InterfacesModel) renderLoadingBanner() string {
-	banner := LoadingBannerStyle.Render(" Refreshing interfaces... ")
-
-	// Center it
-	padding := (m.Width - lipgloss.Width(banner)) / 2
-	if padding < 0 {
-		padding = 0
-	}
-	return strings.Repeat(" ", padding) + banner
+	return RenderLoadingBanner(m.SpinnerFrame, "Refreshing interfaces...", m.Width)
 }
 
 func (m InterfacesModel) renderHeader() string {
@@ -277,121 +396,7 @@ func (m InterfacesModel) renderFilterBar() string {
 	return FilterBorderStyle.Render(m.Filter.View())
 }
 
-func (m InterfacesModel) renderCards() string {
-	if len(m.filtered) == 0 {
-		return EmptyMsgStyle.Padding(1, 0).Render("No interfaces found")
-	}
-
-	visible := m.visibleCards()
-	end := minInt(m.Offset+visible, len(m.filtered))
-
-	var cards []string
-	for i := m.Offset; i < end; i++ {
-		cards = append(cards, m.renderCard(m.filtered[i], i == m.Cursor))
-	}
-
-	if len(m.filtered) > visible {
-		scrollInfo := DetailDimStyle.Render(fmt.Sprintf("  Showing %d-%d of %d", m.Offset+1, end, len(m.filtered)))
-		cards = append(cards, scrollInfo)
-	}
-
-	return lipgloss.JoinVertical(lipgloss.Left, cards...)
-}
-
-func (m InterfacesModel) renderCard(iface models.Interface, selected bool) string {
-	upStyle := StatusActiveStyle
-	downStyle := StatusInactiveStyle
-	labelStyle := DetailLabelStyle
-	valueStyle := DetailValueStyle
-	dimStyle := DetailDimStyle
-
-	cardStyle := CardStyle.Width(m.Width - 2)
-	if selected {
-		cardStyle = CardSelectedStyle.Width(m.Width - 2)
-	}
-
-	// Line 1: Status, Name, Type, Zone, Mode
-	var line1Parts []string
-	if iface.State == "up" {
-		line1Parts = append(line1Parts, upStyle.Render("●"))
-	} else {
-		line1Parts = append(line1Parts, downStyle.Render("○"))
-	}
-	line1Parts = append(line1Parts, TextBoldStyle.Render(iface.Name))
-
-	if t := cleanValue(iface.Type); t != "" {
-		line1Parts = append(line1Parts, TagStyle.Render("["+t+"]"))
-	}
-	if z := cleanValue(iface.Zone); z != "" {
-		line1Parts = append(line1Parts, labelStyle.Render("zone:")+valueStyle.Render(z))
-	}
-	if mode := cleanValue(iface.Mode); mode != "" {
-		line1Parts = append(line1Parts, labelStyle.Render("mode:")+valueStyle.Render(mode))
-	}
-
-	line1 := strings.Join(line1Parts, "  ")
-
-	// Line 2: IP, MAC, VR, MTU, Speed
-	var line2Parts []string
-	if ip := cleanValue(iface.IP); ip != "" {
-		line2Parts = append(line2Parts, labelStyle.Render("IP: ")+valueStyle.Render(ip))
-	} else {
-		line2Parts = append(line2Parts, labelStyle.Render("IP: ")+dimStyle.Render("none"))
-	}
-	if mac := cleanValue(iface.MAC); mac != "" {
-		line2Parts = append(line2Parts, labelStyle.Render("MAC: ")+valueStyle.Render(mac))
-	}
-	if vr := cleanValue(iface.VirtualRouter); vr != "" {
-		line2Parts = append(line2Parts, labelStyle.Render("VR: ")+valueStyle.Render(vr))
-	}
-	if iface.MTU > 0 {
-		line2Parts = append(line2Parts, labelStyle.Render("MTU: ")+valueStyle.Render(fmt.Sprintf("%d", iface.MTU)))
-	}
-	if speed := cleanValue(iface.Speed); speed != "" {
-		line2Parts = append(line2Parts, labelStyle.Render("Speed: ")+valueStyle.Render(speed))
-	}
-
-	line2 := strings.Join(line2Parts, "  ")
-
-	// Line 3: Traffic (only if data exists)
-	var line3 string
-	if iface.BytesIn > 0 || iface.BytesOut > 0 {
-		var trafficParts []string
-		trafficParts = append(trafficParts, labelStyle.Render("Traffic:")+
-			valueStyle.Render(fmt.Sprintf(" %s in / %s out", formatBytes(iface.BytesIn), formatBytes(iface.BytesOut))))
-		trafficParts = append(trafficParts, labelStyle.Render("Pkts:")+
-			valueStyle.Render(fmt.Sprintf(" %s / %s", formatPackets(iface.PacketsIn), formatPackets(iface.PacketsOut))))
-
-		if iface.ErrorsIn > 0 || iface.ErrorsOut > 0 {
-			trafficParts = append(trafficParts, StatusWarningStyle.
-				Render(fmt.Sprintf("Err: %d/%d", iface.ErrorsIn, iface.ErrorsOut)))
-		}
-		if iface.DropsIn > 0 || iface.DropsOut > 0 {
-			trafficParts = append(trafficParts, StatusInactiveStyle.
-				Render(fmt.Sprintf("Drop: %d/%d", iface.DropsIn, iface.DropsOut)))
-		}
-		line3 = strings.Join(trafficParts, "  ")
-	}
-
-	var lines []string
-	lines = append(lines, line1)
-	if len(line2Parts) > 0 {
-		lines = append(lines, line2)
-	}
-	if line3 != "" {
-		lines = append(lines, line3)
-	}
-
-	return cardStyle.Render(lipgloss.JoinVertical(lipgloss.Left, lines...))
-}
-
-func (m InterfacesModel) renderDetailPanel() string {
-	if m.Cursor >= len(m.filtered) {
-		return ""
-	}
-
-	iface := m.filtered[m.Cursor]
-
+func (m InterfacesModel) renderDetailPanel(iface models.Interface) string {
 	panelStyle := DetailPanelStyle.Width(m.Width - 2)
 	titleStyle := ViewTitleStyle
 	sectionStyle := DetailSectionStyle
@@ -456,6 +461,32 @@ func (m InterfacesModel) renderDetailPanel() string {
 		}
 		if iface.DropsIn > 0 || iface.DropsOut > 0 {
 			lines = append(lines, labelStyle.Render("Drops")+StatusInactiveStyle.Render(fmt.Sprintf("%d in / %d out", iface.DropsIn, iface.DropsOut)))
+		}
+	}
+
+	// ARP Entries for this interface
+	arpEntries := m.getARPEntriesForInterface(iface.Name)
+	if len(arpEntries) > 0 {
+		lines = append(lines, sectionStyle.Render("ARP Entries"))
+		maxShow := 5
+		if len(arpEntries) < maxShow {
+			maxShow = len(arpEntries)
+		}
+		for i := 0; i < maxShow; i++ {
+			entry := arpEntries[i]
+			var statusIndicator string
+			switch entry.Status {
+			case "complete", "c":
+				statusIndicator = upStyle.Render("●")
+			case "incomplete", "i":
+				statusIndicator = downStyle.Render("○")
+			default:
+				statusIndicator = dimStyle.Render("?")
+			}
+			lines = append(lines, fmt.Sprintf("  %s %-15s  %s", statusIndicator, entry.IP, dimStyle.Render(entry.MAC)))
+		}
+		if len(arpEntries) > maxShow {
+			lines = append(lines, dimStyle.Render(fmt.Sprintf("  ... and %d more", len(arpEntries)-maxShow)))
 		}
 	}
 

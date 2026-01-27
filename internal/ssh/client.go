@@ -282,7 +282,8 @@ func expandPath(path string) string {
 // Otherwise, it uses the known_hosts file for verification.
 func getHostKeyCallback(cfg config.SSHConfig) (ssh.HostKeyCallback, error) {
 	if cfg.Insecure {
-		return ssh.InsecureIgnoreHostKey(), nil //nolint:gosec // #nosec G106 -- InsecureIgnoreHostKey used when user explicitly disables host key verification
+		// #nosec G106 -- InsecureIgnoreHostKey used when user explicitly disables host key verification
+		return ssh.InsecureIgnoreHostKey(), nil //nolint:gosec
 	}
 
 	// Determine known_hosts path

@@ -16,13 +16,29 @@ func (m Model) handleLoginKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case msg.String() == "enter":
+		// On insecure field, toggle checkbox on enter
+		if m.login.FocusedField() == views.FieldInsecure {
+			m.login = m.login.ToggleInsecure()
+			return m, nil
+		}
 		if m.login.CanSubmit() {
 			m.loading = true
 			return m, m.doLogin()
 		}
 
+	case msg.String() == " ":
+		// Space toggles insecure checkbox when focused
+		if m.login.FocusedField() == views.FieldInsecure {
+			m.login = m.login.ToggleInsecure()
+			return m, nil
+		}
+
 	case msg.String() == "tab":
 		m.login = m.login.NextField()
+		return m, nil
+
+	case msg.String() == "shift+tab":
+		m.login = m.login.PrevField()
 		return m, nil
 	}
 
@@ -178,6 +194,13 @@ func (m Model) buildCommandRegistry() []views.Command {
 			Action:      func() tea.Msg { return SwitchViewMsg{ViewInterfaces} },
 		},
 		{
+			ID:          "analyze-routes",
+			Label:       "Routes",
+			Description: "Routing table & neighbors",
+			Category:    "Analyze",
+			Action:      func() tea.Msg { return SwitchViewMsg{ViewRoutes} },
+		},
+		{
 			ID:          "analyze-logs",
 			Label:       "Logs",
 			Description: "Traffic & threat logs",
@@ -237,13 +260,155 @@ func (m Model) buildCommandRegistry() []views.Command {
 	if conn != nil {
 		commands = append(commands, views.Command{
 			ID:          "conn-current",
-			Label:       conn.Name + " (current)",
+			Label:       conn.Host + " (current)",
 			Description: "Connected",
 			Category:    "Connections",
 		})
 	}
 
 	return commands
+}
+
+func (m Model) handleConnectionHubKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	hubKeys := DefaultConnectionHubKeyMap()
+
+	// Handle delete confirmation
+	if m.connectionHub.IsConfirming() {
+		switch msg.String() {
+		case "y", "Y":
+			target := m.connectionHub.ConfirmTarget()
+			m.connectionHub = m.connectionHub.HideDeleteConfirm()
+			return m, func() tea.Msg { return ConnectionDeletedMsg{Host: target} }
+		case "n", "N", "esc":
+			m.connectionHub = m.connectionHub.HideDeleteConfirm()
+			return m, nil
+		}
+		return m, nil
+	}
+
+	switch {
+	case key.Matches(msg, hubKeys.Quit):
+		return m, tea.Quit
+
+	case key.Matches(msg, hubKeys.Connect):
+		if entry := m.connectionHub.Selected(); entry != nil {
+			connConfig, ok := m.config.GetConnection(entry.Host)
+			if ok {
+				return m, func() tea.Msg {
+					return ConnectionSelectedMsg{
+						Host:   entry.Host,
+						Config: connConfig,
+					}
+				}
+			}
+		}
+		return m, nil
+
+	case key.Matches(msg, hubKeys.New):
+		return m, func() tea.Msg {
+			return ShowConnectionFormMsg{Mode: views.FormModeAdd}
+		}
+
+	case key.Matches(msg, hubKeys.Edit):
+		if entry := m.connectionHub.Selected(); entry != nil {
+			connConfig, ok := m.config.GetConnection(entry.Host)
+			if ok {
+				return m, func() tea.Msg {
+					return ShowConnectionFormMsg{
+						Mode:   views.FormModeEdit,
+						Host:   entry.Host,
+						Config: connConfig,
+					}
+				}
+			}
+		}
+		return m, nil
+
+	case key.Matches(msg, hubKeys.Delete):
+		if entry := m.connectionHub.Selected(); entry != nil {
+			m.connectionHub = m.connectionHub.ShowDeleteConfirm(entry.Host)
+		}
+		return m, nil
+
+	case key.Matches(msg, hubKeys.QuickConnect):
+		return m, func() tea.Msg {
+			return ShowConnectionFormMsg{Mode: views.FormModeQuickConnect}
+		}
+	}
+
+	var cmd tea.Cmd
+	m.connectionHub, cmd = m.connectionHub.Update(msg)
+	return m, cmd
+}
+
+func (m Model) handleConnectionFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	formKeys := DefaultConnectionFormKeyMap()
+
+	switch {
+	case key.Matches(msg, formKeys.Quit):
+		return m, tea.Quit
+
+	case key.Matches(msg, formKeys.Cancel):
+		// Go back to hub if we have connections, otherwise quit
+		if m.config.HasConnections() {
+			m.connectionHub = m.connectionHub.SetConnections(m.config, m.state)
+			m.currentView = ViewConnectionHub
+		} else {
+			return m, tea.Quit
+		}
+		return m, nil
+
+	case key.Matches(msg, formKeys.Submit):
+		// Handle toggles on type/insecure/save fields
+		switch m.connectionForm.FocusedField() {
+		case views.FormFieldType:
+			m.connectionForm = m.connectionForm.ToggleType()
+			return m, nil
+		case views.FormFieldInsecure:
+			m.connectionForm = m.connectionForm.ToggleInsecure()
+			return m, nil
+		case views.FormFieldSave:
+			m.connectionForm = m.connectionForm.ToggleSave()
+			return m, nil
+		}
+
+		// Submit the form
+		if m.connectionForm.CanSubmit() {
+			return m, func() tea.Msg {
+				return ConnectionFormSubmitMsg{
+					Host:         m.connectionForm.Host(),
+					Config:       m.connectionForm.GetConfig(),
+					SaveToConfig: m.connectionForm.SaveToConfig(),
+					Mode:         m.connectionForm.Mode(),
+				}
+			}
+		}
+		return m, nil
+
+	case key.Matches(msg, formKeys.Tab):
+		m.connectionForm = m.connectionForm.NextField()
+		return m, nil
+
+	case key.Matches(msg, formKeys.ShiftTab):
+		m.connectionForm = m.connectionForm.PrevField()
+		return m, nil
+
+	case key.Matches(msg, formKeys.Space):
+		// Toggle checkboxes
+		switch m.connectionForm.FocusedField() {
+		case views.FormFieldType:
+			m.connectionForm = m.connectionForm.ToggleType()
+		case views.FormFieldInsecure:
+			m.connectionForm = m.connectionForm.ToggleInsecure()
+		case views.FormFieldSave:
+			m.connectionForm = m.connectionForm.ToggleSave()
+		}
+		return m, nil
+	}
+
+	var cmd tea.Cmd
+	m.connectionForm, cmd = m.connectionForm.Update(msg)
+	return m, cmd
 }
 
 func (m Model) handleViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -260,6 +425,8 @@ func (m Model) handleViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.sessions, cmd = m.sessions.Update(msg)
 	case ViewInterfaces:
 		m.interfaces, cmd = m.interfaces.Update(msg)
+	case ViewRoutes:
+		m.routes, cmd = m.routes.Update(msg)
 	case ViewLogs:
 		m.logs, cmd = m.logs.Update(msg)
 	}

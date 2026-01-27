@@ -133,8 +133,16 @@ func (m *MockPANOS) handleOp(w http.ResponseWriter, r *http.Request, cmd string)
 func (m *MockPANOS) handleConfig(w http.ResponseWriter, r *http.Request) {
 	xpath := r.URL.Query().Get("xpath")
 
-	if strings.Contains(xpath, "security/rules") {
+	// Only respond to local rulebase queries (not pre-rulebase or post-rulebase)
+	// This simulates a standalone firewall without Panorama-pushed policies
+	if strings.Contains(xpath, "rulebase/security/rules") &&
+		!strings.Contains(xpath, "pre-rulebase") &&
+		!strings.Contains(xpath, "post-rulebase") {
 		m.respondSecurityRules(w)
+	} else if strings.Contains(xpath, "rulebase/nat/rules") &&
+		!strings.Contains(xpath, "pre-rulebase") &&
+		!strings.Contains(xpath, "post-rulebase") {
+		m.respondNATRules(w)
 	} else {
 		_, _ = w.Write([]byte(`<response status="success"><result></result></response>`)) //nolint:errcheck // test helper
 	}
@@ -381,6 +389,29 @@ func (m *MockPANOS) respondSecurityRules(w http.ResponseWriter) {
 <application><member>any</member></application>
 <service><member>any</member></service>
 <log-end>no</log-end>
+</entry>
+</result>
+</response>`))
+}
+
+func (m *MockPANOS) respondNATRules(w http.ResponseWriter) {
+	//nolint:errcheck // test helper
+	_, _ = w.Write([]byte(`<response status="success">
+<result>
+<entry name="outbound-nat">
+<disabled>no</disabled>
+<from><member>trust</member></from>
+<to><member>untrust</member></to>
+<source><member>any</member></source>
+<destination><member>any</member></destination>
+<service>any</service>
+<source-translation>
+<dynamic-ip-and-port>
+<interface-address>
+<interface>ethernet1/1</interface>
+</interface-address>
+</dynamic-ip-and-port>
+</source-translation>
 </entry>
 </result>
 </response>`))

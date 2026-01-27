@@ -24,17 +24,17 @@ func TestPickerModel_WithConnections(t *testing.T) {
 	cfg := config.DefaultConfig()
 	session := auth.NewSession(cfg)
 
-	fwConfig := &config.FirewallConfig{Host: "10.0.0.1"}
-	session.AddConnection("fw1", fwConfig, "key1")
-	session.AddConnection("fw2", fwConfig, "key2")
+	fwConfig := &config.ConnectionConfig{}
+	session.AddConnection("10.0.0.1", fwConfig, "key1")
+	session.AddConnection("10.0.0.2", fwConfig, "key2")
 
 	m := NewPickerModel(session)
 
 	if len(m.connections) != 2 {
 		t.Errorf("expected 2 connections, got %d", len(m.connections))
 	}
-	if m.active != "fw1" {
-		t.Errorf("expected active='fw1', got %q", m.active)
+	if m.active != "10.0.0.1" {
+		t.Errorf("expected active='10.0.0.1', got %q", m.active)
 	}
 }
 
@@ -42,13 +42,13 @@ func TestPickerModel_UpdateConnections(t *testing.T) {
 	cfg := config.DefaultConfig()
 	session := auth.NewSession(cfg)
 
-	fwConfig := &config.FirewallConfig{Host: "10.0.0.1"}
-	session.AddConnection("fw1", fwConfig, "key1")
+	fwConfig := &config.ConnectionConfig{}
+	session.AddConnection("10.0.0.1", fwConfig, "key1")
 
 	m := NewPickerModel(session)
 
 	// Add another connection
-	session.AddConnection("fw2", fwConfig, "key2")
+	session.AddConnection("10.0.0.2", fwConfig, "key2")
 	m = m.UpdateConnections(session)
 
 	if len(m.connections) != 2 {
@@ -82,9 +82,9 @@ func TestPickerModel_Selected(t *testing.T) {
 	}
 
 	// With connections
-	fwConfig := &config.FirewallConfig{Host: "10.0.0.1"}
-	session.AddConnection("fw1", fwConfig, "key1")
-	session.AddConnection("fw2", fwConfig, "key2")
+	fwConfig := &config.ConnectionConfig{}
+	session.AddConnection("10.0.0.1", fwConfig, "key1")
+	session.AddConnection("10.0.0.2", fwConfig, "key2")
 
 	m = NewPickerModel(session)
 	if m.Selected() == "" {
@@ -96,10 +96,10 @@ func TestPickerModel_Update_Navigation(t *testing.T) {
 	cfg := config.DefaultConfig()
 	session := auth.NewSession(cfg)
 
-	fwConfig := &config.FirewallConfig{Host: "10.0.0.1"}
-	session.AddConnection("fw1", fwConfig, "key1")
-	session.AddConnection("fw2", fwConfig, "key2")
-	session.AddConnection("fw3", fwConfig, "key3")
+	fwConfig := &config.ConnectionConfig{}
+	session.AddConnection("10.0.0.1", fwConfig, "key1")
+	session.AddConnection("10.0.0.2", fwConfig, "key2")
+	session.AddConnection("10.0.0.3", fwConfig, "key3")
 
 	m := NewPickerModel(session)
 	initialCursor := m.cursor
@@ -159,8 +159,8 @@ func TestPickerModel_View_WithConnections(t *testing.T) {
 	cfg := config.DefaultConfig()
 	session := auth.NewSession(cfg)
 
-	fwConfig := &config.FirewallConfig{Host: "10.0.0.1"}
-	session.AddConnection("fw1", fwConfig, "key1")
+	fwConfig := &config.ConnectionConfig{}
+	session.AddConnection("10.0.0.1", fwConfig, "key1")
 
 	m := NewPickerModel(session)
 	m = m.SetSize(100, 50)
@@ -186,17 +186,17 @@ func TestPickerModel_CursorOnActive(t *testing.T) {
 	cfg := config.DefaultConfig()
 	session := auth.NewSession(cfg)
 
-	fwConfig := &config.FirewallConfig{Host: "10.0.0.1"}
-	session.AddConnection("fw1", fwConfig, "key1")
-	session.AddConnection("fw2", fwConfig, "key2")
-	session.AddConnection("fw3", fwConfig, "key3")
+	fwConfig := &config.ConnectionConfig{}
+	session.AddConnection("10.0.0.1", fwConfig, "key1")
+	session.AddConnection("10.0.0.2", fwConfig, "key2")
+	session.AddConnection("10.0.0.3", fwConfig, "key3")
 
-	// Set fw2 as active
-	session.SetActiveFirewall("fw2")
+	// Set 10.0.0.2 as active
+	session.SetActiveFirewall("10.0.0.2")
 
 	m := NewPickerModel(session)
 
-	// Cursor should be on fw2 (index depends on map iteration order)
+	// Cursor should be on 10.0.0.2 (index depends on map iteration order)
 	selected := m.Selected()
 	if selected == "" {
 		t.Error("expected a selection")

@@ -12,7 +12,8 @@ import (
 
 // GetARPTable retrieves the ARP table
 func (c *Client) GetARPTable(ctx context.Context) ([]models.ARPEntry, error) {
-	resp, err := c.Op(ctx, "<show><arp><entry name='all'/></arp></show>")
+	// Try the standard command format
+	resp, err := c.Op(ctx, "<show><arp><entry name = 'all'/></arp></show>")
 	if err != nil {
 		return nil, err
 	}
@@ -24,24 +25,51 @@ func (c *Client) GetARPTable(ctx context.Context) ([]models.ARPEntry, error) {
 		return []models.ARPEntry{}, nil
 	}
 
-	var result struct {
-		Entry []struct {
-			IP        string `xml:"ip"`
-			MAC       string `xml:"mac"`
-			Interface string `xml:"interface"`
-			Status    string `xml:"status"`
-			TTL       int    `xml:"ttl"`
-			Port      string `xml:"port"`
-		} `xml:"entries>entry"`
+	// Try multiple parsing approaches for different PAN-OS versions
+	type arpEntry struct {
+		IP        string `xml:"ip"`
+		MAC       string `xml:"mac"`
+		Interface string `xml:"interface"`
+		Status    string `xml:"status"`
+		TTL       int    `xml:"ttl"`
+		Port      string `xml:"port"`
 	}
 
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
-		return []models.ARPEntry{}, nil
+	var entries []arpEntry
+
+	// Approach 1: entries>entry (common format)
+	var result1 struct {
+		Entry []arpEntry `xml:"entries>entry"`
+	}
+	if xml.Unmarshal(WrapInner(resp.Result.Inner), &result1) == nil && len(result1.Entry) > 0 {
+		entries = result1.Entry
 	}
 
-	entries := make([]models.ARPEntry, 0, len(result.Entry))
-	for _, e := range result.Entry {
-		entries = append(entries, models.ARPEntry{
+	// Approach 2: direct entry elements
+	if len(entries) == 0 {
+		var result2 struct {
+			Entry []arpEntry `xml:"entry"`
+		}
+		if xml.Unmarshal(WrapInner(resp.Result.Inner), &result2) == nil {
+			entries = result2.Entry
+		}
+	}
+
+	// Approach 3: max element wrapper
+	if len(entries) == 0 {
+		var result3 struct {
+			Max struct {
+				Entry []arpEntry `xml:"entry"`
+			} `xml:"max"`
+		}
+		if xml.Unmarshal(WrapInner(resp.Result.Inner), &result3) == nil {
+			entries = result3.Max.Entry
+		}
+	}
+
+	result := make([]models.ARPEntry, 0, len(entries))
+	for _, e := range entries {
+		result = append(result, models.ARPEntry{
 			IP:        e.IP,
 			MAC:       e.MAC,
 			Interface: e.Interface,
@@ -51,37 +79,58 @@ func (c *Client) GetARPTable(ctx context.Context) ([]models.ARPEntry, error) {
 		})
 	}
 
-	return entries, nil
+	return result, nil
 }
 
 // GetRoutingTable retrieves the routing table
 func (c *Client) GetRoutingTable(ctx context.Context) ([]models.RouteEntry, error) {
-	// Try Advanced Routing commands first (PAN-OS 10.2+), then legacy
+	// Try legacy command first (more widely supported), then advanced routing
+	// This order ensures faster response on devices that don't support advanced routing
 	commands := []string{
+		// Legacy routing mode (widely supported)
+		"<show><routing><route></route></routing></show>",
 		// Advanced Routing mode (PAN-OS 10.2+)
 		"<show><advanced-routing><route></route></advanced-routing></show>",
-		// Legacy routing mode
-		"<show><routing><route></route></routing></show>",
 	}
 
 	var resp *XMLResponse
-	var err error
+	var lastErr error
 	var isAdvancedRouting bool
+
 	for _, cmd := range commands {
+		var err error
 		resp, err = c.Op(ctx, cmd)
-		if err == nil && resp.IsSuccess() && len(resp.Result.Inner) > 0 {
-			// Check if response indicates deprecated command
-			inner := string(resp.Result.Inner)
-			if !strings.Contains(inner, "deprecated") && !strings.Contains(inner, "Command deprecated") {
-				isAdvancedRouting = strings.Contains(cmd, "advanced-routing")
-				break
-			}
+		if err != nil {
+			lastErr = err
+			continue
 		}
+		if !resp.IsSuccess() {
+			continue
+		}
+		if len(resp.Result.Inner) == 0 {
+			continue
+		}
+
+		// Check if response indicates deprecated command
+		inner := string(resp.Result.Inner)
+		if strings.Contains(inner, "deprecated") || strings.Contains(inner, "Command deprecated") {
+			continue
+		}
+
+		// Found a working command
+		isAdvancedRouting = strings.Contains(cmd, "advanced-routing")
+		lastErr = nil
+		break
 	}
 
-	if err != nil {
-		return nil, err
+	// If all commands failed, return the last error or empty result
+	if resp == nil {
+		if lastErr != nil {
+			return nil, lastErr
+		}
+		return []models.RouteEntry{}, nil
 	}
+
 	if err := CheckResponse(resp); err != nil {
 		return nil, err
 	}
@@ -166,6 +215,152 @@ func parseAdvancedRoutingJSON(inner []byte) ([]models.RouteEntry, error) {
 	}
 
 	return routes, nil
+}
+
+// GetBGPNeighbors retrieves BGP neighbor information
+func (c *Client) GetBGPNeighbors(ctx context.Context) ([]models.BGPNeighbor, error) {
+	resp, err := c.Op(ctx, "<show><routing><protocol><bgp><peer></peer></bgp></protocol></routing></show>")
+	if err != nil {
+		// Return empty slice with error for display as "Not available"
+		return nil, err
+	}
+	if err := CheckResponse(resp); err != nil {
+		// BGP might not be configured - return empty slice, not error
+		// This allows the UI to show "No BGP neighbors" instead of error
+		return []models.BGPNeighbor{}, nil
+	}
+
+	if len(resp.Result.Inner) == 0 {
+		return []models.BGPNeighbor{}, nil
+	}
+
+	// Try multiple parsing approaches for different PAN-OS versions
+	type bgpEntry struct {
+		Peer             string `xml:"peer"`
+		PeerAddress      string `xml:"peer-address"`
+		RemoteAS         int    `xml:"remote-as"`
+		LocalAS          int    `xml:"local-as"`
+		RouterID         string `xml:"peer-router-id"`
+		Status           string `xml:"status"`
+		StatusMsg        string `xml:"status-msg"`
+		PrefixCounter    int    `xml:"prefix-counter"`
+		PrefixAdvertised int    `xml:"prefix-advertised"`
+		Uptime           string `xml:"status-duration"`
+		VR               string `xml:"vr"`
+		PeerGroup        string `xml:"peer-group"`
+	}
+
+	var entries []bgpEntry
+
+	// Approach 1: direct entry elements
+	var result1 struct {
+		Entry []bgpEntry `xml:"entry"`
+	}
+	if xml.Unmarshal(WrapInner(resp.Result.Inner), &result1) == nil && len(result1.Entry) > 0 {
+		entries = result1.Entry
+	}
+
+	// Approach 2: peer-group wrapper
+	if len(entries) == 0 {
+		var result2 struct {
+			PeerGroup struct {
+				Entry []bgpEntry `xml:"entry"`
+			} `xml:"peer-group"`
+		}
+		if xml.Unmarshal(WrapInner(resp.Result.Inner), &result2) == nil {
+			entries = result2.PeerGroup.Entry
+		}
+	}
+
+	neighbors := make([]models.BGPNeighbor, 0, len(entries))
+	for _, e := range entries {
+		state := e.Status
+		if state == "" {
+			state = e.StatusMsg
+		}
+		neighbors = append(neighbors, models.BGPNeighbor{
+			PeerAddress:      e.PeerAddress,
+			PeerAS:           e.RemoteAS,
+			LocalAS:          e.LocalAS,
+			RouterID:         e.RouterID,
+			State:            state,
+			PrefixesReceived: e.PrefixCounter,
+			PrefixesSent:     e.PrefixAdvertised,
+			Uptime:           e.Uptime,
+			VirtualRouter:    e.VR,
+			PeerGroup:        e.PeerGroup,
+		})
+	}
+
+	return neighbors, nil
+}
+
+// GetOSPFNeighbors retrieves OSPF neighbor information
+func (c *Client) GetOSPFNeighbors(ctx context.Context) ([]models.OSPFNeighbor, error) {
+	resp, err := c.Op(ctx, "<show><routing><protocol><ospf><neighbor></neighbor></ospf></protocol></routing></show>")
+	if err != nil {
+		// Return empty slice with error for display as "Not available"
+		return nil, err
+	}
+	if err := CheckResponse(resp); err != nil {
+		// OSPF might not be configured - return empty slice, not error
+		// This allows the UI to show "No OSPF neighbors" instead of error
+		return []models.OSPFNeighbor{}, nil
+	}
+
+	if len(resp.Result.Inner) == 0 {
+		return []models.OSPFNeighbor{}, nil
+	}
+
+	// Try multiple parsing approaches for different PAN-OS versions
+	type ospfEntry struct {
+		NeighborID string `xml:"neighbor-router-id"`
+		Address    string `xml:"neighbor-address"`
+		State      string `xml:"status"`
+		Interface  string `xml:"interface-name"`
+		Area       string `xml:"area-id"`
+		Priority   int    `xml:"priority"`
+		DeadTime   string `xml:"dead-time"`
+		VR         string `xml:"virtual-router"`
+	}
+
+	var entries []ospfEntry
+
+	// Approach 1: direct entry elements
+	var result1 struct {
+		Entry []ospfEntry `xml:"entry"`
+	}
+	if xml.Unmarshal(WrapInner(resp.Result.Inner), &result1) == nil && len(result1.Entry) > 0 {
+		entries = result1.Entry
+	}
+
+	// Approach 2: area wrapper
+	if len(entries) == 0 {
+		var result2 struct {
+			Area struct {
+				Entry []ospfEntry `xml:"entry"`
+			} `xml:"area"`
+		}
+		if xml.Unmarshal(WrapInner(resp.Result.Inner), &result2) == nil {
+			entries = result2.Area.Entry
+		}
+	}
+
+	neighbors := make([]models.OSPFNeighbor, 0, len(entries))
+	for _, e := range entries {
+		neighbors = append(neighbors, models.OSPFNeighbor{
+			NeighborID:    e.NeighborID,
+			Address:       e.Address,
+			State:         e.State,
+			Interface:     e.Interface,
+			Area:          e.Area,
+			Priority:      e.Priority,
+			DeadTime:      e.DeadTime,
+			VirtualRouter: e.VR,
+		})
+	}
+
+	return neighbors, nil
 }
 
 // parseLegacyRoutingXML parses the XML format from legacy routing mode

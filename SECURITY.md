@@ -23,24 +23,29 @@ We will respond within 72 hours and work with you to address the issue.
 pyre handles sensitive Palo Alto firewall API keys. Follow these practices:
 
 **Recommended:**
-- Use environment variables for API keys (`api_key_env` in config)
-- Set restrictive permissions on `~/.pyre.yaml` (`chmod 600`)
+- Use environment variables for API keys (`PYRE_API_KEY`)
+- Use the `--api-key` flag for one-off connections
 - Use separate API keys per firewall with minimal required permissions
 - Rotate API keys periodically
 
 **Avoid:**
-- Storing API keys directly in configuration files
+- Storing API keys in configuration files (not supported)
 - Committing credentials to version control
 - Sharing API keys between users
 
 ### Configuration Example
 
 ```yaml
-firewalls:
-  prod-fw01:
-    host: firewall.example.com
-    api_key_env: PROD_FW01_API_KEY  # Read from environment
-    insecure: false                  # Verify TLS certificates
+connections:
+  10.0.0.1:
+    insecure: false  # Verify TLS certificates
+```
+
+Then provide the API key via environment:
+
+```bash
+export PYRE_API_KEY=YOUR_API_KEY
+pyre -c 10.0.0.1
 ```
 
 ### TLS Certificate Verification
@@ -51,7 +56,7 @@ firewalls:
 
 ### Network Security
 
-- pyre communicates with firewalls over HTTPS (port 443) and SSH (port 22)
+- pyre communicates with firewalls over HTTPS (port 443)
 - Ensure network policies allow only authorized hosts to connect to firewall management interfaces
 - Consider using jump hosts or VPNs for remote management
 

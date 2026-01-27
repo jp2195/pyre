@@ -25,10 +25,11 @@ type KeyMap struct {
 	End      key.Binding
 
 	// Actions
-	Enter  key.Binding
-	Filter key.Binding
-	Escape key.Binding
-	Tab    key.Binding
+	Enter    key.Binding
+	Filter   key.Binding
+	Escape   key.Binding
+	Tab      key.Binding
+	ShiftTab key.Binding
 }
 
 func DefaultKeyMap() KeyMap {
@@ -112,6 +113,10 @@ func DefaultKeyMap() KeyMap {
 		Tab: key.NewBinding(
 			key.WithKeys("tab"),
 			key.WithHelp("tab", "next field"),
+		),
+		ShiftTab: key.NewBinding(
+			key.WithKeys("shift+tab"),
+			key.WithHelp("shift+tab", "prev field"),
 		),
 	}
 }
@@ -221,6 +226,92 @@ func DefaultDevicePickerKeyMap() DevicePickerKeyMap {
 		Down: key.NewBinding(
 			key.WithKeys("down", "j"),
 			key.WithHelp("↓/j", "down"),
+		),
+	}
+}
+
+type ConnectionHubKeyMap struct {
+	Connect      key.Binding
+	New          key.Binding
+	Edit         key.Binding
+	Delete       key.Binding
+	QuickConnect key.Binding
+	Up           key.Binding
+	Down         key.Binding
+	Quit         key.Binding
+}
+
+func DefaultConnectionHubKeyMap() ConnectionHubKeyMap {
+	return ConnectionHubKeyMap{
+		Connect: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("enter", "connect"),
+		),
+		New: key.NewBinding(
+			key.WithKeys("n"),
+			key.WithHelp("n", "new"),
+		),
+		Edit: key.NewBinding(
+			key.WithKeys("e"),
+			key.WithHelp("e", "edit"),
+		),
+		Delete: key.NewBinding(
+			key.WithKeys("d"),
+			key.WithHelp("d", "delete"),
+		),
+		QuickConnect: key.NewBinding(
+			key.WithKeys("q"),
+			key.WithHelp("q", "quick connect"),
+		),
+		Up: key.NewBinding(
+			key.WithKeys("up", "k"),
+			key.WithHelp("↑/k", "up"),
+		),
+		Down: key.NewBinding(
+			key.WithKeys("down", "j"),
+			key.WithHelp("↓/j", "down"),
+		),
+		Quit: key.NewBinding(
+			key.WithKeys("ctrl+c"),
+			key.WithHelp("ctrl+c", "quit"),
+		),
+	}
+}
+
+type ConnectionFormKeyMap struct {
+	Submit   key.Binding
+	Cancel   key.Binding
+	Tab      key.Binding
+	ShiftTab key.Binding
+	Space    key.Binding
+	Quit     key.Binding
+}
+
+func DefaultConnectionFormKeyMap() ConnectionFormKeyMap {
+	return ConnectionFormKeyMap{
+		Submit: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("enter", "submit"),
+		),
+		Cancel: key.NewBinding(
+			key.WithKeys("esc"),
+			key.WithHelp("esc", "cancel"),
+		),
+		Tab: key.NewBinding(
+			key.WithKeys("tab"),
+			key.WithHelp("tab", "next field"),
+		),
+		ShiftTab: key.NewBinding(
+			key.WithKeys("shift+tab"),
+			key.WithHelp("shift+tab", "prev field"),
+		),
+		Space: key.NewBinding(
+			key.WithKeys(" "),
+			key.WithHelp("space", "toggle"),
+		),
+		Quit: key.NewBinding(
+			key.WithKeys("ctrl+c"),
+			key.WithHelp("ctrl+c", "quit"),
 		),
 	}
 }
