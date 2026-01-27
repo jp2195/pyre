@@ -283,7 +283,7 @@ func (m *RoutesModel) updateTableRows() {
 }
 
 func (m *RoutesModel) updateNeighborsTable() {
-	var rows []table.Row
+	rows := make([]table.Row, 0, len(m.bgpNeighbors)+len(m.ospfNeighbors))
 
 	// Add BGP neighbors
 	for _, n := range m.bgpNeighbors {
@@ -523,5 +523,5 @@ func (m RoutesModel) renderNeighborsTab() string {
 
 // IsFilterMode returns true if the filter input is active
 func (m RoutesModel) IsFilterMode() bool {
-	return m.TableBase.FilterMode
+	return m.FilterMode
 }

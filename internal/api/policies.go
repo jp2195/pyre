@@ -219,7 +219,8 @@ func (c *Client) GetSecurityPolicies(ctx context.Context) ([]models.SecurityRule
 	postEntries := c.fetchSecurityRulesFromPaths(ctx, postRulebasePaths)
 
 	// Combine in evaluation order: pre -> local -> post
-	var rules []models.SecurityRule
+	totalEntries := len(preEntries) + len(localEntries) + len(postEntries)
+	rules := make([]models.SecurityRule, 0, totalEntries)
 	position := 1
 
 	for _, e := range preEntries {
@@ -465,7 +466,8 @@ func (c *Client) GetNATRules(ctx context.Context) ([]models.NATRule, error) {
 	postEntries := c.fetchNATRulesFromPaths(ctx, postRulebasePaths)
 
 	// Combine in evaluation order: pre -> local -> post
-	var rules []models.NATRule
+	totalEntries := len(preEntries) + len(localEntries) + len(postEntries)
+	rules := make([]models.NATRule, 0, totalEntries)
 	position := 1
 
 	for _, e := range preEntries {

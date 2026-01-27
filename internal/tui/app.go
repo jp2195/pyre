@@ -316,12 +316,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Share spinner frame with all views
 		frame := m.spinner.View()
-		m.policies.TableBase.SpinnerFrame = frame
-		m.natPolicies.TableBase.SpinnerFrame = frame
-		m.sessions.TableBase.SpinnerFrame = frame
-		m.interfaces.TableBase.SpinnerFrame = frame
-		m.routes.TableBase.SpinnerFrame = frame
-		m.logs.TableBase.SpinnerFrame = frame
+		m.policies.SpinnerFrame = frame
+		m.natPolicies.SpinnerFrame = frame
+		m.sessions.SpinnerFrame = frame
+		m.interfaces.SpinnerFrame = frame
+		m.routes.SpinnerFrame = frame
+		m.logs.SpinnerFrame = frame
 
 		// Share spinner frame with dashboard views
 		m.dashboard = m.dashboard.SetSpinnerFrame(frame)
@@ -362,7 +362,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.state != nil && host != "" {
 			m.state.UpdateConnection(host, msg.Username)
 			go func() {
-				_ = m.state.Save()
+				_ = m.state.Save() //nolint:errcheck // async save, errors are not actionable
 			}()
 		}
 
@@ -545,14 +545,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.SaveToConfig {
 			if msg.Mode == views.FormModeEdit {
 				// Update existing
-				_ = m.config.UpdateConnection(msg.Host, msg.Config)
+				_ = m.config.UpdateConnection(msg.Host, msg.Config) //nolint:errcheck // UI flow continues regardless
 			} else {
 				// Add new
-				_ = m.config.AddConnection(msg.Host, msg.Config)
+				_ = m.config.AddConnection(msg.Host, msg.Config) //nolint:errcheck // UI flow continues regardless
 			}
 			// Save config asynchronously
 			go func() {
-				_ = m.config.Save()
+				_ = m.config.Save() //nolint:errcheck // async save, errors are not actionable
 			}()
 			// Update hub with new data
 			m.connectionHub = m.connectionHub.SetConnections(m.config, m.state)
@@ -572,15 +572,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ConnectionDeletedMsg:
 		// Delete from config and save
-		_ = m.config.DeleteConnection(msg.Host)
+		_ = m.config.DeleteConnection(msg.Host) //nolint:errcheck // UI flow continues regardless
 		go func() {
-			_ = m.config.Save()
+			_ = m.config.Save() //nolint:errcheck // async save, errors are not actionable
 		}()
 		// Also delete from state
 		if m.state != nil {
 			m.state.DeleteConnection(msg.Host)
 			go func() {
-				_ = m.state.Save()
+				_ = m.state.Save() //nolint:errcheck // async save, errors are not actionable
 			}()
 		}
 		// Refresh hub

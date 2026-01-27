@@ -69,8 +69,8 @@ func (s *State) Save() error {
 
 	// Ensure directory exists
 	dir := filepath.Dir(statePath)
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return fmt.Errorf("failed to create state directory: %w", err)
+	if mkdirErr := os.MkdirAll(dir, 0700); mkdirErr != nil {
+		return fmt.Errorf("failed to create state directory: %w", mkdirErr)
 	}
 
 	data, err := json.MarshalIndent(s, "", "  ")

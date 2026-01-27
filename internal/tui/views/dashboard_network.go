@@ -341,17 +341,20 @@ func (m NetworkDashboardModel) renderRoutingSummary(width int) string {
 	protocols := []string{"connected", "local", "static", "bgp", "ospf"}
 	for _, proto := range protocols {
 		if count, ok := protocolCounts[proto]; ok && count > 0 {
-			abbrev := proto[:1]
-			if proto == "connected" {
+			var abbrev string
+			switch proto {
+			case "connected":
 				abbrev = "C"
-			} else if proto == "local" {
+			case "local":
 				abbrev = "L"
-			} else if proto == "static" {
+			case "static":
 				abbrev = "S"
-			} else if proto == "bgp" {
+			case "bgp":
 				abbrev = "B"
-			} else if proto == "ospf" {
+			case "ospf":
 				abbrev = "O"
+			default:
+				abbrev = proto[:1]
 			}
 			parts = append(parts, fmt.Sprintf("%s:%d", abbrev, count))
 		}
@@ -368,8 +371,8 @@ func (m NetworkDashboardModel) renderNeighborsSummary(width int) string {
 	b.WriteString(titleStyle().Render("Routing Neighbors"))
 	b.WriteString("\n")
 
-	hasBGP := m.bgpNeighbors != nil && len(m.bgpNeighbors) > 0
-	hasOSPF := m.ospfNeighbors != nil && len(m.ospfNeighbors) > 0
+	hasBGP := len(m.bgpNeighbors) > 0
+	hasOSPF := len(m.ospfNeighbors) > 0
 
 	// Both are still loading
 	if m.bgpNeighbors == nil && m.ospfNeighbors == nil && m.bgpErr == nil && m.ospfErr == nil {

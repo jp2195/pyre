@@ -103,7 +103,7 @@ func (c *Config) Save() error {
 	}
 
 	// Create backup if file exists
-	if _, err := os.Stat(configPath); err == nil {
+	if _, statErr := os.Stat(configPath); statErr == nil {
 		backupPath := configPath + ".bak"
 		data, readErr := os.ReadFile(configPath) // #nosec G304 -- Path is constructed from user's home directory
 		if readErr == nil {

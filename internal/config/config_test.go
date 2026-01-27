@@ -57,7 +57,7 @@ func TestConfig_GetDefaultConnection(t *testing.T) {
 	cfg := DefaultConfig()
 
 	// Test with no default set
-	host, conn, ok := cfg.GetDefaultConnection()
+	host, _, ok := cfg.GetDefaultConnection()
 	if ok {
 		t.Error("expected no default connection")
 	}
@@ -69,14 +69,13 @@ func TestConfig_GetDefaultConnection(t *testing.T) {
 	cfg.Connections["10.0.0.1"] = ConnectionConfig{}
 	cfg.Default = "10.0.0.1"
 
-	host, conn, ok = cfg.GetDefaultConnection()
+	host, _, ok = cfg.GetDefaultConnection()
 	if !ok {
 		t.Error("expected to find default connection")
 	}
 	if host != "10.0.0.1" {
 		t.Errorf("expected host '10.0.0.1', got %q", host)
 	}
-	_ = conn // conn is used to check insecure, type, etc.
 
 	// Test with invalid default
 	cfg.Default = "nonexistent"

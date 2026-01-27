@@ -474,11 +474,14 @@ func (m InterfacesModel) renderDetailPanel(iface models.Interface) string {
 		}
 		for i := 0; i < maxShow; i++ {
 			entry := arpEntries[i]
-			statusIndicator := dimStyle.Render("?")
-			if entry.Status == "complete" || entry.Status == "c" {
+			var statusIndicator string
+			switch entry.Status {
+			case "complete", "c":
 				statusIndicator = upStyle.Render("●")
-			} else if entry.Status == "incomplete" || entry.Status == "i" {
+			case "incomplete", "i":
 				statusIndicator = downStyle.Render("○")
+			default:
+				statusIndicator = dimStyle.Render("?")
 			}
 			lines = append(lines, fmt.Sprintf("  %s %-15s  %s", statusIndicator, entry.IP, dimStyle.Render(entry.MAC)))
 		}
