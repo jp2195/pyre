@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/jp2195/pyre/compare/v1.0.1...v1.1.0) (2026-01-27)
+
+
+### Features
+
+* **tui:** add 10 navigation and view enhancements ([d9b66df](https://github.com/jp2195/pyre/commit/d9b66dff5300d9c75cce6b5346106e08c44159e5))
+
 ## [1.0.1](https://github.com/jp2195/pyre/compare/v1.0.0...v1.0.1) (2026-01-25)
 
 
