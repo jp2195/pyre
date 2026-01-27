@@ -16,7 +16,7 @@ func (m Model) renderHeader() string {
 	conn := m.session.GetActiveConnection()
 	var status string
 	if conn != nil {
-		statusText := fmt.Sprintf("● %s (%s)", conn.Name, conn.Config.Host)
+		statusText := fmt.Sprintf("● %s", conn.Host)
 		// Show current target for Panorama connections
 		if conn.IsPanorama {
 			if target := conn.GetTargetDevice(); target != nil {

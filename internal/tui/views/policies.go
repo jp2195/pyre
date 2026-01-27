@@ -208,7 +208,7 @@ func (m PoliciesModel) visibleRows() int {
 
 func (m PoliciesModel) View() string {
 	if m.Width == 0 {
-		return "Loading..."
+		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
 	titleStyle := ViewTitleStyle.MarginBottom(1)

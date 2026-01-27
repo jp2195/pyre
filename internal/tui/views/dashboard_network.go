@@ -25,13 +25,20 @@ type NetworkDashboardModel struct {
 	bgpErr   error
 	ospfErr  error
 
-	width  int
-	height int
+	width        int
+	height       int
+	SpinnerFrame string
 }
 
 // NewNetworkDashboardModel creates a new network dashboard model
 func NewNetworkDashboardModel() NetworkDashboardModel {
 	return NetworkDashboardModel{}
+}
+
+// SetSpinnerFrame sets the current spinner animation frame
+func (m NetworkDashboardModel) SetSpinnerFrame(frame string) NetworkDashboardModel {
+	m.SpinnerFrame = frame
+	return m
 }
 
 // SetSize sets the terminal dimensions
@@ -81,10 +88,27 @@ func (m NetworkDashboardModel) Update(msg tea.Msg) (NetworkDashboardModel, tea.C
 	return m, nil
 }
 
+// HasData returns true if the dashboard has already loaded its data
+func (m NetworkDashboardModel) HasData() bool {
+	// Check if any of the network-specific data has been loaded
+	// We need to check multiple sources since this dashboard shows:
+	// - interfaces (shared with main dashboard)
+	// - ARP table
+	// - routing table
+	// - BGP/OSPF neighbors
+	hasInterfaces := m.interfaces != nil
+	hasARP := m.arpTable != nil || m.arpErr != nil
+	hasRoutes := m.routes != nil || m.routeErr != nil
+	hasNeighbors := m.bgpNeighbors != nil || m.bgpErr != nil || m.ospfNeighbors != nil || m.ospfErr != nil
+
+	// Only consider data loaded if we have interfaces AND at least tried to load the others
+	return hasInterfaces && hasARP && hasRoutes && hasNeighbors
+}
+
 // View renders the network dashboard
 func (m NetworkDashboardModel) View() string {
 	if m.width == 0 {
-		return "Loading..."
+		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
 	totalWidth := m.width - 4
@@ -134,7 +158,7 @@ func (m NetworkDashboardModel) renderTopInterfaces(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.interfaces == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -191,7 +215,7 @@ func (m NetworkDashboardModel) renderInterfaceErrors(width int) string {
 	b.WriteString("\n")
 
 	if m.ifaceErr != nil || m.interfaces == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -249,7 +273,7 @@ func (m NetworkDashboardModel) renderARPSummary(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.arpTable == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -258,11 +282,9 @@ func (m NetworkDashboardModel) renderARPSummary(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 
-	// Count by interface
-	ifaceCounts := make(map[string]int)
+	// Count complete entries
 	completeCount := 0
 	for _, entry := range m.arpTable {
-		ifaceCounts[entry.Interface]++
 		if strings.ToLower(entry.Status) == "complete" || strings.ToLower(entry.Status) == "c" {
 			completeCount++
 		}
@@ -270,40 +292,11 @@ func (m NetworkDashboardModel) renderARPSummary(width int) string {
 
 	// Summary
 	b.WriteString(valueStyle().Render(fmt.Sprintf("%d", len(m.arpTable))))
-	b.WriteString(dimStyle().Render(" entries ("))
-	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", completeCount)))
-	b.WriteString(dimStyle().Render(" complete)"))
-	b.WriteString("\n\n")
-
-	// Per-interface breakdown
-	b.WriteString(subtitleStyle().Render("By Interface:"))
-	b.WriteString("\n")
-
-	// Sort interfaces by count
-	type ifaceCount struct {
-		name  string
-		count int
-	}
-	counts := make([]ifaceCount, 0, len(ifaceCounts))
-	for name, count := range ifaceCounts {
-		counts = append(counts, ifaceCount{name, count})
-	}
-	sort.Slice(counts, func(i, j int) bool {
-		return counts[i].count > counts[j].count
-	})
-
-	maxShow := 6
-	if len(counts) < maxShow {
-		maxShow = len(counts)
-	}
-	for i := 0; i < maxShow; i++ {
-		ic := counts[i]
-		name := truncateEllipsis(ic.name, 16)
-		b.WriteString(labelStyle().Render(fmt.Sprintf("  %-16s ", name)))
-		b.WriteString(valueStyle().Render(fmt.Sprintf("%d", ic.count)))
-		if i < maxShow-1 {
-			b.WriteString("\n")
-		}
+	b.WriteString(dimStyle().Render(" entries"))
+	if completeCount > 0 {
+		b.WriteString(dimStyle().Render(" ("))
+		b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", completeCount)))
+		b.WriteString(dimStyle().Render(" complete)"))
 	}
 
 	return panelStyle().Width(width).Render(b.String())
@@ -319,7 +312,7 @@ func (m NetworkDashboardModel) renderRoutingSummary(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.routes == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -341,47 +334,33 @@ func (m NetworkDashboardModel) renderRoutingSummary(width int) string {
 	// Total routes
 	b.WriteString(valueStyle().Render(fmt.Sprintf("%d", len(m.routes))))
 	b.WriteString(dimStyle().Render(" routes"))
-	b.WriteString("\n\n")
-
-	// By protocol breakdown
-	b.WriteString(subtitleStyle().Render("By Protocol:"))
 	b.WriteString("\n")
 
-	protocols := []string{"connected", "static", "bgp", "ospf"}
+	// By protocol breakdown (compact)
+	var parts []string
+	protocols := []string{"connected", "local", "static", "bgp", "ospf"}
 	for _, proto := range protocols {
 		if count, ok := protocolCounts[proto]; ok && count > 0 {
-			protoStyle := dimStyle()
-			switch proto {
-			case "connected":
-				protoStyle = highlightStyle()
-			case "bgp":
-				protoStyle = accentStyle()
-			case "ospf":
-				protoStyle = warningStyle()
+			abbrev := proto[:1]
+			if proto == "connected" {
+				abbrev = "C"
+			} else if proto == "local" {
+				abbrev = "L"
+			} else if proto == "static" {
+				abbrev = "S"
+			} else if proto == "bgp" {
+				abbrev = "B"
+			} else if proto == "ospf" {
+				abbrev = "O"
 			}
-			b.WriteString(protoStyle.Render(fmt.Sprintf("  %-12s ", proto)))
-			b.WriteString(valueStyle().Render(fmt.Sprintf("%d", count)))
-			b.WriteString("\n")
+			parts = append(parts, fmt.Sprintf("%s:%d", abbrev, count))
 		}
 	}
-
-	// Show any other protocols
-	for proto, count := range protocolCounts {
-		found := false
-		for _, p := range protocols {
-			if p == proto {
-				found = true
-				break
-			}
-		}
-		if !found && count > 0 {
-			b.WriteString(dimStyle().Render(fmt.Sprintf("  %-12s ", proto)))
-			b.WriteString(valueStyle().Render(fmt.Sprintf("%d", count)))
-			b.WriteString("\n")
-		}
+	if len(parts) > 0 {
+		b.WriteString(dimStyle().Render(strings.Join(parts, " ")))
 	}
 
-	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+	return panelStyle().Width(width).Render(b.String())
 }
 
 func (m NetworkDashboardModel) renderNeighborsSummary(width int) string {
@@ -394,7 +373,7 @@ func (m NetworkDashboardModel) renderNeighborsSummary(width int) string {
 
 	// Both are still loading
 	if m.bgpNeighbors == nil && m.ospfNeighbors == nil && m.bgpErr == nil && m.ospfErr == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -403,12 +382,8 @@ func (m NetworkDashboardModel) renderNeighborsSummary(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 
-	// BGP Neighbors
+	// BGP Neighbors - just count
 	if hasBGP {
-		b.WriteString(subtitleStyle().Render("BGP Peers:"))
-		b.WriteString("\n")
-
-		// Count established
 		established := 0
 		for _, n := range m.bgpNeighbors {
 			state := strings.ToLower(n.State)
@@ -416,54 +391,16 @@ func (m NetworkDashboardModel) renderNeighborsSummary(width int) string {
 				established++
 			}
 		}
-		b.WriteString(dimStyle().Render("  "))
+		b.WriteString(dimStyle().Render("BGP: "))
 		b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", established)))
-		b.WriteString(dimStyle().Render(fmt.Sprintf("/%d established", len(m.bgpNeighbors))))
-		b.WriteString("\n")
-
-		// Show up to 4 peers
-		maxShow := 4
-		if len(m.bgpNeighbors) < maxShow {
-			maxShow = len(m.bgpNeighbors)
-		}
-		for i := 0; i < maxShow; i++ {
-			n := m.bgpNeighbors[i]
-			state := strings.ToLower(n.State)
-			stateStyle := dimStyle()
-			stateIcon := "x"
-			if state == "established" || state == "openconfirm" {
-				stateStyle = highlightStyle()
-				stateIcon = "o"
-			} else if state == "connect" || state == "active" || state == "opensent" {
-				stateStyle = warningStyle()
-				stateIcon = "~"
-			}
-
-			peer := truncateEllipsis(n.PeerAddress, 15)
-			b.WriteString("  ")
-			b.WriteString(stateStyle.Render(stateIcon))
-			b.WriteString(" ")
-			b.WriteString(valueStyle().Render(fmt.Sprintf("%-15s", peer)))
-			b.WriteString(dimStyle().Render(fmt.Sprintf(" AS%d", n.PeerAS)))
-			if n.PrefixesReceived > 0 {
-				b.WriteString(dimStyle().Render(fmt.Sprintf(" (%d pfx)", n.PrefixesReceived)))
-			}
+		b.WriteString(dimStyle().Render(fmt.Sprintf("/%d up", len(m.bgpNeighbors))))
+		if hasOSPF {
 			b.WriteString("\n")
-		}
-		if len(m.bgpNeighbors) > maxShow {
-			b.WriteString(dimStyle().Render(fmt.Sprintf("  ... and %d more\n", len(m.bgpNeighbors)-maxShow)))
 		}
 	}
 
-	// OSPF Neighbors
+	// OSPF Neighbors - just count
 	if hasOSPF {
-		if hasBGP {
-			b.WriteString("\n")
-		}
-		b.WriteString(subtitleStyle().Render("OSPF Neighbors:"))
-		b.WriteString("\n")
-
-		// Count full adjacencies
 		full := 0
 		for _, n := range m.ospfNeighbors {
 			state := strings.ToLower(n.State)
@@ -471,46 +408,10 @@ func (m NetworkDashboardModel) renderNeighborsSummary(width int) string {
 				full++
 			}
 		}
-		b.WriteString(dimStyle().Render("  "))
+		b.WriteString(dimStyle().Render("OSPF: "))
 		b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", full)))
-		b.WriteString(dimStyle().Render(fmt.Sprintf("/%d full adjacency", len(m.ospfNeighbors))))
-		b.WriteString("\n")
-
-		// Show up to 4 neighbors
-		maxShow := 4
-		if len(m.ospfNeighbors) < maxShow {
-			maxShow = len(m.ospfNeighbors)
-		}
-		for i := 0; i < maxShow; i++ {
-			n := m.ospfNeighbors[i]
-			state := strings.ToLower(n.State)
-			stateStyle := dimStyle()
-			stateIcon := "x"
-			if state == "full" {
-				stateStyle = highlightStyle()
-				stateIcon = "o"
-			} else if state == "2-way" || state == "exstart" || state == "exchange" || state == "loading" {
-				stateStyle = warningStyle()
-				stateIcon = "~"
-			}
-
-			neighborID := truncateEllipsis(n.NeighborID, 15)
-			b.WriteString("  ")
-			b.WriteString(stateStyle.Render(stateIcon))
-			b.WriteString(" ")
-			b.WriteString(valueStyle().Render(fmt.Sprintf("%-15s", neighborID)))
-			if n.Interface != "" {
-				b.WriteString(dimStyle().Render(fmt.Sprintf(" %s", truncateEllipsis(n.Interface, 12))))
-			}
-			if n.Area != "" {
-				b.WriteString(dimStyle().Render(fmt.Sprintf(" area %s", n.Area)))
-			}
-			b.WriteString("\n")
-		}
-		if len(m.ospfNeighbors) > maxShow {
-			b.WriteString(dimStyle().Render(fmt.Sprintf("  ... and %d more\n", len(m.ospfNeighbors)-maxShow)))
-		}
+		b.WriteString(dimStyle().Render(fmt.Sprintf("/%d full", len(m.ospfNeighbors))))
 	}
 
-	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+	return panelStyle().Width(width).Render(b.String())
 }

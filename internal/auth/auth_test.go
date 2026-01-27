@@ -16,14 +16,14 @@ func TestConcurrentSetActiveFirewall(t *testing.T) {
 		cfg := &config.Config{}
 		session := auth.NewSession(cfg)
 
-		// Add some test connections
-		fwConfig := &config.FirewallConfig{Host: "10.0.0.1"}
-		session.AddConnection("fw1", fwConfig, "key1")
-		session.AddConnection("fw2", fwConfig, "key2")
-		session.AddConnection("fw3", fwConfig, "key3")
+		// Add some test connections (host is now the key)
+		fwConfig := &config.ConnectionConfig{}
+		session.AddConnection("10.0.0.1", fwConfig, "key1")
+		session.AddConnection("10.0.0.2", fwConfig, "key2")
+		session.AddConnection("10.0.0.3", fwConfig, "key3")
 
 		var wg sync.WaitGroup
-		firewalls := []string{"fw1", "fw2", "fw3"}
+		firewalls := []string{"10.0.0.1", "10.0.0.2", "10.0.0.3"}
 
 		// Launch concurrent SetActiveFirewall calls
 		for i := 0; i < 100; i++ {
@@ -45,9 +45,9 @@ func TestConcurrentSetActiveFirewall(t *testing.T) {
 		}
 
 		// The active firewall should be one of the valid ones
-		validFirewalls := map[string]bool{"fw1": true, "fw2": true, "fw3": true}
-		if !validFirewalls[conn.Name] {
-			t.Errorf("unexpected active firewall: %s", conn.Name)
+		validFirewalls := map[string]bool{"10.0.0.1": true, "10.0.0.2": true, "10.0.0.3": true}
+		if !validFirewalls[conn.Host] {
+			t.Errorf("unexpected active firewall: %s", conn.Host)
 		}
 	})
 }
@@ -60,9 +60,9 @@ func TestConcurrentGetActiveConnection(t *testing.T) {
 		session := auth.NewSession(cfg)
 
 		// Add a test connection
-		fwConfig := &config.FirewallConfig{Host: "10.0.0.1"}
-		session.AddConnection("fw1", fwConfig, "key1")
-		session.SetActiveFirewall("fw1")
+		fwConfig := &config.ConnectionConfig{}
+		session.AddConnection("10.0.0.1", fwConfig, "key1")
+		session.SetActiveFirewall("10.0.0.1")
 
 		var wg sync.WaitGroup
 
@@ -90,15 +90,15 @@ func TestConcurrentAddRemoveConnection(t *testing.T) {
 		session := auth.NewSession(cfg)
 
 		var wg sync.WaitGroup
-		fwConfig := &config.FirewallConfig{Host: "10.0.0.1"}
+		fwConfig := &config.ConnectionConfig{}
 
-		// Concurrent adds
+		// Concurrent adds - use different IPs as keys
 		for i := 0; i < 50; i++ {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
-				name := "fw" + string(rune('a'+idx%26))
-				session.AddConnection(name, fwConfig, "key")
+				host := "10.0.0." + string(rune('a'+idx%26))
+				session.AddConnection(host, fwConfig, "key")
 			}(i)
 		}
 
@@ -119,8 +119,8 @@ func TestConcurrentMixedOperations(t *testing.T) {
 		cfg := &config.Config{}
 		session := auth.NewSession(cfg)
 
-		fwConfig := &config.FirewallConfig{Host: "10.0.0.1"}
-		session.AddConnection("fw1", fwConfig, "key1")
+		fwConfig := &config.ConnectionConfig{}
+		session.AddConnection("10.0.0.1", fwConfig, "key1")
 
 		var wg sync.WaitGroup
 
@@ -130,10 +130,10 @@ func TestConcurrentMixedOperations(t *testing.T) {
 			go func(idx int) {
 				defer wg.Done()
 				if idx%2 == 0 {
-					session.SetActiveFirewall("fw1")
+					session.SetActiveFirewall("10.0.0.1")
 				} else {
-					name := "temp" + string(rune('a'+idx%26))
-					session.AddConnection(name, fwConfig, "key")
+					host := "10.1.0." + string(rune('a'+idx%26))
+					session.AddConnection(host, fwConfig, "key")
 				}
 			}(i)
 		}

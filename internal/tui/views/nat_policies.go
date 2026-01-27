@@ -186,7 +186,7 @@ func (m NATPoliciesModel) visibleRows() int {
 
 func (m NATPoliciesModel) View() string {
 	if m.Width == 0 {
-		return "Loading..."
+		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
 	titleStyle := ViewTitleStyle.MarginBottom(1)

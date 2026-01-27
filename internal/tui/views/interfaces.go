@@ -285,7 +285,7 @@ func (m InterfacesModel) TableCursor() int {
 
 func (m InterfacesModel) View() string {
 	if m.Width == 0 {
-		return "Loading..."
+		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
 	var sections []string

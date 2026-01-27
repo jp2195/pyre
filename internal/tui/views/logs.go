@@ -394,7 +394,7 @@ func (m LogsModel) visibleRows() int {
 
 func (m LogsModel) View() string {
 	if m.Width == 0 {
-		return "Loading..."
+		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
 	var sections []string

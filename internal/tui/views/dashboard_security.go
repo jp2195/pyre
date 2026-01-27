@@ -20,13 +20,20 @@ type SecurityDashboardModel struct {
 	threatErr error
 	policyErr error
 
-	width  int
-	height int
+	width        int
+	height       int
+	SpinnerFrame string
 }
 
 // NewSecurityDashboardModel creates a new security dashboard model
 func NewSecurityDashboardModel() SecurityDashboardModel {
 	return SecurityDashboardModel{}
+}
+
+// SetSpinnerFrame sets the current spinner animation frame
+func (m SecurityDashboardModel) SetSpinnerFrame(frame string) SecurityDashboardModel {
+	m.SpinnerFrame = frame
+	return m
 }
 
 // SetSize sets the terminal dimensions
@@ -55,10 +62,15 @@ func (m SecurityDashboardModel) Update(msg tea.Msg) (SecurityDashboardModel, tea
 	return m, nil
 }
 
+// HasData returns true if the dashboard has already loaded its data
+func (m SecurityDashboardModel) HasData() bool {
+	return m.threatSummary != nil
+}
+
 // View renders the security dashboard
 func (m SecurityDashboardModel) View() string {
 	if m.width == 0 {
-		return "Loading..."
+		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
 	totalWidth := m.width - 4
@@ -106,7 +118,7 @@ func (m SecurityDashboardModel) renderThreatBreakdown(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.threatSummary == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -161,7 +173,7 @@ func (m SecurityDashboardModel) renderThreatSeverity(width int) string {
 	b.WriteString("\n")
 
 	if m.threatErr != nil || m.threatSummary == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -231,7 +243,7 @@ func (m SecurityDashboardModel) renderZeroHitRules(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.policies == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -312,7 +324,7 @@ func (m SecurityDashboardModel) renderMostHitRules(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.policies == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 

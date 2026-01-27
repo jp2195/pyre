@@ -40,47 +40,73 @@ func (m Model) navigateToCurrentItem() (tea.Model, tea.Cmd) {
 	case "overview":
 		m.currentView = ViewDashboard
 		m.currentDashboard = views.DashboardMain
-		cmd = m.fetchDashboardData()
+		if !m.dashboard.HasData() {
+			cmd = m.fetchDashboardData()
+		}
 	case "network":
 		m.currentView = ViewDashboard
 		m.currentDashboard = views.DashboardNetwork
-		cmd = m.fetchNetworkDashboardData()
+		if !m.networkDashboard.HasData() {
+			cmd = m.fetchNetworkDashboardData()
+		}
 	case "security":
 		m.currentView = ViewDashboard
 		m.currentDashboard = views.DashboardSecurity
-		cmd = m.fetchSecurityDashboardData()
+		if !m.securityDashboard.HasData() {
+			cmd = m.fetchSecurityDashboardData()
+		}
 	case "vpn":
 		m.currentView = ViewDashboard
 		m.currentDashboard = views.DashboardVPN
-		cmd = m.fetchVPNDashboardData()
+		if !m.vpnDashboard.HasData() {
+			cmd = m.fetchVPNDashboardData()
+		}
 
 	// Analyze group
 	case "policies":
 		m.currentView = ViewPolicies
-		m.policies = m.policies.SetLoading(true)
-		cmd = m.fetchPolicies()
+		if !m.policies.HasData() {
+			m.policies = m.policies.SetLoading(true)
+			cmd = m.fetchPolicies()
+		}
 	case "nat":
 		m.currentView = ViewNATPolicies
-		m.natPolicies = m.natPolicies.SetLoading(true)
-		cmd = m.fetchNATPolicies()
+		if !m.natPolicies.HasData() {
+			m.natPolicies = m.natPolicies.SetLoading(true)
+			cmd = m.fetchNATPolicies()
+		}
 	case "sessions":
 		m.currentView = ViewSessions
-		m.sessions = m.sessions.SetLoading(true)
-		cmd = m.fetchSessions()
+		if !m.sessions.HasData() {
+			m.sessions = m.sessions.SetLoading(true)
+			cmd = m.fetchSessions()
+		}
 	case "interfaces":
 		m.currentView = ViewInterfaces
-		m.interfaces = m.interfaces.SetLoading(true)
-		cmd = m.fetchInterfaces()
+		if !m.interfaces.HasData() {
+			m.interfaces = m.interfaces.SetLoading(true)
+			cmd = m.fetchInterfaces()
+		}
+	case "routes":
+		m.currentView = ViewRoutes
+		if !m.routes.HasData() {
+			m.routes = m.routes.SetLoading(true)
+			cmd = m.fetchRoutesData()
+		}
 	case "logs":
 		m.currentView = ViewLogs
-		m.logs = m.logs.SetLoading(true)
-		cmd = m.fetchLogs()
+		if !m.logs.HasData() {
+			m.logs = m.logs.SetLoading(true)
+			cmd = m.fetchLogs()
+		}
 
 	// Tools group
 	case "config":
 		m.currentView = ViewDashboard
 		m.currentDashboard = views.DashboardConfig
-		cmd = m.fetchConfigDashboardData()
+		if !m.configDashboard.HasData() {
+			cmd = m.fetchConfigDashboardData()
+		}
 
 	// Connections group
 	case "picker":
@@ -114,6 +140,8 @@ func (m *Model) syncNavbarToCurrentView() {
 		m.navbar = m.navbar.SetActiveByID("analyze", "sessions")
 	case ViewInterfaces:
 		m.navbar = m.navbar.SetActiveByID("analyze", "interfaces")
+	case ViewRoutes:
+		m.navbar = m.navbar.SetActiveByID("analyze", "routes")
 	case ViewLogs:
 		m.navbar = m.navbar.SetActiveByID("analyze", "logs")
 	case ViewPicker:

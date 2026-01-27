@@ -2,6 +2,7 @@ package views
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -202,8 +203,8 @@ func TestLogsModel_View_ZeroWidth(t *testing.T) {
 	// Don't set size
 
 	view := m.View()
-	if view != "Loading..." {
-		t.Errorf("expected 'Loading...' with zero width, got %q", view)
+	if !strings.Contains(view, "Loading...") {
+		t.Errorf("expected view to contain 'Loading...' with zero width, got %q", view)
 	}
 }
 

@@ -17,12 +17,15 @@ import (
 type ViewState int
 
 const (
-	ViewLogin ViewState = iota
+	ViewConnectionHub  ViewState = iota // Entry point when config has connections
+	ViewConnectionForm                  // Add/Edit/QuickConnect form
+	ViewLogin
 	ViewDashboard
 	ViewPolicies
 	ViewNATPolicies
 	ViewSessions
 	ViewInterfaces
+	ViewRoutes
 	ViewLogs
 	ViewPicker
 	ViewDevicePicker
@@ -34,6 +37,7 @@ type Model struct {
 	cancel context.CancelFunc
 
 	config  *config.Config
+	state   *config.State
 	session *auth.Session
 	keys    KeyMap
 	help    help.Model
@@ -49,6 +53,8 @@ type Model struct {
 	err              error
 
 	navbar            views.NavbarModel
+	connectionHub     views.ConnectionHubModel
+	connectionForm    views.ConnectionFormModel
 	login             views.LoginModel
 	dashboard         views.DashboardModel
 	networkDashboard  views.NetworkDashboardModel
@@ -59,14 +65,19 @@ type Model struct {
 	natPolicies       views.NATPoliciesModel
 	sessions          views.SessionsModel
 	interfaces        views.InterfacesModel
+	routes            views.RoutesModel
 	logs              views.LogsModel
 	picker            views.PickerModel
 	devicePicker      views.DevicePickerModel
 	commandPalette    views.CommandPaletteModel
 	previousView      ViewState // Track previous view for Esc to return
+
+	// selectedConnection stores the connection selected from hub before login
+	selectedConnection       string
+	selectedConnectionConfig config.ConnectionConfig
 }
 
-func NewModel(cfg *config.Config, creds *auth.Credentials) Model {
+func NewModel(cfg *config.Config, state *config.State, creds *auth.Credentials, startView ViewState) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = SpinnerStyle
@@ -78,37 +89,34 @@ func NewModel(cfg *config.Config, creds *auth.Credentials) Model {
 		ctx:         ctx,
 		cancel:      cancel,
 		config:      cfg,
+		state:       state,
 		session:     session,
 		keys:        DefaultKeyMap(),
 		help:        help.New(),
 		spinner:     s,
-		currentView: ViewLogin,
+		currentView: startView,
 	}
 
+	// If we have full credentials (API key + host), go straight to dashboard
 	if creds.HasAPIKey() && creds.HasHost() {
-		// Look up full firewall config by host
-		var fwConfig *config.FirewallConfig
-		var connName string
-		for name, fw := range cfg.Firewalls {
-			if fw.Host == creds.Host {
-				fwCopy := fw
-				fwConfig = &fwCopy
-				connName = name
-				break
-			}
-		}
-		if fwConfig == nil {
-			fwConfig = &config.FirewallConfig{
-				Host:     creds.Host,
+		// Look up full connection config by host
+		var connConfig *config.ConnectionConfig
+		if conn, ok := cfg.Connections[creds.Host]; ok {
+			connCopy := conn
+			connConfig = &connCopy
+		} else {
+			connConfig = &config.ConnectionConfig{
 				Insecure: creds.Insecure,
 			}
-			connName = "default"
 		}
-		session.AddConnection(connName, fwConfig, creds.APIKey)
+		session.AddConnection(creds.Host, connConfig, creds.APIKey)
 		m.currentView = ViewDashboard
 	}
 
+	// Initialize all view models
 	m.navbar = views.NewNavbarModel()
+	m.connectionHub = views.NewConnectionHubModel().SetConnections(cfg, state)
+	m.connectionForm = views.NewQuickConnectForm()
 	m.login = views.NewLoginModel(creds)
 	m.dashboard = views.NewDashboardModel()
 	m.networkDashboard = views.NewNetworkDashboardModel()
@@ -119,6 +127,7 @@ func NewModel(cfg *config.Config, creds *auth.Credentials) Model {
 	m.natPolicies = views.NewNATPoliciesModel()
 	m.sessions = views.NewSessionsModel()
 	m.interfaces = views.NewInterfacesModel()
+	m.routes = views.NewRoutesModel()
 	m.logs = views.NewLogsModel()
 	m.picker = views.NewPickerModel(session)
 	m.devicePicker = views.NewDevicePickerModel()
@@ -152,6 +161,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		contentHeight := msg.Height - 4
 
 		m.navbar = m.navbar.SetSize(msg.Width)
+		m.connectionHub = m.connectionHub.SetSize(msg.Width, msg.Height)
+		m.connectionForm = m.connectionForm.SetSize(msg.Width, msg.Height)
 		m.login = m.login.SetSize(msg.Width, msg.Height)
 		m.dashboard = m.dashboard.SetSize(msg.Width, contentHeight)
 		m.networkDashboard = m.networkDashboard.SetSize(msg.Width, contentHeight)
@@ -162,6 +173,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.natPolicies = m.natPolicies.SetSize(msg.Width, contentHeight)
 		m.sessions = m.sessions.SetSize(msg.Width, contentHeight)
 		m.interfaces = m.interfaces.SetSize(msg.Width, contentHeight)
+		m.routes = m.routes.SetSize(msg.Width, contentHeight)
 		m.logs = m.logs.SetSize(msg.Width, contentHeight)
 		m.picker = m.picker.SetSize(msg.Width, contentHeight)
 		m.devicePicker = m.devicePicker.SetSize(msg.Width, contentHeight)
@@ -171,6 +183,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.showHelp {
 			m.showHelp = false
 			return m, nil
+		}
+
+		if m.currentView == ViewConnectionHub {
+			return m.handleConnectionHubKeys(msg)
+		}
+
+		if m.currentView == ViewConnectionForm {
+			return m.handleConnectionFormKeys(msg)
 		}
 
 		if m.currentView == ViewLogin {
@@ -231,7 +251,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.devicePicker = m.devicePicker.SetDevices(
 					conn.ManagedDevices,
 					conn.TargetSerial,
-					conn.Name,
+					conn.Host,
 				)
 				return m, nil
 			}
@@ -248,6 +268,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.sessions = m.sessions.SetLoading(true)
 			case ViewInterfaces:
 				m.interfaces = m.interfaces.SetLoading(true)
+			case ViewRoutes:
+				m.routes = m.routes.SetLoading(true)
 			case ViewLogs:
 				m.logs = m.logs.SetLoading(true)
 			}
@@ -292,40 +314,62 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)
 
-		// Share spinner frame with all table views
+		// Share spinner frame with all views
 		frame := m.spinner.View()
 		m.policies.TableBase.SpinnerFrame = frame
 		m.natPolicies.TableBase.SpinnerFrame = frame
 		m.sessions.TableBase.SpinnerFrame = frame
 		m.interfaces.TableBase.SpinnerFrame = frame
+		m.routes.TableBase.SpinnerFrame = frame
 		m.logs.TableBase.SpinnerFrame = frame
+
+		// Share spinner frame with dashboard views
+		m.dashboard = m.dashboard.SetSpinnerFrame(frame)
+		m.networkDashboard = m.networkDashboard.SetSpinnerFrame(frame)
+		m.securityDashboard = m.securityDashboard.SetSpinnerFrame(frame)
+		m.vpnDashboard = m.vpnDashboard.SetSpinnerFrame(frame)
+		m.configDashboard = m.configDashboard.SetSpinnerFrame(frame)
 
 	case LoginSuccessMsg:
 		m.loading = false
 		// Clear password from login model immediately after success
 		m.login = m.login.ClearPassword()
 
-		// Look up full firewall config by host
-		var fwConfig *config.FirewallConfig
-		var connName string
-		loginHost := m.login.Host()
-		for name, fw := range m.config.Firewalls {
-			if fw.Host == loginHost {
-				fwCopy := fw
-				fwConfig = &fwCopy
-				connName = name
-				break
+		// Use selected connection if available, otherwise look up by host
+		var connConfig *config.ConnectionConfig
+		host := msg.Host
+
+		if m.selectedConnection != "" {
+			// Use the connection selected from hub
+			host = m.selectedConnection
+			connConfig = &m.selectedConnectionConfig
+		} else {
+			// Look up full connection config by host
+			if conn, ok := m.config.Connections[host]; ok {
+				connCopy := conn
+				connConfig = &connCopy
+			} else {
+				connConfig = &config.ConnectionConfig{
+					Insecure: m.login.Insecure(),
+				}
 			}
 		}
-		if fwConfig == nil {
-			fwConfig = &config.FirewallConfig{
-				Host:     loginHost,
-				Insecure: m.login.Insecure(),
-			}
-			connName = msg.Name
-		}
-		conn := m.session.AddConnection(connName, fwConfig, msg.APIKey)
+
+		conn := m.session.AddConnection(host, connConfig, msg.APIKey)
 		m.currentView = ViewDashboard
+
+		// Update state with connection info
+		if m.state != nil && host != "" {
+			m.state.UpdateConnection(host, msg.Username)
+			go func() {
+				_ = m.state.Save()
+			}()
+		}
+
+		// Clear selected connection
+		m.selectedConnection = ""
+		m.selectedConnectionConfig = config.ConnectionConfig{}
+
 		cmds = append(cmds, m.fetchCurrentDashboardData(), m.detectPanorama(conn))
 
 	case LoginErrorMsg:
@@ -441,6 +485,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, m.fetchInterfaces()
 			}
+		case ViewRoutes:
+			if !m.routes.HasData() {
+				m.routes = m.routes.SetLoading(true)
+				return m, m.fetchRoutesData()
+			}
 		case ViewLogs:
 			if !m.logs.HasData() {
 				m.logs = m.logs.SetLoading(true)
@@ -460,6 +509,84 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.picker = m.picker.UpdateConnections(m.session)
 		return m, nil
 
+	case ShowConnectionHubMsg:
+		m.connectionHub = m.connectionHub.SetConnections(m.config, m.state)
+		m.currentView = ViewConnectionHub
+		return m, nil
+
+	case ShowConnectionFormMsg:
+		switch msg.Mode {
+		case views.FormModeQuickConnect:
+			m.connectionForm = views.NewQuickConnectForm()
+		case views.FormModeAdd:
+			m.connectionForm = views.NewAddConnectionForm()
+		case views.FormModeEdit:
+			m.connectionForm = views.NewEditConnectionForm(msg.Host, msg.Config)
+		}
+		m.connectionForm = m.connectionForm.SetSize(m.width, m.height)
+		m.currentView = ViewConnectionForm
+		return m, nil
+
+	case ConnectionSelectedMsg:
+		// Store selected connection info and transition to login
+		m.selectedConnection = msg.Host
+		m.selectedConnectionConfig = msg.Config
+		m.login = views.NewLoginModel(&auth.Credentials{
+			Host:     msg.Host,
+			Username: msg.Config.Username,
+			Insecure: msg.Config.Insecure,
+		})
+		m.login = m.login.SetSize(m.width, m.height)
+		m.currentView = ViewLogin
+		return m, nil
+
+	case ConnectionFormSubmitMsg:
+		// Handle form submission - save to config if requested
+		if msg.SaveToConfig {
+			if msg.Mode == views.FormModeEdit {
+				// Update existing
+				_ = m.config.UpdateConnection(msg.Host, msg.Config)
+			} else {
+				// Add new
+				_ = m.config.AddConnection(msg.Host, msg.Config)
+			}
+			// Save config asynchronously
+			go func() {
+				_ = m.config.Save()
+			}()
+			// Update hub with new data
+			m.connectionHub = m.connectionHub.SetConnections(m.config, m.state)
+		}
+
+		// For quick connect or after saving, go to login
+		m.selectedConnection = msg.Host
+		m.selectedConnectionConfig = msg.Config
+		m.login = views.NewLoginModel(&auth.Credentials{
+			Host:     msg.Host,
+			Username: msg.Config.Username,
+			Insecure: msg.Config.Insecure,
+		})
+		m.login = m.login.SetSize(m.width, m.height)
+		m.currentView = ViewLogin
+		return m, nil
+
+	case ConnectionDeletedMsg:
+		// Delete from config and save
+		_ = m.config.DeleteConnection(msg.Host)
+		go func() {
+			_ = m.config.Save()
+		}()
+		// Also delete from state
+		if m.state != nil {
+			m.state.DeleteConnection(msg.Host)
+			go func() {
+				_ = m.state.Save()
+			}()
+		}
+		// Refresh hub
+		m.connectionHub = m.connectionHub.SetConnections(m.config, m.state)
+		return m, nil
+
 	case RefreshMsg:
 		switch m.currentView {
 		case ViewPolicies:
@@ -470,6 +597,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.sessions = m.sessions.SetLoading(true)
 		case ViewInterfaces:
 			m.interfaces = m.interfaces.SetLoading(true)
+		case ViewRoutes:
+			m.routes = m.routes.SetLoading(true)
 		case ViewLogs:
 			m.logs = m.logs.SetLoading(true)
 		}
@@ -496,12 +625,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case RoutingTableMsg:
 		m.networkDashboard = m.networkDashboard.SetRoutingTable(msg.Routes, msg.Err)
+		m.routes = m.routes.SetRoutes(msg.Routes, msg.Err)
 
 	case BGPNeighborsMsg:
 		m.networkDashboard = m.networkDashboard.SetBGPNeighbors(msg.Neighbors, msg.Err)
+		m.routes = m.routes.SetBGPNeighbors(msg.Neighbors, msg.Err)
 
 	case OSPFNeighborsMsg:
 		m.networkDashboard = m.networkDashboard.SetOSPFNeighbors(msg.Neighbors, msg.Err)
+		m.routes = m.routes.SetOSPFNeighbors(msg.Neighbors, msg.Err)
 
 	case IPSecTunnelsMsg:
 		m.vpnDashboard = m.vpnDashboard.SetIPSecTunnels(msg.Tunnels, msg.Err)
@@ -533,6 +665,12 @@ func (m Model) View() string {
 	var content string
 
 	switch m.currentView {
+	case ViewConnectionHub:
+		return m.connectionHub.View()
+
+	case ViewConnectionForm:
+		return m.connectionForm.View()
+
 	case ViewLogin:
 		return m.login.View()
 
@@ -571,6 +709,9 @@ func (m Model) View() string {
 
 	case ViewInterfaces:
 		content = m.interfaces.View()
+
+	case ViewRoutes:
+		content = m.routes.View()
 
 	case ViewLogs:
 		content = m.logs.View()

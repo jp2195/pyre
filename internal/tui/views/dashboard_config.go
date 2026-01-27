@@ -19,13 +19,20 @@ type ConfigDashboardModel struct {
 	policyErr  error
 	changesErr error
 
-	width  int
-	height int
+	width        int
+	height       int
+	SpinnerFrame string
 }
 
 // NewConfigDashboardModel creates a new config dashboard model
 func NewConfigDashboardModel() ConfigDashboardModel {
 	return ConfigDashboardModel{}
+}
+
+// SetSpinnerFrame sets the current spinner animation frame
+func (m ConfigDashboardModel) SetSpinnerFrame(frame string) ConfigDashboardModel {
+	m.SpinnerFrame = frame
+	return m
 }
 
 // SetSize sets the terminal dimensions
@@ -54,10 +61,15 @@ func (m ConfigDashboardModel) Update(msg tea.Msg) (ConfigDashboardModel, tea.Cmd
 	return m, nil
 }
 
+// HasData returns true if the dashboard has already loaded its data
+func (m ConfigDashboardModel) HasData() bool {
+	return m.policies != nil
+}
+
 // View renders the config dashboard
 func (m ConfigDashboardModel) View() string {
 	if m.width == 0 {
-		return "Loading..."
+		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
 	totalWidth := m.width - 4
@@ -105,7 +117,7 @@ func (m ConfigDashboardModel) renderPolicyStats(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.policies == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -179,7 +191,7 @@ func (m ConfigDashboardModel) renderPendingChanges(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.pendingChanges == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -267,7 +279,7 @@ func (m ConfigDashboardModel) renderZeroHitRules(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.policies == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -348,7 +360,7 @@ func (m ConfigDashboardModel) renderMostHitRules(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 	if m.policies == nil {
-		b.WriteString(dimStyle().Render("Loading..."))
+		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}
 

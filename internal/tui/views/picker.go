@@ -30,7 +30,7 @@ func (m PickerModel) UpdateConnections(session *auth.Session) PickerModel {
 	m.cursor = 0
 
 	for i, c := range m.connections {
-		if c.Name == m.active {
+		if c.Host == m.active {
 			m.cursor = i
 			break
 		}
@@ -47,7 +47,7 @@ func (m PickerModel) SetSize(width, height int) PickerModel {
 
 func (m PickerModel) Selected() string {
 	if m.cursor >= 0 && m.cursor < len(m.connections) {
-		return m.connections[m.cursor].Name
+		return m.connections[m.cursor].Host
 	}
 	return ""
 }
@@ -98,7 +98,7 @@ func (m PickerModel) View() string {
 			}
 
 			indicator := "  "
-			if conn.Name == m.active {
+			if conn.Host == m.active {
 				indicator = activeStyle.Render("● ")
 			}
 
@@ -107,8 +107,7 @@ func (m PickerModel) View() string {
 				status = StatusInactiveStyle.Render("disconnected")
 			}
 
-			line := indicator + style.Render(conn.Name) + " " +
-				DetailDimStyle.Render("("+conn.Config.Host+")")
+			line := indicator + style.Render(conn.Host)
 
 			// Add Panorama indicator with device count
 			if conn.IsPanorama {

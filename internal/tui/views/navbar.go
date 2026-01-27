@@ -51,7 +51,8 @@ func NewNavbarModel() NavbarModel {
 					{ID: "nat", Label: "NAT", Key: "2"},
 					{ID: "sessions", Label: "Sessions", Key: "3"},
 					{ID: "interfaces", Label: "Interfaces", Key: "4"},
-					{ID: "logs", Label: "Logs", Key: "5"},
+					{ID: "routes", Label: "Routes", Key: "5"},
+					{ID: "logs", Label: "Logs", Key: "6"},
 				},
 			},
 			{
