@@ -22,7 +22,6 @@ pyre solves this by combining multiple API calls into unified terminal views. Ge
 - **Active Sessions** - View and filter live sessions with detailed traffic information
 - **Logs** - Browse system, traffic, and threat logs with filtering
 - **Interfaces** - Monitor interface status, traffic counters, and errors
-- **Troubleshooting** - Run interactive troubleshooting runbooks via SSH
 - **Panorama Support** - Manage multiple firewalls through Panorama device targeting
 - **Multi-Firewall** - Switch between multiple firewall connections
 - **Command Palette** - Quick access to any view or action with `Ctrl+P`
@@ -76,19 +75,28 @@ pyre
 Create `~/.pyre.yaml`:
 
 ```yaml
-default_firewall: prod-fw01
+default: 10.0.0.1
 
-firewalls:
-  prod-fw01:
-    host: 10.0.0.1
-    api_key_env: PROD_FW01_API_KEY
+connections:
+  10.0.0.1:
     insecure: true
 
 settings:
-  theme: "dark"
+  theme: dark
 ```
 
-Then run `pyre`.
+Then set your API key and run:
+
+```bash
+export PYRE_API_KEY=YOUR_API_KEY
+pyre
+```
+
+Or use the `-c` flag to connect to a saved connection:
+
+```bash
+pyre -c 10.0.0.1
+```
 
 See [Getting Started](docs/getting-started.md) for more options.
 
@@ -100,7 +108,7 @@ pyre uses a group-based navigation system:
 |-----|-------|-------|
 | `1` | Monitor | Overview, Network, Security, VPN |
 | `2` | Analyze | Policies, NAT, Sessions, Interfaces, Logs |
-| `3` | Tools | Troubleshoot, Config |
+| `3` | Tools | Config |
 | `4` | Connections | Switch Device |
 
 - Press the same number to cycle through views in that group
@@ -142,7 +150,6 @@ See [Keybindings](docs/keybindings.md) for the complete reference.
 - [Keybindings](docs/keybindings.md) - Complete keyboard shortcut reference
 - [Configuration](docs/configuration.md) - Configuration file reference
 - [Panorama](docs/panorama.md) - Panorama-specific features
-- [SSH Setup](docs/ssh-setup.md) - SSH configuration for troubleshooting
 
 ### View Reference
 
@@ -152,7 +159,6 @@ See [Keybindings](docs/keybindings.md) for the complete reference.
 - [Sessions](docs/views/sessions.md) - Active sessions
 - [Interfaces](docs/views/interfaces.md) - Interface status
 - [Logs](docs/views/logs.md) - Log viewer
-- [Troubleshoot](docs/views/troubleshoot.md) - Diagnostic runbooks
 
 ## Contributing
 

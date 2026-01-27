@@ -4,13 +4,12 @@ pyre can connect to Panorama and manage its managed firewalls through device tar
 
 ## Connecting to Panorama
 
-Configure Panorama in your config file like any other firewall:
+Configure Panorama in your config file:
 
 ```yaml
-firewalls:
-  panorama:
-    host: panorama.example.com
-    api_key_env: PANORAMA_API_KEY
+connections:
+  panorama.example.com:
+    type: panorama
     insecure: true
 ```
 
@@ -82,21 +81,19 @@ In the device picker, press `r` to refresh the list of managed devices. This is 
 
 ## Configuration Tips
 
-### Dedicated Panorama Entry
+### Panorama and Direct Firewall Entries
 
-Create a dedicated entry for Panorama:
+You can have both Panorama and direct firewall entries:
 
 ```yaml
-firewalls:
-  panorama:
-    host: panorama.example.com
-    api_key_env: PANORAMA_API_KEY
+connections:
+  panorama.example.com:
+    type: panorama
     insecure: true
 
-  # You can also have direct entries for individual firewalls
-  fw-dc1-01:
-    host: 10.1.0.1
-    api_key_env: DC1_FW01_KEY
+  # Direct entries for individual firewalls
+  10.1.0.1:
+    insecure: true
 ```
 
 This gives you flexibility to connect directly to firewalls or through Panorama.

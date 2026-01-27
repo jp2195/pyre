@@ -36,7 +36,7 @@ go build -o pyre ./cmd/pyre
 
 ## First Connection
 
-There are four ways to connect to a firewall. Choose the method that fits your workflow.
+There are several ways to connect to a firewall. Choose the method that fits your workflow.
 
 ### Option 1: CLI Flags
 
@@ -67,31 +67,36 @@ pyre
 Best for managing multiple firewalls. Create `~/.pyre.yaml`:
 
 ```yaml
-default_firewall: prod-fw01
+default: 10.0.0.1
 
-firewalls:
-  prod-fw01:
-    host: 10.0.0.1
-    api_key_env: PROD_FW01_API_KEY  # Read from environment variable
+connections:
+  10.0.0.1:
     insecure: true
 
-  prod-fw02:
-    host: 10.0.0.2
-    api_key: LUFRPT...              # Or specify directly
+  10.0.0.2:
     insecure: true
 ```
 
-Then run:
+Then set your API key and run:
 
 ```bash
+export PYRE_API_KEY=YOUR_API_KEY
 pyre
+```
+
+With a config file, pyre shows the Connection Hub where you can select which firewall to connect to.
+
+Use `-c` to connect directly to a specific connection:
+
+```bash
+pyre -c 10.0.0.1
 ```
 
 See [Configuration](configuration.md) for all options.
 
 ### Option 4: Interactive Login
 
-If no credentials are configured, pyre prompts for them:
+If no credentials are configured, pyre shows a Quick Connect form:
 
 1. Enter the firewall hostname or IP
 2. Enter your username
@@ -143,9 +148,8 @@ Dig into detailed data:
 
 ### Tools Group (Press 3)
 
-Run diagnostics and view configuration:
+View configuration status:
 
-- **Troubleshoot** - Interactive runbooks via SSH
 - **Config** - Pending changes, rule statistics
 
 ### Connections Group (Press 4)

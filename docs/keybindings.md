@@ -12,7 +12,7 @@ These work from any view (except when in filter mode or text input).
 |-----|--------|
 | `1` | Monitor group (Overview, Network, Security, VPN) |
 | `2` | Analyze group (Policies, NAT, Sessions, Interfaces, Logs) |
-| `3` | Tools group (Troubleshoot, Config) |
+| `3` | Tools group (Config) |
 | `4` | Connections group (Switch Device) |
 | `Tab` | Next view in current group |
 | `Ctrl+P` | Open command palette |
@@ -109,14 +109,25 @@ When in filter mode, type your search query. Filters support partial matching.
 | `S` | Toggle sort direction |
 | `Enter` | Toggle log detail view |
 
-### Troubleshoot View
+### Connection Hub
 
 | Key | Action |
 |-----|--------|
-| `Tab` | Switch runbook category |
-| `Enter` | Run selected runbook |
-| `R` | Retry SSH connection |
-| `Esc` | Return to runbook list (when viewing results) |
+| `j`/`k` | Navigate up/down |
+| `Enter` | Connect to selected connection |
+| `n` | Add new connection |
+| `e` | Edit selected connection |
+| `d` | Delete selected connection |
+| `Esc` | Back / Cancel |
+
+### Connection Form
+
+| Key | Action |
+|-----|--------|
+| `Tab` | Move to next field |
+| `Shift+Tab` | Move to previous field |
+| `Enter` | Submit form |
+| `Esc` | Cancel and go back |
 
 ### Connection Picker
 
@@ -124,7 +135,6 @@ When in filter mode, type your search query. Filters support partial matching.
 |-----|--------|
 | `j`/`k` | Navigate up/down |
 | `Enter` | Connect to selected firewall |
-| `a` | Add new connection |
 | `x` | Disconnect selected |
 | `Esc` / `:` | Close picker |
 
