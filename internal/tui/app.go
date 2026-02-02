@@ -141,6 +141,10 @@ func (m Model) Init() tea.Cmd {
 
 	if m.currentView == ViewDashboard {
 		cmds = append(cmds, m.fetchCurrentDashboardData())
+		// Also detect panorama when starting with API key credentials
+		if conn := m.session.GetActiveConnection(); conn != nil {
+			cmds = append(cmds, m.detectPanorama(conn))
+		}
 	}
 
 	return tea.Batch(cmds...)
@@ -439,6 +443,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		conn := m.session.GetActiveConnection()
 		if conn != nil && msg.Err == nil {
 			conn.ManagedDevices = msg.Devices
+			// If we're on dashboard after initial panorama connection (no target selected yet),
+			// automatically show the device picker so user can select a target device
+			if m.currentView == ViewDashboard && conn.IsPanorama && conn.TargetSerial == "" {
+				m.currentView = ViewDevicePicker
+				m.devicePicker = m.devicePicker.SetDevices(msg.Devices, conn.TargetSerial, conn.Host)
+			}
 		}
 
 	case SystemLogsMsg:

@@ -16,11 +16,6 @@ func (m Model) handleLoginKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case msg.String() == "enter":
-		// On insecure field, toggle checkbox on enter
-		if m.login.FocusedField() == views.FieldInsecure {
-			m.login = m.login.ToggleInsecure()
-			return m, nil
-		}
 		if m.login.CanSubmit() {
 			m.loading = true
 			return m, m.doLogin()
@@ -359,19 +354,6 @@ func (m Model) handleConnectionFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, formKeys.Submit):
-		// Handle toggles on type/insecure/save fields
-		switch m.connectionForm.FocusedField() {
-		case views.FormFieldType:
-			m.connectionForm = m.connectionForm.ToggleType()
-			return m, nil
-		case views.FormFieldInsecure:
-			m.connectionForm = m.connectionForm.ToggleInsecure()
-			return m, nil
-		case views.FormFieldSave:
-			m.connectionForm = m.connectionForm.ToggleSave()
-			return m, nil
-		}
-
 		// Submit the form
 		if m.connectionForm.CanSubmit() {
 			return m, func() tea.Msg {

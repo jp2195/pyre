@@ -128,7 +128,15 @@ func (m Model) renderFooter() string {
 		navHint = HelpKeyStyle.Render("1-4") + HelpDescStyle.Render(" section")
 	}
 
+	// Show devices hint for Panorama connections
+	var devicesHint string
+	conn := m.session.GetActiveConnection()
+	if conn != nil && conn.IsPanorama {
+		devicesHint = HelpKeyStyle.Render("  d") + HelpDescStyle.Render(" devices")
+	}
+
 	help := navHint +
+		devicesHint +
 		HelpKeyStyle.Render("  Tab/S-Tab") + HelpDescStyle.Render(" next/prev") +
 		HelpKeyStyle.Render("  r") + HelpDescStyle.Render(" refresh") +
 		HelpKeyStyle.Render("  Ctrl+P") + HelpDescStyle.Render(" search") +
