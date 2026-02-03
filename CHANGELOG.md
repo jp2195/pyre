@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.1](https://github.com/jp2195/pyre/compare/v1.1.0...v1.1.1) (2026-02-03)
+
+
+### Bug Fixes
+
+* Add the d selector to the help menu when utilizing panorama. ([b3ad73c](https://github.com/jp2195/pyre/commit/b3ad73c3674ca5542c04b48f8b9c9689d98a512c))
+* Panorama default/entry screen to the device selector. ([b3ad73c](https://github.com/jp2195/pyre/commit/b3ad73c3674ca5542c04b48f8b9c9689d98a512c))
+* space bar to select/toggle and enter to move to the next form. ([b3ad73c](https://github.com/jp2195/pyre/commit/b3ad73c3674ca5542c04b48f8b9c9689d98a512c))
+
 ## [1.1.0](https://github.com/jp2195/pyre/compare/v1.0.1...v1.1.0) (2026-01-27)
 
 
