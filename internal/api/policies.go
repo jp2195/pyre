@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/xml"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -100,7 +101,7 @@ func parseSecurityRuleEntries(inner []byte) []securityRuleEntry {
 }
 
 // convertSecurityRuleEntry converts a parsed XML entry to a SecurityRule model
-func convertSecurityRuleEntry(e securityRuleEntry, position int) models.SecurityRule {
+func convertSecurityRuleEntry(e securityRuleEntry, position int, ruleBase models.RuleBase) models.SecurityRule {
 	// Determine rule type
 	ruleType := models.RuleTypeUniversal
 	switch e.RuleType {
@@ -148,6 +149,7 @@ func convertSecurityRuleEntry(e securityRuleEntry, position int) models.Security
 		Description:          e.Description,
 		Tags:                 e.Tag.Member,
 		RuleType:             ruleType,
+		RuleBase:             ruleBase,
 		Action:               e.Action,
 		SourceZones:          e.From.Member,
 		Sources:              e.Source.Member,
@@ -173,19 +175,19 @@ func convertSecurityRuleEntry(e securityRuleEntry, position int) models.Security
 	}
 }
 
-// fetchSecurityRulesFromPaths tries to fetch security rules from multiple XPaths
-func (c *Client) fetchSecurityRulesFromPaths(ctx context.Context, xpaths []string) []securityRuleEntry {
+// fetchRulesFromPaths tries to fetch rules from multiple XPaths, using the provided parse function.
+func fetchRulesFromPaths[T any](c *Client, ctx context.Context, xpaths []string, parse func([]byte) []T) []T {
 	for _, xpath := range xpaths {
 		resp, err := c.Show(ctx, xpath)
 		if err == nil && resp.IsSuccess() && len(resp.Result.Inner) > 0 {
-			if entries := parseSecurityRuleEntries(resp.Result.Inner); len(entries) > 0 {
+			if entries := parse(resp.Result.Inner); len(entries) > 0 {
 				return entries
 			}
 		}
 		// Try Get if Show didn't work
 		resp, err = c.Get(ctx, xpath)
 		if err == nil && resp.IsSuccess() && len(resp.Result.Inner) > 0 {
-			if entries := parseSecurityRuleEntries(resp.Result.Inner); len(entries) > 0 {
+			if entries := parse(resp.Result.Inner); len(entries) > 0 {
 				return entries
 			}
 		}
@@ -195,9 +197,13 @@ func (c *Client) fetchSecurityRulesFromPaths(ctx context.Context, xpaths []strin
 
 func (c *Client) GetSecurityPolicies(ctx context.Context) ([]models.SecurityRule, error) {
 	// Pre-rulebase paths (Panorama-pushed rules evaluated first)
+	// Includes paths for both standalone firewalls and Panorama-managed firewalls
 	preRulebasePaths := []string{
+		// Standalone firewall paths
 		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/pre-rulebase/security/rules",
 		"/config/devices/entry/vsys/entry[@name='vsys1']/pre-rulebase/security/rules",
+		// Panorama-pushed rules on managed firewalls
+		"/config/panorama/vsys/entry[@name='vsys1']/pre-rulebase/security/rules",
 	}
 
 	// Local rulebase paths (locally defined rules)
@@ -208,15 +214,19 @@ func (c *Client) GetSecurityPolicies(ctx context.Context) ([]models.SecurityRule
 	}
 
 	// Post-rulebase paths (Panorama-pushed rules evaluated last)
+	// Includes paths for both standalone firewalls and Panorama-managed firewalls
 	postRulebasePaths := []string{
+		// Standalone firewall paths
 		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/post-rulebase/security/rules",
 		"/config/devices/entry/vsys/entry[@name='vsys1']/post-rulebase/security/rules",
+		// Panorama-pushed rules on managed firewalls
+		"/config/panorama/vsys/entry[@name='vsys1']/post-rulebase/security/rules",
 	}
 
 	// Fetch from all three rulebase locations
-	preEntries := c.fetchSecurityRulesFromPaths(ctx, preRulebasePaths)
-	localEntries := c.fetchSecurityRulesFromPaths(ctx, localRulebasePaths)
-	postEntries := c.fetchSecurityRulesFromPaths(ctx, postRulebasePaths)
+	preEntries := fetchRulesFromPaths(c, ctx, preRulebasePaths, parseSecurityRuleEntries)
+	localEntries := fetchRulesFromPaths(c, ctx, localRulebasePaths, parseSecurityRuleEntries)
+	postEntries := fetchRulesFromPaths(c, ctx, postRulebasePaths, parseSecurityRuleEntries)
 
 	// Combine in evaluation order: pre -> local -> post
 	totalEntries := len(preEntries) + len(localEntries) + len(postEntries)
@@ -224,15 +234,15 @@ func (c *Client) GetSecurityPolicies(ctx context.Context) ([]models.SecurityRule
 	position := 1
 
 	for _, e := range preEntries {
-		rules = append(rules, convertSecurityRuleEntry(e, position))
+		rules = append(rules, convertSecurityRuleEntry(e, position, models.RuleBasePre))
 		position++
 	}
 	for _, e := range localEntries {
-		rules = append(rules, convertSecurityRuleEntry(e, position))
+		rules = append(rules, convertSecurityRuleEntry(e, position, models.RuleBaseLocal))
 		position++
 	}
 	for _, e := range postEntries {
-		rules = append(rules, convertSecurityRuleEntry(e, position))
+		rules = append(rules, convertSecurityRuleEntry(e, position, models.RuleBasePost))
 		position++
 	}
 
@@ -242,6 +252,11 @@ func (c *Client) GetSecurityPolicies(ctx context.Context) ([]models.SecurityRule
 
 	// Fetch rule hit counts with extended stats
 	hitCountResp, err := c.Op(ctx, "<show><rule-hit-count><vsys><vsys-name><entry name='vsys1'><rule-base><entry name='security'><rules><all/></rules></entry></rule-base></entry></vsys-name></vsys></rule-hit-count></show>")
+	if err != nil {
+		log.Printf("[API Warning] failed to fetch security rule hit counts: %v", err)
+	} else if !hitCountResp.IsSuccess() {
+		log.Printf("[API Warning] security rule hit count request returned non-success: %s", hitCountResp.Error())
+	}
 	if err == nil && hitCountResp.IsSuccess() {
 		var hitResult struct {
 			Entry []struct {
@@ -373,13 +388,14 @@ func parseNATRuleEntries(inner []byte) []natRuleEntry {
 }
 
 // convertNATRuleEntry converts a parsed XML entry to a NATRule model
-func convertNATRuleEntry(e natRuleEntry, position int) models.NATRule {
+func convertNATRuleEntry(e natRuleEntry, position int, ruleBase models.RuleBase) models.NATRule {
 	rule := models.NATRule{
 		Name:          e.Name,
 		Position:      position,
 		Disabled:      e.Disabled == "yes",
 		Description:   e.Description,
 		Tags:          e.Tag.Member,
+		RuleBase:      ruleBase,
 		SourceZones:   e.From.Member,
 		DestZones:     e.To.Member,
 		Sources:       e.Source.Member,
@@ -419,32 +435,16 @@ func convertNATRuleEntry(e natRuleEntry, position int) models.NATRule {
 	return rule
 }
 
-// fetchNATRulesFromPaths tries to fetch NAT rules from multiple XPaths
-func (c *Client) fetchNATRulesFromPaths(ctx context.Context, xpaths []string) []natRuleEntry {
-	for _, xpath := range xpaths {
-		resp, err := c.Show(ctx, xpath)
-		if err == nil && resp.IsSuccess() && len(resp.Result.Inner) > 0 {
-			if entries := parseNATRuleEntries(resp.Result.Inner); len(entries) > 0 {
-				return entries
-			}
-		}
-		// Try Get if Show didn't work
-		resp, err = c.Get(ctx, xpath)
-		if err == nil && resp.IsSuccess() && len(resp.Result.Inner) > 0 {
-			if entries := parseNATRuleEntries(resp.Result.Inner); len(entries) > 0 {
-				return entries
-			}
-		}
-	}
-	return nil
-}
-
 // GetNATRules retrieves NAT policy rules from the firewall
 func (c *Client) GetNATRules(ctx context.Context) ([]models.NATRule, error) {
 	// Pre-rulebase paths (Panorama-pushed rules evaluated first)
+	// Includes paths for both standalone firewalls and Panorama-managed firewalls
 	preRulebasePaths := []string{
+		// Standalone firewall paths
 		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/pre-rulebase/nat/rules",
 		"/config/devices/entry/vsys/entry[@name='vsys1']/pre-rulebase/nat/rules",
+		// Panorama-pushed rules on managed firewalls
+		"/config/panorama/vsys/entry[@name='vsys1']/pre-rulebase/nat/rules",
 	}
 
 	// Local rulebase paths (locally defined rules)
@@ -455,15 +455,19 @@ func (c *Client) GetNATRules(ctx context.Context) ([]models.NATRule, error) {
 	}
 
 	// Post-rulebase paths (Panorama-pushed rules evaluated last)
+	// Includes paths for both standalone firewalls and Panorama-managed firewalls
 	postRulebasePaths := []string{
+		// Standalone firewall paths
 		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/post-rulebase/nat/rules",
 		"/config/devices/entry/vsys/entry[@name='vsys1']/post-rulebase/nat/rules",
+		// Panorama-pushed rules on managed firewalls
+		"/config/panorama/vsys/entry[@name='vsys1']/post-rulebase/nat/rules",
 	}
 
 	// Fetch from all three rulebase locations
-	preEntries := c.fetchNATRulesFromPaths(ctx, preRulebasePaths)
-	localEntries := c.fetchNATRulesFromPaths(ctx, localRulebasePaths)
-	postEntries := c.fetchNATRulesFromPaths(ctx, postRulebasePaths)
+	preEntries := fetchRulesFromPaths(c, ctx, preRulebasePaths, parseNATRuleEntries)
+	localEntries := fetchRulesFromPaths(c, ctx, localRulebasePaths, parseNATRuleEntries)
+	postEntries := fetchRulesFromPaths(c, ctx, postRulebasePaths, parseNATRuleEntries)
 
 	// Combine in evaluation order: pre -> local -> post
 	totalEntries := len(preEntries) + len(localEntries) + len(postEntries)
@@ -471,15 +475,15 @@ func (c *Client) GetNATRules(ctx context.Context) ([]models.NATRule, error) {
 	position := 1
 
 	for _, e := range preEntries {
-		rules = append(rules, convertNATRuleEntry(e, position))
+		rules = append(rules, convertNATRuleEntry(e, position, models.RuleBasePre))
 		position++
 	}
 	for _, e := range localEntries {
-		rules = append(rules, convertNATRuleEntry(e, position))
+		rules = append(rules, convertNATRuleEntry(e, position, models.RuleBaseLocal))
 		position++
 	}
 	for _, e := range postEntries {
-		rules = append(rules, convertNATRuleEntry(e, position))
+		rules = append(rules, convertNATRuleEntry(e, position, models.RuleBasePost))
 		position++
 	}
 
@@ -489,6 +493,11 @@ func (c *Client) GetNATRules(ctx context.Context) ([]models.NATRule, error) {
 
 	// Fetch NAT rule hit counts
 	hitCountResp, err := c.Op(ctx, "<show><rule-hit-count><vsys><vsys-name><entry name='vsys1'><rule-base><entry name='nat'><rules><all/></rules></entry></rule-base></entry></vsys-name></vsys></rule-hit-count></show>")
+	if err != nil {
+		log.Printf("[API Warning] failed to fetch NAT rule hit counts: %v", err)
+	} else if !hitCountResp.IsSuccess() {
+		log.Printf("[API Warning] NAT rule hit count request returned non-success: %s", hitCountResp.Error())
+	}
 	if err == nil && hitCountResp.IsSuccess() {
 		var hitResult struct {
 			Entry []struct {

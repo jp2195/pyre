@@ -52,7 +52,9 @@ func NewNavbarModel() NavbarModel {
 					{ID: "sessions", Label: "Sessions", Key: "3"},
 					{ID: "interfaces", Label: "Interfaces", Key: "4"},
 					{ID: "routes", Label: "Routes", Key: "5"},
-					{ID: "logs", Label: "Logs", Key: "6"},
+					{ID: "ipsec", Label: "IPSec", Key: "6"},
+					{ID: "gpusers", Label: "GP Users", Key: "7"},
+					{ID: "logs", Label: "Logs", Key: "8"},
 				},
 			},
 			{
@@ -61,14 +63,6 @@ func NewNavbarModel() NavbarModel {
 				Key:   "3",
 				Items: []NavItem{
 					{ID: "config", Label: "Config", Key: "1"},
-				},
-			},
-			{
-				ID:    "connections",
-				Label: "Conn",
-				Key:   "4",
-				Items: []NavItem{
-					{ID: "picker", Label: "Switch Device", Key: "1"},
 				},
 			},
 		},

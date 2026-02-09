@@ -232,7 +232,7 @@ func (m ConnectionFormModel) EditingHost() string {
 
 // CanSubmit returns true if the form has valid data
 func (m ConnectionFormModel) CanSubmit() bool {
-	return m.Host() != ""
+	return m.Host() != "" && validateHost(m.Host()) == ""
 }
 
 // GetConfig returns the connection config from form values
@@ -289,6 +289,10 @@ func (m ConnectionFormModel) View() string {
 		b.WriteString(focusedInputStyle.Render(m.hostInput.View()))
 	} else {
 		b.WriteString(inputStyle.Render(m.hostInput.View()))
+	}
+	if hostErr := validateHost(m.Host()); hostErr != "" {
+		b.WriteString("\n")
+		b.WriteString(errorStyle.Render(hostErr))
 	}
 	b.WriteString("\n")
 

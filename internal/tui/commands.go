@@ -1,12 +1,23 @@
 package tui
 
 import (
+	"context"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/jp2195/pyre/internal/api"
 	"github.com/jp2195/pyre/internal/auth"
+	"github.com/jp2195/pyre/internal/models"
 	"github.com/jp2195/pyre/internal/tui/views"
 )
+
+// fetchCmd creates a tea.Cmd that calls fn with the given context and wraps the result in a message.
+func fetchCmd[T any](ctx context.Context, fn func(context.Context) (T, error), wrap func(T, error) tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		result, err := fn(ctx)
+		return wrap(result, err)
+	}
+}
 
 func (m Model) doLogin() tea.Cmd {
 	ctx := m.ctx
@@ -125,11 +136,9 @@ func (m Model) fetchConfigDashboardData() tea.Cmd {
 }
 
 func (m Model) fetchSystemInfo(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		info, err := conn.Client.GetSystemInfo(ctx)
+	return fetchCmd(m.ctx, conn.Client.GetSystemInfo, func(info *models.SystemInfo, err error) tea.Msg {
 		return SystemInfoMsg{Info: info, Err: err}
-	}
+	})
 }
 
 func (m Model) fetchManagedDevices(conn *auth.Connection) tea.Cmd {
@@ -172,19 +181,15 @@ func (m Model) fetchResources(conn *auth.Connection) tea.Cmd {
 }
 
 func (m Model) fetchSessionInfo(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		info, err := conn.Client.GetSessionInfo(ctx)
+	return fetchCmd(m.ctx, conn.Client.GetSessionInfo, func(info *models.SessionInfo, err error) tea.Msg {
 		return SessionInfoMsg{Info: info, Err: err}
-	}
+	})
 }
 
 func (m Model) fetchHAStatus(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		status, err := conn.Client.GetHAStatus(ctx)
+	return fetchCmd(m.ctx, conn.Client.GetHAStatus, func(status *models.HAStatus, err error) tea.Msg {
 		return HAStatusMsg{Status: status, Err: err}
-	}
+	})
 }
 
 func (m Model) fetchInterfaces() tea.Cmd {
@@ -200,132 +205,100 @@ func (m Model) fetchInterfaces() tea.Cmd {
 }
 
 func (m Model) fetchThreatSummary(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		summary, err := conn.Client.GetThreatSummary(ctx)
-		return ThreatSummaryMsg{Summary: summary, Err: err}
-	}
+	return fetchCmd(m.ctx, conn.Client.GetThreatSummary, func(s *models.ThreatSummary, err error) tea.Msg {
+		return ThreatSummaryMsg{Summary: s, Err: err}
+	})
 }
 
 func (m Model) fetchGlobalProtect(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		info, err := conn.Client.GetGlobalProtectInfo(ctx)
+	return fetchCmd(m.ctx, conn.Client.GetGlobalProtectInfo, func(info *models.GlobalProtectInfo, err error) tea.Msg {
 		return GlobalProtectMsg{Info: info, Err: err}
-	}
+	})
 }
 
 func (m Model) fetchLoggedInAdmins(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		admins, err := conn.Client.GetLoggedInAdmins(ctx)
+	return fetchCmd(m.ctx, conn.Client.GetLoggedInAdmins, func(admins []models.LoggedInAdmin, err error) tea.Msg {
 		return LoggedInAdminsMsg{Admins: admins, Err: err}
-	}
+	})
 }
 
 func (m Model) fetchLicenses(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		licenses, err := conn.Client.GetLicenseInfo(ctx)
-		return LicensesMsg{Licenses: licenses, Err: err}
-	}
+	return fetchCmd(m.ctx, conn.Client.GetLicenseInfo, func(lics []models.LicenseInfo, err error) tea.Msg {
+		return LicensesMsg{Licenses: lics, Err: err}
+	})
 }
 
 func (m Model) fetchJobs(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		jobs, err := conn.Client.GetJobs(ctx)
+	return fetchCmd(m.ctx, conn.Client.GetJobs, func(jobs []models.Job, err error) tea.Msg {
 		return JobsMsg{Jobs: jobs, Err: err}
-	}
+	})
 }
 
 func (m Model) fetchDiskUsage(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		disks, err := conn.Client.GetDiskUsage(ctx)
+	return fetchCmd(m.ctx, conn.Client.GetDiskUsage, func(disks []models.DiskUsage, err error) tea.Msg {
 		return DiskUsageMsg{Disks: disks, Err: err}
-	}
+	})
 }
 
 //nolint:misspell // "environmentals" is the PAN-OS XML API tag name
 func (m Model) fetchEnvironmentals(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		envs, err := conn.Client.GetEnvironmentals(ctx)
+	return fetchCmd(m.ctx, conn.Client.GetEnvironmentals, func(envs []models.Environmental, err error) tea.Msg {
 		return EnvironmentalsMsg{Environmentals: envs, Err: err}
-	}
+	})
 }
 
 func (m Model) fetchCertificates(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		certs, err := conn.Client.GetCertificates(ctx)
+	return fetchCmd(m.ctx, conn.Client.GetCertificates, func(certs []models.Certificate, err error) tea.Msg {
 		return CertificatesMsg{Certificates: certs, Err: err}
-	}
+	})
 }
 
 func (m Model) fetchARPTable(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		entries, err := conn.Client.GetARPTable(ctx)
+	return fetchCmd(m.ctx, conn.Client.GetARPTable, func(entries []models.ARPEntry, err error) tea.Msg {
 		return ARPTableMsg{Entries: entries, Err: err}
-	}
+	})
 }
 
 func (m Model) fetchRoutingTable(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		routes, err := conn.Client.GetRoutingTable(ctx)
+	return fetchCmd(m.ctx, conn.Client.GetRoutingTable, func(routes []models.RouteEntry, err error) tea.Msg {
 		return RoutingTableMsg{Routes: routes, Err: err}
-	}
+	})
 }
 
 func (m Model) fetchBGPNeighbors(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		neighbors, err := conn.Client.GetBGPNeighbors(ctx)
-		return BGPNeighborsMsg{Neighbors: neighbors, Err: err}
-	}
+	return fetchCmd(m.ctx, conn.Client.GetBGPNeighbors, func(n []models.BGPNeighbor, err error) tea.Msg {
+		return BGPNeighborsMsg{Neighbors: n, Err: err}
+	})
 }
 
 func (m Model) fetchOSPFNeighbors(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		neighbors, err := conn.Client.GetOSPFNeighbors(ctx)
-		return OSPFNeighborsMsg{Neighbors: neighbors, Err: err}
-	}
+	return fetchCmd(m.ctx, conn.Client.GetOSPFNeighbors, func(n []models.OSPFNeighbor, err error) tea.Msg {
+		return OSPFNeighborsMsg{Neighbors: n, Err: err}
+	})
 }
 
 func (m Model) fetchIPSecTunnels(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		tunnels, err := conn.Client.GetIPSecTunnels(ctx)
-		return IPSecTunnelsMsg{Tunnels: tunnels, Err: err}
-	}
+	return fetchCmd(m.ctx, conn.Client.GetIPSecTunnels, func(t []models.IPSecTunnel, err error) tea.Msg {
+		return IPSecTunnelsMsg{Tunnels: t, Err: err}
+	})
 }
 
 func (m Model) fetchGlobalProtectUsers(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		users, err := conn.Client.GetGlobalProtectUsers(ctx)
-		return GlobalProtectUsersMsg{Users: users, Err: err}
-	}
+	return fetchCmd(m.ctx, conn.Client.GetGlobalProtectUsers, func(u []models.GlobalProtectUser, err error) tea.Msg {
+		return GlobalProtectUsersMsg{Users: u, Err: err}
+	})
 }
 
 func (m Model) fetchPendingChanges(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		changes, err := conn.Client.GetPendingChanges(ctx)
-		return PendingChangesMsg{Changes: changes, Err: err}
-	}
+	return fetchCmd(m.ctx, conn.Client.GetPendingChanges, func(c []models.PendingChange, err error) tea.Msg {
+		return PendingChangesMsg{Changes: c, Err: err}
+	})
 }
 
 func (m Model) fetchNATPoolInfo(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
-	return func() tea.Msg {
-		pools, err := conn.Client.GetNATPoolInfo(ctx)
-		return NATPoolMsg{Pools: pools, Err: err}
-	}
+	return fetchCmd(m.ctx, conn.Client.GetNATPoolInfo, func(p []models.NATPoolInfo, err error) tea.Msg {
+		return NATPoolMsg{Pools: p, Err: err}
+	})
 }
 
 func (m Model) fetchPolicies() tea.Cmd {
@@ -435,10 +408,36 @@ func (m Model) refreshCurrentView() tea.Cmd {
 		return m.fetchInterfaces()
 	case ViewRoutes:
 		return m.fetchRoutesData()
+	case ViewIPSecTunnels:
+		conn := m.session.GetActiveConnection()
+		if conn != nil {
+			return m.fetchIPSecTunnels(conn)
+		}
+	case ViewGPUsers:
+		conn := m.session.GetActiveConnection()
+		if conn != nil {
+			return m.fetchGlobalProtectUsers(conn)
+		}
 	case ViewLogs:
 		return m.fetchLogs()
 	}
 	return nil
+}
+
+func (m Model) saveConfig() tea.Cmd {
+	cfg := m.config
+	return func() tea.Msg {
+		err := cfg.Save()
+		return ConfigSavedMsg{Err: err}
+	}
+}
+
+func (m Model) saveState() tea.Cmd {
+	state := m.state
+	return func() tea.Msg {
+		err := state.Save()
+		return StateSavedMsg{Err: err}
+	}
 }
 
 func (m Model) fetchRoutesData() tea.Cmd {

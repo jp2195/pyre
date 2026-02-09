@@ -3,7 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
+	"log"
 	"os"
+	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -26,6 +29,7 @@ func main() {
 		insecure   = flag.Bool("insecure", false, "Skip TLS certificate verification (for self-signed certs)")
 		configPath = flag.String("config", "", "Path to config file (default: ~/.pyre.yaml)")
 		connection = flag.String("c", "", "Connect to a named connection from config")
+		debug      = flag.Bool("debug", false, "Enable debug logging to ~/.pyre/logs/debug.log")
 		showHelp   = flag.Bool("help", false, "Show help message")
 		showVer    = flag.Bool("version", false, "Show version")
 	)
@@ -40,6 +44,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  PYRE_HOST      Firewall hostname or IP\n")
 		fmt.Fprintf(os.Stderr, "  PYRE_API_KEY   API key for authentication\n")
 		fmt.Fprintf(os.Stderr, "  PYRE_INSECURE  Skip TLS verification (true/false)\n")
+		fmt.Fprintf(os.Stderr, "  DEBUG          Enable debug logging (same as --debug)\n")
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
 		fmt.Fprintf(os.Stderr, "  pyre                                    # Connection hub (if config exists)\n")
 		fmt.Fprintf(os.Stderr, "  pyre -c myfw                            # Connect to 'myfw' from config\n")
@@ -47,6 +52,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  pyre --host fw.example.com --user admin --insecure  # Prompts for password\n")
 		fmt.Fprintf(os.Stderr, "  pyre --host fw.example.com --api-key LUFRPT...\n")
 		fmt.Fprintf(os.Stderr, "  PYRE_HOST=10.0.0.1 PYRE_API_KEY=LUFRPT... pyre\n")
+		fmt.Fprintf(os.Stderr, "  pyre --debug                            # Enable debug logging\n")
 	}
 
 	flag.Parse()
@@ -59,6 +65,29 @@ func main() {
 	if *showVer {
 		fmt.Printf("pyre version %s\n", version)
 		os.Exit(0)
+	}
+
+	// Always redirect the default logger away from stderr so log.Printf
+	// calls (e.g. in internal/api/) don't bleed into the TUI.
+	if *debug || os.Getenv("DEBUG") != "" {
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			logDir := filepath.Join(homeDir, ".pyre", "logs")
+			if err := os.MkdirAll(logDir, 0700); err == nil {
+				logPath := filepath.Join(logDir, "debug.log")
+				f, err := tea.LogToFile(logPath, "pyre")
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: could not enable debug logging: %v\n", err)
+					log.SetOutput(io.Discard)
+				} else {
+					defer f.Close()
+					fmt.Fprintf(os.Stderr, "Debug logging: %s\n", logPath)
+				}
+			}
+		}
+	} else {
+		// No debug flag: silence all log output to prevent TUI corruption
+		log.SetOutput(io.Discard)
 	}
 
 	flags := config.CLIFlags{

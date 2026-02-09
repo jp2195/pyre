@@ -704,8 +704,8 @@ func (m DashboardModel) renderLoggedInAdmins(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 
-	// Show up to 4 admins, single line each
-	maxAdmins := 4
+	// Show up to 6 admins, single line each
+	maxAdmins := 6
 	for i, admin := range m.admins {
 		if i >= maxAdmins {
 			break
@@ -733,7 +733,8 @@ func (m DashboardModel) renderLoggedInAdmins(width int) string {
 	}
 
 	if len(m.admins) > maxAdmins {
-		b.WriteString(dimStyle().Render(fmt.Sprintf(" +%d", len(m.admins)-maxAdmins)))
+		b.WriteString("\n")
+		b.WriteString(dimStyle().Render(fmt.Sprintf("... and %d more admins", len(m.admins)-maxAdmins)))
 	}
 
 	return panelStyle().Width(width).Render(b.String())
@@ -758,8 +759,8 @@ func (m DashboardModel) renderJobs(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 
-	// Show up to 4 most recent jobs
-	maxJobs := 4
+	// Show up to 6 most recent jobs
+	maxJobs := 6
 	for i, job := range m.jobs {
 		if i >= maxJobs {
 			break
@@ -802,6 +803,11 @@ func (m DashboardModel) renderJobs(width int) string {
 		if i < len(m.jobs)-1 && i < maxJobs-1 {
 			b.WriteString("\n")
 		}
+	}
+
+	if len(m.jobs) > maxJobs {
+		b.WriteString("\n")
+		b.WriteString(dimStyle().Render(fmt.Sprintf("... and %d more jobs", len(m.jobs)-maxJobs)))
 	}
 
 	return panelStyle().Width(width).Render(b.String())
@@ -880,15 +886,16 @@ func (m DashboardModel) renderDiskUsage(width int) string {
 	c := theme.Colors()
 
 	// Show most relevant filesystems (root, var, etc)
-	maxShow := 4
+	maxShow := 6
 	shown := 0
+	totalEligible := 0
 	for _, disk := range m.diskUsage {
-		if shown >= maxShow {
-			break
-		}
-
-		// Skip some system filesystems
 		if disk.MountPoint == "/dev" || disk.MountPoint == "/run" {
+			continue
+		}
+		totalEligible++
+
+		if shown >= maxShow {
 			continue
 		}
 
@@ -911,7 +918,12 @@ func (m DashboardModel) renderDiskUsage(width int) string {
 		shown++
 	}
 
-	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+	result := strings.TrimSuffix(b.String(), "\n")
+	if totalEligible > maxShow {
+		result += "\n" + dimStyle().Render(fmt.Sprintf("... and %d more filesystems", totalEligible-maxShow))
+	}
+
+	return panelStyle().Width(width).Render(result)
 }
 
 func (m DashboardModel) renderEnvironmentals(width int) string {
@@ -995,7 +1007,12 @@ func (m DashboardModel) renderEnvironmentals(width int) string {
 		}
 	}
 
-	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+	result := strings.TrimSuffix(b.String(), "\n")
+	if len(m.environmentals) > maxShow {
+		result += "\n" + dimStyle().Render(fmt.Sprintf("... and %d more sensors", len(m.environmentals)-maxShow))
+	}
+
+	return panelStyle().Width(width).Render(result)
 }
 
 func (m DashboardModel) renderCertificates(width int) string {
@@ -1054,7 +1071,7 @@ func (m DashboardModel) renderCertificates(width int) string {
 
 	if len(attention) > 0 {
 		b.WriteString("\n\n")
-		maxShow := 4
+		maxShow := 6
 		for i, cert := range attention {
 			if i >= maxShow {
 				break
@@ -1081,6 +1098,11 @@ func (m DashboardModel) renderCertificates(width int) string {
 			if i < len(attention)-1 && i < maxShow-1 {
 				b.WriteString("\n")
 			}
+		}
+
+		if len(attention) > maxShow {
+			b.WriteString("\n")
+			b.WriteString(dimStyle().Render(fmt.Sprintf("... and %d more certificates", len(attention)-maxShow)))
 		}
 	}
 

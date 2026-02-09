@@ -13,12 +13,12 @@ func TestNewNavbarModel(t *testing.T) {
 	if nav.activeItem != 0 {
 		t.Errorf("expected activeItem=0, got %d", nav.activeItem)
 	}
-	if len(nav.groups) != 4 {
-		t.Errorf("expected 4 groups, got %d", len(nav.groups))
+	if len(nav.groups) != 3 {
+		t.Errorf("expected 3 groups, got %d", len(nav.groups))
 	}
 
 	// Verify group structure
-	expectedGroups := []string{"monitor", "analyze", "tools", "connections"}
+	expectedGroups := []string{"monitor", "analyze", "tools"}
 	for i, expected := range expectedGroups {
 		if nav.groups[i].ID != expected {
 			t.Errorf("expected group %d ID=%q, got %q", i, expected, nav.groups[i].ID)

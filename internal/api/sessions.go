@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -35,7 +36,7 @@ func (c *Client) GetSessionInfo(ctx context.Context) (*models.SessionInfo, error
 		NumICMP    int   `xml:"num-icmp"`
 	}
 	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
-		// Return empty info rather than error
+		log.Printf("[API Warning] failed to parse session info XML: %v", err)
 		return &models.SessionInfo{}, nil
 	}
 
@@ -91,7 +92,7 @@ func (c *Client) GetSessions(ctx context.Context, filter string) ([]models.Sessi
 		} `xml:"entry"`
 	}
 	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
-		// If parsing fails, return empty list rather than error
+		log.Printf("[API Warning] failed to parse sessions list XML: %v", err)
 		return []models.Session{}, nil
 	}
 

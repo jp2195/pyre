@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
+	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -119,11 +120,16 @@ func (c *Client) GetSystemInfo(ctx context.Context) (*models.SystemInfo, error) 
 			"Mon Jan 02 15:04:05 2006",
 			"2006-01-02 15:04:05",
 		}
+		parsed := false
 		for _, layout := range layouts {
 			if t, err := time.Parse(layout, si.Time); err == nil {
 				info.CurrentTime = t
+				parsed = true
 				break
 			}
+		}
+		if !parsed {
+			log.Printf("[API Warning] failed to parse system time %q: no matching layout", si.Time)
 		}
 	}
 

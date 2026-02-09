@@ -48,6 +48,9 @@ func (m Model) handlePickerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, pickerKeys.Back):
 		if m.session.GetActiveConnection() != nil {
 			m.currentView = ViewDashboard
+		} else if m.config.HasConnections() {
+			m.connectionHub = m.connectionHub.SetConnections(m.config, m.state)
+			m.currentView = ViewConnectionHub
 		}
 		return m, nil
 
@@ -84,8 +87,7 @@ func (m Model) handleDevicePickerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if conn != nil {
 			device := m.devicePicker.SelectedDevice()
 			if err := conn.SetTarget(device); err != nil {
-				m.err = err
-				return m, nil
+				return m, m.setError(err)
 			}
 			m.currentView = ViewDashboard
 			return m, m.fetchCurrentDashboardData()
@@ -196,6 +198,20 @@ func (m Model) buildCommandRegistry() []views.Command {
 			Action:      func() tea.Msg { return SwitchViewMsg{ViewRoutes} },
 		},
 		{
+			ID:          "analyze-ipsec",
+			Label:       "IPSec Tunnels",
+			Description: "IPSec VPN tunnels",
+			Category:    "Analyze",
+			Action:      func() tea.Msg { return SwitchViewMsg{ViewIPSecTunnels} },
+		},
+		{
+			ID:          "analyze-gpusers",
+			Label:       "GlobalProtect Users",
+			Description: "GP VPN users",
+			Category:    "Analyze",
+			Action:      func() tea.Msg { return SwitchViewMsg{ViewGPUsers} },
+		},
+		{
 			ID:          "analyze-logs",
 			Label:       "Logs",
 			Description: "Traffic & threat logs",
@@ -214,11 +230,12 @@ func (m Model) buildCommandRegistry() []views.Command {
 
 		// Connections
 		{
-			ID:          "connect-new",
-			Label:       "Connect to firewall...",
-			Description: "Switch device",
+			ID:          "connections",
+			Label:       "Connections",
+			Description: "Manage & switch devices",
 			Category:    "Connections",
-			Action:      func() tea.Msg { return ShowPickerMsg{} },
+			Shortcut:    ":",
+			Action:      func() tea.Msg { return ShowConnectionHubMsg{} },
 		},
 
 		// Actions
@@ -248,17 +265,6 @@ func (m Model) buildCommandRegistry() []views.Command {
 			Shortcut:    "q",
 			Action:      func() tea.Msg { return tea.Quit() },
 		},
-	}
-
-	// Add dynamic connection entries
-	conn := m.session.GetActiveConnection()
-	if conn != nil {
-		commands = append(commands, views.Command{
-			ID:          "conn-current",
-			Label:       conn.Host + " (current)",
-			Description: "Connected",
-			Category:    "Connections",
-		})
 	}
 
 	return commands
@@ -344,13 +350,8 @@ func (m Model) handleConnectionFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case key.Matches(msg, formKeys.Cancel):
-		// Go back to hub if we have connections, otherwise quit
-		if m.config.HasConnections() {
-			m.connectionHub = m.connectionHub.SetConnections(m.config, m.state)
-			m.currentView = ViewConnectionHub
-		} else {
-			return m, tea.Quit
-		}
+		m.connectionHub = m.connectionHub.SetConnections(m.config, m.state)
+		m.currentView = ViewConnectionHub
 		return m, nil
 
 	case key.Matches(msg, formKeys.Submit):
@@ -409,6 +410,10 @@ func (m Model) handleViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.interfaces, cmd = m.interfaces.Update(msg)
 	case ViewRoutes:
 		m.routes, cmd = m.routes.Update(msg)
+	case ViewIPSecTunnels:
+		m.ipsecTunnels, cmd = m.ipsecTunnels.Update(msg)
+	case ViewGPUsers:
+		m.gpUsers, cmd = m.gpUsers.Update(msg)
 	case ViewLogs:
 		m.logs, cmd = m.logs.Update(msg)
 	}

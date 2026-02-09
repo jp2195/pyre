@@ -183,6 +183,7 @@ func (m NetworkDashboardModel) renderTopInterfaces(width int) string {
 	}
 
 	nameWidth := 16
+	shown := 0
 	for i := 0; i < maxShow; i++ {
 		iface := sorted[i]
 		total := iface.BytesIn + iface.BytesOut
@@ -204,9 +205,15 @@ func (m NetworkDashboardModel) renderTopInterfaces(width int) string {
 		b.WriteString(dimStyle().Render(" Out:"))
 		b.WriteString(valueStyle().Render(formatBytes(iface.BytesOut)))
 		b.WriteString("\n")
+		shown++
 	}
 
-	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+	result := strings.TrimSuffix(b.String(), "\n")
+	if len(sorted) > shown {
+		result += "\n" + dimStyle().Render(fmt.Sprintf("... and %d more interfaces", len(sorted)-shown))
+	}
+
+	return panelStyle().Width(width).Render(result)
 }
 
 func (m NetworkDashboardModel) renderInterfaceErrors(width int) string {
@@ -260,7 +267,12 @@ func (m NetworkDashboardModel) renderInterfaceErrors(width int) string {
 		b.WriteString("\n")
 	}
 
-	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+	result := strings.TrimSuffix(b.String(), "\n")
+	if len(problemIfaces) > maxShow {
+		result += "\n" + dimStyle().Render(fmt.Sprintf("... and %d more interfaces with errors", len(problemIfaces)-maxShow))
+	}
+
+	return panelStyle().Width(width).Render(result)
 }
 
 func (m NetworkDashboardModel) renderARPSummary(width int) string {
@@ -278,7 +290,7 @@ func (m NetworkDashboardModel) renderARPSummary(width int) string {
 	}
 
 	if len(m.arpTable) == 0 {
-		b.WriteString(dimStyle().Render("Empty"))
+		b.WriteString(dimStyle().Render("No ARP entries found"))
 		return panelStyle().Width(width).Render(b.String())
 	}
 
@@ -317,7 +329,7 @@ func (m NetworkDashboardModel) renderRoutingSummary(width int) string {
 	}
 
 	if len(m.routes) == 0 {
-		b.WriteString(dimStyle().Render("Empty"))
+		b.WriteString(dimStyle().Render("No routes found"))
 		return panelStyle().Width(width).Render(b.String())
 	}
 

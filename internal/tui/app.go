@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"time"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -13,6 +14,8 @@ import (
 	"github.com/jp2195/pyre/internal/config"
 	"github.com/jp2195/pyre/internal/tui/views"
 )
+
+const errorDismissTimeout = 5 * time.Second
 
 type ViewState int
 
@@ -26,6 +29,8 @@ const (
 	ViewSessions
 	ViewInterfaces
 	ViewRoutes
+	ViewIPSecTunnels
+	ViewGPUsers
 	ViewLogs
 	ViewPicker
 	ViewDevicePicker
@@ -66,6 +71,8 @@ type Model struct {
 	sessions          views.SessionsModel
 	interfaces        views.InterfacesModel
 	routes            views.RoutesModel
+	ipsecTunnels      views.IPSecTunnelsModel
+	gpUsers           views.GPUsersModel
 	logs              views.LogsModel
 	picker            views.PickerModel
 	devicePicker      views.DevicePickerModel
@@ -128,12 +135,22 @@ func NewModel(cfg *config.Config, state *config.State, creds *auth.Credentials, 
 	m.sessions = views.NewSessionsModel()
 	m.interfaces = views.NewInterfacesModel()
 	m.routes = views.NewRoutesModel()
+	m.ipsecTunnels = views.NewIPSecTunnelsModel()
+	m.gpUsers = views.NewGPUsersModel()
 	m.logs = views.NewLogsModel()
 	m.picker = views.NewPickerModel(session)
 	m.devicePicker = views.NewDevicePickerModel()
 	m.commandPalette = views.NewCommandPaletteModel()
 
 	return m
+}
+
+// setError sets an error on the model and returns a command to auto-dismiss it.
+func (m *Model) setError(err error) tea.Cmd {
+	m.err = err
+	return tea.Tick(errorDismissTimeout, func(time.Time) tea.Msg {
+		return ErrorDismissMsg{}
+	})
 }
 
 func (m Model) Init() tea.Cmd {
@@ -151,189 +168,213 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		return m.handleWindowSize(msg)
+	case tea.KeyMsg:
+		return m.handleKeyMsg(msg)
+	case spinner.TickMsg:
+		return m.handleSpinnerTick(msg)
+	default:
+		return m.handleDataMsg(msg)
+	}
+}
+
+// handleWindowSize propagates resize events to all sub-views.
+func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
+	m.width = msg.Width
+	m.height = msg.Height
+	m.help.Width = msg.Width
+
+	// Calculate content height (minus header and footer)
+	// Header = main row + sub-tab row + border = 3 lines
+	// Footer = 1 line
+	contentHeight := msg.Height - 4
+
+	m.navbar = m.navbar.SetSize(msg.Width)
+	m.connectionHub = m.connectionHub.SetSize(msg.Width, msg.Height)
+	m.connectionForm = m.connectionForm.SetSize(msg.Width, msg.Height)
+	m.login = m.login.SetSize(msg.Width, msg.Height)
+	m.dashboard = m.dashboard.SetSize(msg.Width, contentHeight)
+	m.networkDashboard = m.networkDashboard.SetSize(msg.Width, contentHeight)
+	m.securityDashboard = m.securityDashboard.SetSize(msg.Width, contentHeight)
+	m.vpnDashboard = m.vpnDashboard.SetSize(msg.Width, contentHeight)
+	m.configDashboard = m.configDashboard.SetSize(msg.Width, contentHeight)
+	m.policies = m.policies.SetSize(msg.Width, contentHeight)
+	m.natPolicies = m.natPolicies.SetSize(msg.Width, contentHeight)
+	m.sessions = m.sessions.SetSize(msg.Width, contentHeight)
+	m.interfaces = m.interfaces.SetSize(msg.Width, contentHeight)
+	m.routes = m.routes.SetSize(msg.Width, contentHeight)
+	m.ipsecTunnels = m.ipsecTunnels.SetSize(msg.Width, contentHeight)
+	m.gpUsers = m.gpUsers.SetSize(msg.Width, contentHeight)
+	m.logs = m.logs.SetSize(msg.Width, contentHeight)
+	m.picker = m.picker.SetSize(msg.Width, contentHeight)
+	m.devicePicker = m.devicePicker.SetSize(msg.Width, contentHeight)
+	m.commandPalette = m.commandPalette.SetSize(msg.Width, msg.Height)
+
+	return m, nil
+}
+
+// handleKeyMsg routes keyboard input to the appropriate view or global handler.
+func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.showHelp {
+		m.showHelp = false
+		return m, nil
+	}
+
+	// Delegate to view-specific key handlers
+	switch m.currentView {
+	case ViewConnectionHub:
+		return m.handleConnectionHubKeys(msg)
+	case ViewConnectionForm:
+		return m.handleConnectionFormKeys(msg)
+	case ViewLogin:
+		return m.handleLoginKeys(msg)
+	case ViewPicker:
+		return m.handlePickerKeys(msg)
+	case ViewDevicePicker:
+		return m.handleDevicePickerKeys(msg)
+	case ViewCommandPalette:
+		return m.handleCommandPaletteKeys(msg)
+	}
+
+	// If logs view is in filter mode, pass keys through to the view
+	// (except ctrl+c for emergency quit)
+	if m.currentView == ViewLogs && m.logs.IsFilterMode() {
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		return m.handleViewKeys(msg)
+	}
+
+	// Global key bindings (active when in main views)
+	switch {
+	case key.Matches(msg, m.keys.Quit):
+		if m.cancel != nil {
+			m.cancel()
+		}
+		return m, tea.Quit
+
+	case key.Matches(msg, m.keys.Help):
+		m.showHelp = !m.showHelp
+		return m, nil
+
+	case key.Matches(msg, m.keys.OpenPalette):
+		m.previousView = m.currentView
+		m.currentView = ViewCommandPalette
+		m.commandPalette = m.commandPalette.SetCommands(m.buildCommandRegistry())
+		m.commandPalette = m.commandPalette.Focus()
+		return m, nil
+
+	case msg.String() == ":":
+		// ":" opens connection hub directly
+		m.connectionHub = m.connectionHub.SetConnections(m.config, m.state)
+		m.currentView = ViewConnectionHub
+		return m, nil
+
+	case key.Matches(msg, m.keys.DevicePicker):
+		conn := m.session.GetActiveConnection()
+		if conn != nil && conn.IsPanorama {
+			m.currentView = ViewDevicePicker
+			m.devicePicker = m.devicePicker.SetDevices(
+				conn.ManagedDevices,
+				conn.TargetSerial,
+				conn.Host,
+			)
+			return m, nil
+		}
+		return m, nil
+
+	case key.Matches(msg, m.keys.Refresh):
+		return m.handleRefresh()
+
+	// Navigation group keys
+	case key.Matches(msg, m.keys.NavGroup1):
+		return m.handleNavGroupKey(0)
+	case key.Matches(msg, m.keys.NavGroup2):
+		return m.handleNavGroupKey(1)
+	case key.Matches(msg, m.keys.NavGroup3):
+		return m.handleNavGroupKey(2)
+
+	// Tab cycles forward through items in current group
+	case key.Matches(msg, m.keys.Tab):
+		group := m.navbar.ActiveGroup()
+		if group != nil && len(group.Items) > 0 {
+			nextItem := (m.navbar.ActiveItemIndex() + 1) % len(group.Items)
+			m.navbar = m.navbar.SetActiveItem(nextItem)
+			return m.navigateToCurrentItem()
+		}
+
+	// Shift+Tab cycles backward through items in current group
+	case key.Matches(msg, m.keys.ShiftTab):
+		group := m.navbar.ActiveGroup()
+		if group != nil && len(group.Items) > 0 {
+			prevItem := m.navbar.ActiveItemIndex() - 1
+			if prevItem < 0 {
+				prevItem = len(group.Items) - 1 // Wrap to end
+			}
+			m.navbar = m.navbar.SetActiveItem(prevItem)
+			return m.navigateToCurrentItem()
+		}
+	}
+
+	return m.handleViewKeys(msg)
+}
+
+// handleRefresh sets loading state and refreshes the current view.
+func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
+	switch m.currentView {
+	case ViewPolicies:
+		m.policies = m.policies.SetLoading(true)
+	case ViewNATPolicies:
+		m.natPolicies = m.natPolicies.SetLoading(true)
+	case ViewSessions:
+		m.sessions = m.sessions.SetLoading(true)
+	case ViewInterfaces:
+		m.interfaces = m.interfaces.SetLoading(true)
+	case ViewRoutes:
+		m.routes = m.routes.SetLoading(true)
+	case ViewIPSecTunnels:
+		m.ipsecTunnels = m.ipsecTunnels.SetLoading(true)
+	case ViewGPUsers:
+		m.gpUsers = m.gpUsers.SetLoading(true)
+	case ViewLogs:
+		m.logs = m.logs.SetLoading(true)
+	}
+	return m, m.refreshCurrentView()
+}
+
+// handleSpinnerTick updates the spinner and shares its frame with all views.
+func (m Model) handleSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.spinner, cmd = m.spinner.Update(msg)
+
+	// Share spinner frame with all views
+	frame := m.spinner.View()
+	m.policies.SpinnerFrame = frame
+	m.natPolicies.SpinnerFrame = frame
+	m.sessions.SpinnerFrame = frame
+	m.interfaces.SpinnerFrame = frame
+	m.routes.SpinnerFrame = frame
+	m.ipsecTunnels.SpinnerFrame = frame
+	m.gpUsers.SpinnerFrame = frame
+	m.logs.SpinnerFrame = frame
+
+	// Share spinner frame with dashboard views
+	m.dashboard = m.dashboard.SetSpinnerFrame(frame)
+	m.networkDashboard = m.networkDashboard.SetSpinnerFrame(frame)
+	m.securityDashboard = m.securityDashboard.SetSpinnerFrame(frame)
+	m.vpnDashboard = m.vpnDashboard.SetSpinnerFrame(frame)
+	m.configDashboard = m.configDashboard.SetSpinnerFrame(frame)
+
+	return m, cmd
+}
+
+// handleDataMsg processes async data messages (API responses, navigation, connections).
+func (m Model) handleDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		m.help.Width = msg.Width
-
-		// Calculate content height (minus header and footer)
-		// Header = main row + sub-tab row + border = 3 lines
-		// Footer = 1 line
-		contentHeight := msg.Height - 4
-
-		m.navbar = m.navbar.SetSize(msg.Width)
-		m.connectionHub = m.connectionHub.SetSize(msg.Width, msg.Height)
-		m.connectionForm = m.connectionForm.SetSize(msg.Width, msg.Height)
-		m.login = m.login.SetSize(msg.Width, msg.Height)
-		m.dashboard = m.dashboard.SetSize(msg.Width, contentHeight)
-		m.networkDashboard = m.networkDashboard.SetSize(msg.Width, contentHeight)
-		m.securityDashboard = m.securityDashboard.SetSize(msg.Width, contentHeight)
-		m.vpnDashboard = m.vpnDashboard.SetSize(msg.Width, contentHeight)
-		m.configDashboard = m.configDashboard.SetSize(msg.Width, contentHeight)
-		m.policies = m.policies.SetSize(msg.Width, contentHeight)
-		m.natPolicies = m.natPolicies.SetSize(msg.Width, contentHeight)
-		m.sessions = m.sessions.SetSize(msg.Width, contentHeight)
-		m.interfaces = m.interfaces.SetSize(msg.Width, contentHeight)
-		m.routes = m.routes.SetSize(msg.Width, contentHeight)
-		m.logs = m.logs.SetSize(msg.Width, contentHeight)
-		m.picker = m.picker.SetSize(msg.Width, contentHeight)
-		m.devicePicker = m.devicePicker.SetSize(msg.Width, contentHeight)
-		m.commandPalette = m.commandPalette.SetSize(msg.Width, msg.Height)
-
-	case tea.KeyMsg:
-		if m.showHelp {
-			m.showHelp = false
-			return m, nil
-		}
-
-		if m.currentView == ViewConnectionHub {
-			return m.handleConnectionHubKeys(msg)
-		}
-
-		if m.currentView == ViewConnectionForm {
-			return m.handleConnectionFormKeys(msg)
-		}
-
-		if m.currentView == ViewLogin {
-			return m.handleLoginKeys(msg)
-		}
-
-		if m.currentView == ViewPicker {
-			return m.handlePickerKeys(msg)
-		}
-
-		if m.currentView == ViewDevicePicker {
-			return m.handleDevicePickerKeys(msg)
-		}
-
-		if m.currentView == ViewCommandPalette {
-			return m.handleCommandPaletteKeys(msg)
-		}
-
-		// If logs view is in filter mode, pass keys through to the view
-		// (except ctrl+c for emergency quit)
-		if m.currentView == ViewLogs && m.logs.IsFilterMode() {
-			if msg.String() == "ctrl+c" {
-				return m, tea.Quit
-			}
-			return m.handleViewKeys(msg)
-		}
-
-		switch {
-		case key.Matches(msg, m.keys.Quit):
-			if m.cancel != nil {
-				m.cancel()
-			}
-			return m, tea.Quit
-
-		case key.Matches(msg, m.keys.Help):
-			m.showHelp = !m.showHelp
-			return m, nil
-
-		case key.Matches(msg, m.keys.OpenPalette):
-			m.previousView = m.currentView
-			m.currentView = ViewCommandPalette
-			m.commandPalette = m.commandPalette.SetCommands(m.buildCommandRegistry())
-			m.commandPalette = m.commandPalette.Focus()
-			return m, nil
-
-		case msg.String() == ":":
-			// ":" opens command palette filtered to connections
-			m.previousView = m.currentView
-			m.currentView = ViewCommandPalette
-			m.commandPalette = m.commandPalette.SetCommands(m.buildCommandRegistry())
-			m.commandPalette = m.commandPalette.FocusWithFilter("Connections")
-			return m, nil
-
-		case key.Matches(msg, m.keys.DevicePicker):
-			conn := m.session.GetActiveConnection()
-			if conn != nil && conn.IsPanorama {
-				m.currentView = ViewDevicePicker
-				m.devicePicker = m.devicePicker.SetDevices(
-					conn.ManagedDevices,
-					conn.TargetSerial,
-					conn.Host,
-				)
-				return m, nil
-			}
-			return m, nil
-
-		case key.Matches(msg, m.keys.Refresh):
-			// Set loading state for views that support it
-			switch m.currentView {
-			case ViewPolicies:
-				m.policies = m.policies.SetLoading(true)
-			case ViewNATPolicies:
-				m.natPolicies = m.natPolicies.SetLoading(true)
-			case ViewSessions:
-				m.sessions = m.sessions.SetLoading(true)
-			case ViewInterfaces:
-				m.interfaces = m.interfaces.SetLoading(true)
-			case ViewRoutes:
-				m.routes = m.routes.SetLoading(true)
-			case ViewLogs:
-				m.logs = m.logs.SetLoading(true)
-			}
-			return m, m.refreshCurrentView()
-
-		// Navigation group keys
-		case key.Matches(msg, m.keys.NavGroup1):
-			return m.handleNavGroupKey(0)
-		case key.Matches(msg, m.keys.NavGroup2):
-			return m.handleNavGroupKey(1)
-		case key.Matches(msg, m.keys.NavGroup3):
-			return m.handleNavGroupKey(2)
-		case key.Matches(msg, m.keys.NavGroup4):
-			return m.handleNavGroupKey(3)
-
-		// Tab cycles forward through items in current group
-		case key.Matches(msg, m.keys.Tab):
-			group := m.navbar.ActiveGroup()
-			if group != nil && len(group.Items) > 0 {
-				nextItem := (m.navbar.ActiveItemIndex() + 1) % len(group.Items)
-				m.navbar = m.navbar.SetActiveItem(nextItem)
-				return m.navigateToCurrentItem()
-			}
-
-		// Shift+Tab cycles backward through items in current group
-		case key.Matches(msg, m.keys.ShiftTab):
-			group := m.navbar.ActiveGroup()
-			if group != nil && len(group.Items) > 0 {
-				prevItem := m.navbar.ActiveItemIndex() - 1
-				if prevItem < 0 {
-					prevItem = len(group.Items) - 1 // Wrap to end
-				}
-				m.navbar = m.navbar.SetActiveItem(prevItem)
-				return m.navigateToCurrentItem()
-			}
-		}
-
-		return m.handleViewKeys(msg)
-
-	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.spinner, cmd = m.spinner.Update(msg)
-		cmds = append(cmds, cmd)
-
-		// Share spinner frame with all views
-		frame := m.spinner.View()
-		m.policies.SpinnerFrame = frame
-		m.natPolicies.SpinnerFrame = frame
-		m.sessions.SpinnerFrame = frame
-		m.interfaces.SpinnerFrame = frame
-		m.routes.SpinnerFrame = frame
-		m.logs.SpinnerFrame = frame
-
-		// Share spinner frame with dashboard views
-		m.dashboard = m.dashboard.SetSpinnerFrame(frame)
-		m.networkDashboard = m.networkDashboard.SetSpinnerFrame(frame)
-		m.securityDashboard = m.securityDashboard.SetSpinnerFrame(frame)
-		m.vpnDashboard = m.vpnDashboard.SetSpinnerFrame(frame)
-		m.configDashboard = m.configDashboard.SetSpinnerFrame(frame)
-
 	case LoginSuccessMsg:
 		m.loading = false
 		// Clear password from login model immediately after success
@@ -365,9 +406,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update state with connection info
 		if m.state != nil && host != "" {
 			m.state.UpdateConnection(host, msg.Username)
-			go func() {
-				_ = m.state.Save() //nolint:errcheck // async save, errors are not actionable
-			}()
+			cmds = append(cmds, m.saveState())
 		}
 
 		// Clear selected connection
@@ -466,52 +505,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.fetchCurrentDashboardData()
 
 	case SwitchViewMsg:
-		m.currentView = msg.View
-		m.syncNavbarToCurrentView() // Sync navbar state
-		switch msg.View {
-		case ViewDashboard:
-			return m, m.fetchCurrentDashboardData()
-		case ViewPolicies:
-			if !m.policies.HasData() {
-				m.policies = m.policies.SetLoading(true)
-				return m, m.fetchPolicies()
-			}
-		case ViewNATPolicies:
-			if !m.natPolicies.HasData() {
-				m.natPolicies = m.natPolicies.SetLoading(true)
-				return m, m.fetchNATPolicies()
-			}
-		case ViewSessions:
-			if !m.sessions.HasData() {
-				m.sessions = m.sessions.SetLoading(true)
-				return m, m.fetchSessions()
-			}
-		case ViewInterfaces:
-			if !m.interfaces.HasData() {
-				m.interfaces = m.interfaces.SetLoading(true)
-				conn := m.session.GetActiveConnection()
-				if conn != nil {
-					return m, tea.Batch(m.fetchInterfaces(), m.fetchARPTable(conn))
-				}
-				return m, m.fetchInterfaces()
-			}
-		case ViewRoutes:
-			if !m.routes.HasData() {
-				m.routes = m.routes.SetLoading(true)
-				return m, m.fetchRoutesData()
-			}
-		case ViewLogs:
-			if !m.logs.HasData() {
-				m.logs = m.logs.SetLoading(true)
-				return m, m.fetchLogs()
-			}
-		}
-		return m, nil
+		return m.handleSwitchView(msg)
 
 	case SwitchDashboardMsg:
 		m.currentDashboard = msg.Dashboard
 		m.currentView = ViewDashboard
-		m.syncNavbarToCurrentView() // Sync navbar state
+		m.syncNavbarToCurrentView()
 		return m, m.fetchCurrentDashboardData()
 
 	case ShowPickerMsg:
@@ -525,17 +524,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case ShowConnectionFormMsg:
-		switch msg.Mode {
-		case views.FormModeQuickConnect:
-			m.connectionForm = views.NewQuickConnectForm()
-		case views.FormModeAdd:
-			m.connectionForm = views.NewAddConnectionForm()
-		case views.FormModeEdit:
-			m.connectionForm = views.NewEditConnectionForm(msg.Host, msg.Config)
-		}
-		m.connectionForm = m.connectionForm.SetSize(m.width, m.height)
-		m.currentView = ViewConnectionForm
-		return m, nil
+		return m.handleShowConnectionForm(msg)
 
 	case ConnectionSelectedMsg:
 		// Store selected connection info and transition to login
@@ -551,68 +540,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case ConnectionFormSubmitMsg:
-		// Handle form submission - save to config if requested
-		if msg.SaveToConfig {
-			if msg.Mode == views.FormModeEdit {
-				// Update existing
-				_ = m.config.UpdateConnection(msg.Host, msg.Config) //nolint:errcheck // UI flow continues regardless
-			} else {
-				// Add new
-				_ = m.config.AddConnection(msg.Host, msg.Config) //nolint:errcheck // UI flow continues regardless
-			}
-			// Save config asynchronously
-			go func() {
-				_ = m.config.Save() //nolint:errcheck // async save, errors are not actionable
-			}()
-			// Update hub with new data
-			m.connectionHub = m.connectionHub.SetConnections(m.config, m.state)
-		}
-
-		// For quick connect or after saving, go to login
-		m.selectedConnection = msg.Host
-		m.selectedConnectionConfig = msg.Config
-		m.login = views.NewLoginModel(&auth.Credentials{
-			Host:     msg.Host,
-			Username: msg.Config.Username,
-			Insecure: msg.Config.Insecure,
-		})
-		m.login = m.login.SetSize(m.width, m.height)
-		m.currentView = ViewLogin
-		return m, nil
+		return m.handleConnectionFormSubmit(msg)
 
 	case ConnectionDeletedMsg:
-		// Delete from config and save
-		_ = m.config.DeleteConnection(msg.Host) //nolint:errcheck // UI flow continues regardless
-		go func() {
-			_ = m.config.Save() //nolint:errcheck // async save, errors are not actionable
-		}()
-		// Also delete from state
-		if m.state != nil {
-			m.state.DeleteConnection(msg.Host)
-			go func() {
-				_ = m.state.Save() //nolint:errcheck // async save, errors are not actionable
-			}()
-		}
-		// Refresh hub
-		m.connectionHub = m.connectionHub.SetConnections(m.config, m.state)
-		return m, nil
+		return m.handleConnectionDeleted(msg)
 
 	case RefreshMsg:
-		switch m.currentView {
-		case ViewPolicies:
-			m.policies = m.policies.SetLoading(true)
-		case ViewNATPolicies:
-			m.natPolicies = m.natPolicies.SetLoading(true)
-		case ViewSessions:
-			m.sessions = m.sessions.SetLoading(true)
-		case ViewInterfaces:
-			m.interfaces = m.interfaces.SetLoading(true)
-		case ViewRoutes:
-			m.routes = m.routes.SetLoading(true)
-		case ViewLogs:
-			m.logs = m.logs.SetLoading(true)
-		}
-		return m, m.refreshCurrentView()
+		return m.handleRefresh()
 
 	case ShowHelpMsg:
 		m.showHelp = !m.showHelp
@@ -647,9 +581,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case IPSecTunnelsMsg:
 		m.vpnDashboard = m.vpnDashboard.SetIPSecTunnels(msg.Tunnels, msg.Err)
+		m.ipsecTunnels = m.ipsecTunnels.SetTunnels(msg.Tunnels, msg.Err)
 
 	case GlobalProtectUsersMsg:
 		m.vpnDashboard = m.vpnDashboard.SetGlobalProtectUsers(msg.Users, msg.Err)
+		m.gpUsers = m.gpUsers.SetUsers(msg.Users, msg.Err)
 
 	case PendingChangesMsg:
 		m.configDashboard = m.configDashboard.SetPendingChanges(msg.Changes, msg.Err)
@@ -660,11 +596,138 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case RefreshTickMsg:
 		return m, m.refreshCurrentView()
 
+	case ConfigSavedMsg:
+		if msg.Err != nil {
+			cmds = append(cmds, m.setError(msg.Err))
+		}
+
+	case StateSavedMsg:
+		if msg.Err != nil {
+			cmds = append(cmds, m.setError(msg.Err))
+		}
+
 	case ErrorMsg:
-		m.err = msg.Err
+		cmds = append(cmds, m.setError(msg.Err))
+
+	case ErrorDismissMsg:
+		m.err = nil
 	}
 
 	return m, tea.Batch(cmds...)
+}
+
+// handleSwitchView switches to a new view and fetches data if needed.
+func (m Model) handleSwitchView(msg SwitchViewMsg) (tea.Model, tea.Cmd) {
+	m.currentView = msg.View
+	m.syncNavbarToCurrentView()
+	switch msg.View {
+	case ViewDashboard:
+		return m, m.fetchCurrentDashboardData()
+	case ViewPolicies:
+		if !m.policies.HasData() {
+			m.policies = m.policies.SetLoading(true)
+			return m, m.fetchPolicies()
+		}
+	case ViewNATPolicies:
+		if !m.natPolicies.HasData() {
+			m.natPolicies = m.natPolicies.SetLoading(true)
+			return m, m.fetchNATPolicies()
+		}
+	case ViewSessions:
+		if !m.sessions.HasData() {
+			m.sessions = m.sessions.SetLoading(true)
+			return m, m.fetchSessions()
+		}
+	case ViewInterfaces:
+		if !m.interfaces.HasData() {
+			m.interfaces = m.interfaces.SetLoading(true)
+			conn := m.session.GetActiveConnection()
+			if conn != nil {
+				return m, tea.Batch(m.fetchInterfaces(), m.fetchARPTable(conn))
+			}
+			return m, m.fetchInterfaces()
+		}
+	case ViewRoutes:
+		if !m.routes.HasData() {
+			m.routes = m.routes.SetLoading(true)
+			return m, m.fetchRoutesData()
+		}
+	case ViewIPSecTunnels:
+		if !m.ipsecTunnels.HasData() {
+			m.ipsecTunnels = m.ipsecTunnels.SetLoading(true)
+			conn := m.session.GetActiveConnection()
+			if conn != nil {
+				return m, m.fetchIPSecTunnels(conn)
+			}
+		}
+	case ViewGPUsers:
+		if !m.gpUsers.HasData() {
+			m.gpUsers = m.gpUsers.SetLoading(true)
+			conn := m.session.GetActiveConnection()
+			if conn != nil {
+				return m, m.fetchGlobalProtectUsers(conn)
+			}
+		}
+	case ViewLogs:
+		if !m.logs.HasData() {
+			m.logs = m.logs.SetLoading(true)
+			return m, m.fetchLogs()
+		}
+	}
+	return m, nil
+}
+
+// handleShowConnectionForm opens the connection form in the appropriate mode.
+func (m Model) handleShowConnectionForm(msg ShowConnectionFormMsg) (tea.Model, tea.Cmd) {
+	switch msg.Mode {
+	case views.FormModeQuickConnect:
+		m.connectionForm = views.NewQuickConnectForm()
+	case views.FormModeAdd:
+		m.connectionForm = views.NewAddConnectionForm()
+	case views.FormModeEdit:
+		m.connectionForm = views.NewEditConnectionForm(msg.Host, msg.Config)
+	}
+	m.connectionForm = m.connectionForm.SetSize(m.width, m.height)
+	m.currentView = ViewConnectionForm
+	return m, nil
+}
+
+// handleConnectionFormSubmit processes form submission, saving to config if requested.
+func (m Model) handleConnectionFormSubmit(msg ConnectionFormSubmitMsg) (tea.Model, tea.Cmd) {
+	var saveCmd tea.Cmd
+	if msg.SaveToConfig {
+		if msg.Mode == views.FormModeEdit {
+			_ = m.config.UpdateConnection(msg.Host, msg.Config) //nolint:errcheck // UI flow continues regardless
+		} else {
+			_ = m.config.AddConnection(msg.Host, msg.Config) //nolint:errcheck // UI flow continues regardless
+		}
+		saveCmd = m.saveConfig()
+		m.connectionHub = m.connectionHub.SetConnections(m.config, m.state)
+	}
+
+	m.selectedConnection = msg.Host
+	m.selectedConnectionConfig = msg.Config
+	m.login = views.NewLoginModel(&auth.Credentials{
+		Host:     msg.Host,
+		Username: msg.Config.Username,
+		Insecure: msg.Config.Insecure,
+	})
+	m.login = m.login.SetSize(m.width, m.height)
+	m.currentView = ViewLogin
+	return m, saveCmd
+}
+
+// handleConnectionDeleted removes a connection from config and state.
+func (m Model) handleConnectionDeleted(msg ConnectionDeletedMsg) (tea.Model, tea.Cmd) {
+	_ = m.config.DeleteConnection(msg.Host) //nolint:errcheck // UI flow continues regardless
+	var saveCmds []tea.Cmd
+	saveCmds = append(saveCmds, m.saveConfig())
+	if m.state != nil {
+		m.state.DeleteConnection(msg.Host)
+		saveCmds = append(saveCmds, m.saveState())
+	}
+	m.connectionHub = m.connectionHub.SetConnections(m.config, m.state)
+	return m, tea.Batch(saveCmds...)
 }
 
 func (m Model) View() string {
@@ -722,6 +785,12 @@ func (m Model) View() string {
 
 	case ViewRoutes:
 		content = m.routes.View()
+
+	case ViewIPSecTunnels:
+		content = m.ipsecTunnels.View()
+
+	case ViewGPUsers:
+		content = m.gpUsers.View()
 
 	case ViewLogs:
 		content = m.logs.View()

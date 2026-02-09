@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -84,6 +83,7 @@ func (m *PoliciesModel) applyFilter() {
 		for _, p := range m.policies {
 			if strings.Contains(strings.ToLower(p.Name), query) ||
 				strings.Contains(strings.ToLower(p.Description), query) ||
+				strings.Contains(strings.ToLower(string(p.RuleBase)), query) ||
 				containsAny(p.Tags, query) ||
 				containsAny(p.SourceZones, query) ||
 				containsAny(p.DestZones, query) ||
@@ -139,15 +139,6 @@ func (m PoliciesModel) sortLabel() string {
 	default:
 		return fmt.Sprintf("Position %s", dir)
 	}
-}
-
-func containsAny(items []string, query string) bool {
-	for _, item := range items {
-		if strings.Contains(strings.ToLower(item), query) {
-			return true
-		}
-	}
-	return false
 }
 
 func (m PoliciesModel) Update(msg tea.Msg) (PoliciesModel, tea.Cmd) {
@@ -311,15 +302,19 @@ func (m PoliciesModel) renderTable() string {
 
 func (m PoliciesModel) formatHeaderRow(width int) string {
 	// Adaptive column layout based on width
-	if width >= 140 {
-		return fmt.Sprintf("%-4s %-24s %-8s %-20s %-18s %-16s %-10s %-10s",
-			"#", "Name", "Action", "Source → Dest Zone", "Application", "Service", "Hits", "Last Hit")
-	} else if width >= 110 {
-		return fmt.Sprintf("%-4s %-20s %-8s %-18s %-14s %-10s %-10s",
-			"#", "Name", "Action", "Zones", "Application", "Hits", "Last Hit")
+	// Base column shows pre/local/post origin
+	if width >= 150 {
+		return fmt.Sprintf("%-4s %-5s %-24s %-8s %-20s %-18s %-16s %-10s %-10s",
+			"#", "Base", "Name", "Action", "Source → Dest Zone", "Application", "Service", "Hits", "Last Hit")
+	} else if width >= 120 {
+		return fmt.Sprintf("%-4s %-5s %-20s %-8s %-18s %-14s %-10s %-10s",
+			"#", "Base", "Name", "Action", "Zones", "Application", "Hits", "Last Hit")
+	} else if width >= 100 {
+		return fmt.Sprintf("%-4s %-5s %-16s %-7s %-14s %-10s %-8s",
+			"#", "Base", "Name", "Action", "Zones", "App", "Hits")
 	} else {
-		return fmt.Sprintf("%-4s %-16s %-7s %-14s %-10s %-8s",
-			"#", "Name", "Action", "Zones", "App", "Hits")
+		return fmt.Sprintf("%-4s %-16s %-7s %-14s %-8s",
+			"#", "Name", "Action", "Zones", "Hits")
 	}
 }
 
@@ -329,6 +324,9 @@ func (m PoliciesModel) formatRuleRow(p models.SecurityRule, width int, allowStyl
 	if len(action) > 8 {
 		action = action[:7] + "…"
 	}
+
+	// Format rulebase indicator
+	base := formatRuleBase(p.RuleBase)
 
 	// Format zones
 	srcZone := formatZoneCompact(p.SourceZones)
@@ -353,19 +351,23 @@ func (m PoliciesModel) formatRuleRow(p models.SecurityRule, width int, allowStyl
 		name = name + " •"
 	}
 
-	if width >= 140 {
-		return fmt.Sprintf("%-4d %-24s %-8s %-20s %-18s %-16s %-10s %-10s",
-			p.Position, truncateStr(name, 24), action,
+	if width >= 150 {
+		return fmt.Sprintf("%-4d %-5s %-24s %-8s %-20s %-18s %-16s %-10s %-10s",
+			p.Position, base, truncateStr(name, 24), action,
 			truncateStr(zones, 20), truncateStr(apps, 18),
 			truncateStr(services, 16), hits, lastHit)
-	} else if width >= 110 {
-		return fmt.Sprintf("%-4d %-20s %-8s %-18s %-14s %-10s %-10s",
-			p.Position, truncateStr(name, 20), action,
+	} else if width >= 120 {
+		return fmt.Sprintf("%-4d %-5s %-20s %-8s %-18s %-14s %-10s %-10s",
+			p.Position, base, truncateStr(name, 20), action,
 			truncateStr(zones, 18), truncateStr(apps, 14), hits, lastHit)
-	} else {
-		return fmt.Sprintf("%-4d %-16s %-7s %-14s %-10s %-8s",
-			p.Position, truncateStr(name, 16), truncateStr(action, 7),
+	} else if width >= 100 {
+		return fmt.Sprintf("%-4d %-5s %-16s %-7s %-14s %-10s %-8s",
+			p.Position, base, truncateStr(name, 16), truncateStr(action, 7),
 			truncateStr(zones, 14), truncateStr(apps, 10), hits)
+	} else {
+		return fmt.Sprintf("%-4d %-16s %-7s %-14s %-8s",
+			p.Position, truncateStr(name, 16), truncateStr(action, 7),
+			truncateStr(zones, 14), hits)
 	}
 }
 
@@ -390,6 +392,11 @@ func (m PoliciesModel) renderDetail(p models.SecurityRule) string {
 		title += dimValueStyle.Render(" (disabled)")
 	}
 	b.WriteString(titleStyle.Render(title))
+	b.WriteString("\n")
+
+	// Rule metadata (position and rulebase)
+	ruleInfo := fmt.Sprintf("Position: %d | %s", p.Position, formatRuleBaseFull(p.RuleBase))
+	b.WriteString(dimValueStyle.Render(ruleInfo))
 	b.WriteString("\n")
 
 	// Tags
@@ -484,125 +491,4 @@ func (m PoliciesModel) renderDetail(p models.SecurityRule) string {
 	}
 
 	return boxStyle.Render(b.String())
-}
-
-// Helper functions
-
-func formatZoneCompact(zones []string) string {
-	if len(zones) == 0 || (len(zones) == 1 && zones[0] == "any") {
-		return "any"
-	}
-	if len(zones) == 1 {
-		z := zones[0]
-		if len(z) > 8 {
-			return z[:6] + "…"
-		}
-		return z
-	}
-	first := zones[0]
-	if len(first) > 5 {
-		first = first[:4] + "…"
-	}
-	return fmt.Sprintf("%s+%d", first, len(zones)-1)
-}
-
-func formatListCompact(items []string, maxLen int) string {
-	if len(items) == 0 || (len(items) == 1 && items[0] == "any") {
-		return "any"
-	}
-	if len(items) == 1 {
-		return truncateStr(items[0], maxLen)
-	}
-	first := truncateStr(items[0], maxLen-4)
-	return fmt.Sprintf("%s+%d", first, len(items)-1)
-}
-
-func formatListFull(items []string) string {
-	if len(items) == 0 {
-		return "any"
-	}
-	return strings.Join(items, ", ")
-}
-
-func formatAddresses(addrs []string, negate bool, valueStyle, dimStyle lipgloss.Style) string {
-	if len(addrs) == 0 || (len(addrs) == 1 && addrs[0] == "any") {
-		return dimStyle.Render("any")
-	}
-	result := valueStyle.Render(strings.Join(addrs, ", "))
-	if negate {
-		result = valueStyle.Render("NOT ") + result
-	}
-	return result
-}
-
-func hasProfiles(p models.SecurityRule) bool {
-	return p.AntivirusProfile != "" || p.VulnerabilityProfile != "" ||
-		p.SpywareProfile != "" || p.URLFilteringProfile != "" ||
-		p.FileBlockingProfile != "" || p.WildFireProfile != ""
-}
-
-func formatHitCount(count int64) string {
-	if count == 0 {
-		return "0"
-	}
-	if count >= 1_000_000_000 {
-		return fmt.Sprintf("%.1fB", float64(count)/1_000_000_000)
-	}
-	if count >= 1_000_000 {
-		return fmt.Sprintf("%.1fM", float64(count)/1_000_000)
-	}
-	if count >= 1_000 {
-		return fmt.Sprintf("%.1fK", float64(count)/1_000)
-	}
-	return fmt.Sprintf("%d", count)
-}
-
-func formatHitCountFull(count int64) string {
-	if count == 0 {
-		return "0"
-	}
-	s := fmt.Sprintf("%d", count)
-	n := len(s)
-	if n <= 3 {
-		return s
-	}
-	var result strings.Builder
-	for i, c := range s {
-		if i > 0 && (n-i)%3 == 0 {
-			result.WriteRune(',')
-		}
-		result.WriteRune(c)
-	}
-	return result.String()
-}
-
-func formatLastHit(t time.Time) string {
-	if t.IsZero() {
-		return "never"
-	}
-	d := time.Since(t)
-	if d < time.Minute {
-		return "just now"
-	}
-	if d < time.Hour {
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	}
-	if d < 24*time.Hour {
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	}
-	if d < 7*24*time.Hour {
-		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-	}
-	return t.Format("Jan 2")
-}
-
-func formatTimestamp(t time.Time) string {
-	if t.IsZero() {
-		return "Never"
-	}
-	return t.Format("2006-01-02 15:04:05")
-}
-
-func truncateStr(s string, maxLen int) string {
-	return truncateEllipsis(s, maxLen)
 }

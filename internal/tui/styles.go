@@ -18,19 +18,12 @@ var (
 	StatusUpStyle     lipgloss.Style
 	StatusDownStyle   lipgloss.Style
 
-	// Tables
-	TableHeaderStyle   lipgloss.Style
-	TableRowStyle      lipgloss.Style
-	TableSelectedStyle lipgloss.Style
-
 	// Panels/Boxes
 	PanelStyle      lipgloss.Style
 	PanelTitleStyle lipgloss.Style
 
 	// Input fields
-	InputStyle        lipgloss.Style
-	InputFocusedStyle lipgloss.Style
-	InputLabelStyle   lipgloss.Style
+	InputLabelStyle lipgloss.Style
 
 	// Messages
 	ErrorStyle   lipgloss.Style
@@ -54,10 +47,6 @@ var (
 	// Progress bars
 	ProgressBarStyle   lipgloss.Style
 	ProgressBarBgStyle lipgloss.Style
-
-	// Help
-	HelpKeyStyle  lipgloss.Style
-	HelpDescStyle lipgloss.Style
 
 	// Spinner
 	SpinnerStyle lipgloss.Style
@@ -104,21 +93,6 @@ func InitStyles() {
 	StatusDownStyle = lipgloss.NewStyle().
 		Foreground(c.Error)
 
-	// Tables
-	TableHeaderStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(c.White).
-		Background(c.Border).
-		Padding(0, 1)
-
-	TableRowStyle = lipgloss.NewStyle().
-		Padding(0, 1)
-
-	TableSelectedStyle = lipgloss.NewStyle().
-		Background(c.BackgroundAlt).
-		Foreground(c.White).
-		Padding(0, 1)
-
 	// Panels/Boxes
 	PanelStyle = lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -131,16 +105,6 @@ func InitStyles() {
 		MarginBottom(1)
 
 	// Input fields
-	InputStyle = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(c.Border).
-		Padding(0, 1)
-
-	InputFocusedStyle = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(c.Primary).
-		Padding(0, 1)
-
 	InputLabelStyle = lipgloss.NewStyle().
 		Foreground(c.TextMuted).
 		MarginBottom(1)
@@ -199,14 +163,6 @@ func InitStyles() {
 
 	ProgressBarBgStyle = lipgloss.NewStyle().
 		Foreground(c.Border)
-
-	// Help
-	HelpKeyStyle = lipgloss.NewStyle().
-		Foreground(c.Primary).
-		Bold(true)
-
-	HelpDescStyle = lipgloss.NewStyle().
-		Foreground(c.TextMuted)
 
 	// Spinner
 	SpinnerStyle = lipgloss.NewStyle().

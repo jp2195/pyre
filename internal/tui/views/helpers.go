@@ -2,6 +2,8 @@ package views
 
 import (
 	"fmt"
+	"net"
+	"regexp"
 	"strings"
 )
 
@@ -92,6 +94,42 @@ func formatPackets(packets int64) string {
 		return fmt.Sprintf("%.1fM", float64(packets)/1000000)
 	}
 	return fmt.Sprintf("%.1fB", float64(packets)/1000000000)
+}
+
+// hostnameRegex matches valid hostnames per RFC 952/1123
+var hostnameRegex = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*$`)
+
+// validateHost checks if a string is a valid IP address or hostname.
+// Returns an error message string if invalid, or empty string if valid.
+func validateHost(host string) string {
+	if host == "" {
+		return ""
+	}
+	if strings.ContainsAny(host, " \t\n\r") {
+		return "host must not contain whitespace"
+	}
+	// Valid IP address
+	if net.ParseIP(host) != nil {
+		return ""
+	}
+	// host:port form - strip port and validate host part
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		if net.ParseIP(h) != nil {
+			return ""
+		}
+		if hostnameRegex.MatchString(h) {
+			return ""
+		}
+		return "invalid hostname or IP address"
+	}
+	// Valid hostname
+	if len(host) > 253 {
+		return "hostname too long (max 253 characters)"
+	}
+	if hostnameRegex.MatchString(host) {
+		return ""
+	}
+	return "invalid hostname or IP address"
 }
 
 // cleanValue normalizes ugly API values like "N/A", "ukn", "[n/a]" to empty

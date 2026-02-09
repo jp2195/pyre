@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/xml"
+	"log"
 	"strings"
 	"time"
 
@@ -44,6 +45,7 @@ func (c *Client) GetIPSecTunnels(ctx context.Context) ([]models.IPSecTunnel, err
 	}
 
 	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+		log.Printf("[API Warning] failed to parse IPSec tunnels XML: %v", err)
 		return []models.IPSecTunnel{}, nil
 	}
 
@@ -108,6 +110,7 @@ func (c *Client) GetGlobalProtectUsers(ctx context.Context) ([]models.GlobalProt
 	}
 
 	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+		log.Printf("[API Warning] failed to parse GlobalProtect users XML: %v", err)
 		return []models.GlobalProtectUser{}, nil
 	}
 

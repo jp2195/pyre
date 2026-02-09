@@ -279,19 +279,19 @@ func (m *LogsModel) cycleSort() {
 }
 
 func (m LogsModel) sortLabel() string {
-	dir := "desc"
+	dir := "↓"
 	if m.SortAsc {
-		dir = "asc"
+		dir = "↑"
 	}
 	switch m.sortBy {
 	case LogSortSeverity:
-		return fmt.Sprintf("severity %s", dir)
+		return fmt.Sprintf("Severity %s", dir)
 	case LogSortSource:
-		return fmt.Sprintf("source %s", dir)
+		return fmt.Sprintf("Source %s", dir)
 	case LogSortAction:
-		return fmt.Sprintf("action %s", dir)
+		return fmt.Sprintf("Action %s", dir)
 	default:
-		return fmt.Sprintf("time %s", dir)
+		return fmt.Sprintf("Time %s", dir)
 	}
 }
 
@@ -688,15 +688,15 @@ func (m LogsModel) colorByAction(row, action string) string {
 func (m LogsModel) renderDetailPanel() string {
 	switch m.activeLogType {
 	case models.LogTypeSystem:
-		if m.Cursor < len(m.filteredSystem) {
+		if m.Cursor >= 0 && m.Cursor < len(m.filteredSystem) {
 			return m.renderSystemDetail(m.filteredSystem[m.Cursor])
 		}
 	case models.LogTypeTraffic:
-		if m.Cursor < len(m.filteredTraffic) {
+		if m.Cursor >= 0 && m.Cursor < len(m.filteredTraffic) {
 			return m.renderTrafficDetail(m.filteredTraffic[m.Cursor])
 		}
 	case models.LogTypeThreat:
-		if m.Cursor < len(m.filteredThreat) {
+		if m.Cursor >= 0 && m.Cursor < len(m.filteredThreat) {
 			return m.renderThreatDetail(m.filteredThreat[m.Cursor])
 		}
 	}
@@ -837,7 +837,8 @@ func (m LogsModel) renderHelp() string {
 	}
 
 	keys := []struct{ key, desc string }{
-		{"[/]", "log type"},
+		{"[", "prev type"},
+		{"]", "next type"},
 		{"j/k", "scroll"},
 		{"enter", expandText},
 		{"/", "filter"},

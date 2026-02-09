@@ -6,6 +6,150 @@ import (
 	"github.com/jp2195/pyre/internal/tui/views"
 )
 
+// navTarget describes the view state and data fetch for a navigation item.
+type navTarget struct {
+	view      ViewState
+	dashboard views.DashboardType // Only used when view == ViewDashboard
+	hasData   func(m *Model) bool
+	fetch     func(m *Model) tea.Cmd
+}
+
+// navTargets maps navbar item IDs to their navigation targets.
+var navTargets = map[string]navTarget{
+	// Monitor group (dashboard views)
+	"overview": {
+		view:      ViewDashboard,
+		dashboard: views.DashboardMain,
+		hasData:   func(m *Model) bool { return m.dashboard.HasData() },
+		fetch:     func(m *Model) tea.Cmd { return m.fetchDashboardData() },
+	},
+	"network": {
+		view:      ViewDashboard,
+		dashboard: views.DashboardNetwork,
+		hasData:   func(m *Model) bool { return m.networkDashboard.HasData() },
+		fetch:     func(m *Model) tea.Cmd { return m.fetchNetworkDashboardData() },
+	},
+	"security": {
+		view:      ViewDashboard,
+		dashboard: views.DashboardSecurity,
+		hasData:   func(m *Model) bool { return m.securityDashboard.HasData() },
+		fetch:     func(m *Model) tea.Cmd { return m.fetchSecurityDashboardData() },
+	},
+	"vpn": {
+		view:      ViewDashboard,
+		dashboard: views.DashboardVPN,
+		hasData:   func(m *Model) bool { return m.vpnDashboard.HasData() },
+		fetch:     func(m *Model) tea.Cmd { return m.fetchVPNDashboardData() },
+	},
+	"config": {
+		view:      ViewDashboard,
+		dashboard: views.DashboardConfig,
+		hasData:   func(m *Model) bool { return m.configDashboard.HasData() },
+		fetch:     func(m *Model) tea.Cmd { return m.fetchConfigDashboardData() },
+	},
+
+	// Analyze group (detail views)
+	"policies": {
+		view:    ViewPolicies,
+		hasData: func(m *Model) bool { return m.policies.HasData() },
+		fetch: func(m *Model) tea.Cmd {
+			m.policies = m.policies.SetLoading(true)
+			return m.fetchPolicies()
+		},
+	},
+	"nat": {
+		view:    ViewNATPolicies,
+		hasData: func(m *Model) bool { return m.natPolicies.HasData() },
+		fetch: func(m *Model) tea.Cmd {
+			m.natPolicies = m.natPolicies.SetLoading(true)
+			return m.fetchNATPolicies()
+		},
+	},
+	"sessions": {
+		view:    ViewSessions,
+		hasData: func(m *Model) bool { return m.sessions.HasData() },
+		fetch: func(m *Model) tea.Cmd {
+			m.sessions = m.sessions.SetLoading(true)
+			return m.fetchSessions()
+		},
+	},
+	"interfaces": {
+		view:    ViewInterfaces,
+		hasData: func(m *Model) bool { return m.interfaces.HasData() },
+		fetch: func(m *Model) tea.Cmd {
+			m.interfaces = m.interfaces.SetLoading(true)
+			return m.fetchInterfaces()
+		},
+	},
+	"routes": {
+		view:    ViewRoutes,
+		hasData: func(m *Model) bool { return m.routes.HasData() },
+		fetch: func(m *Model) tea.Cmd {
+			m.routes = m.routes.SetLoading(true)
+			return m.fetchRoutesData()
+		},
+	},
+	"ipsec": {
+		view:    ViewIPSecTunnels,
+		hasData: func(m *Model) bool { return m.ipsecTunnels.HasData() },
+		fetch: func(m *Model) tea.Cmd {
+			m.ipsecTunnels = m.ipsecTunnels.SetLoading(true)
+			conn := m.session.GetActiveConnection()
+			if conn != nil {
+				return m.fetchIPSecTunnels(conn)
+			}
+			return nil
+		},
+	},
+	"gpusers": {
+		view:    ViewGPUsers,
+		hasData: func(m *Model) bool { return m.gpUsers.HasData() },
+		fetch: func(m *Model) tea.Cmd {
+			m.gpUsers = m.gpUsers.SetLoading(true)
+			conn := m.session.GetActiveConnection()
+			if conn != nil {
+				return m.fetchGlobalProtectUsers(conn)
+			}
+			return nil
+		},
+	},
+	"logs": {
+		view:    ViewLogs,
+		hasData: func(m *Model) bool { return m.logs.HasData() },
+		fetch: func(m *Model) tea.Cmd {
+			m.logs = m.logs.SetLoading(true)
+			return m.fetchLogs()
+		},
+	},
+}
+
+// navbarMapping maps (view, dashboard) pairs to (group, item) IDs for navbar sync.
+type navbarID struct {
+	group string
+	item  string
+}
+
+var viewToNavbar = map[ViewState][]struct {
+	dashboard views.DashboardType
+	id        navbarID
+}{
+	ViewDashboard: {
+		{views.DashboardMain, navbarID{"monitor", "overview"}},
+		{views.DashboardNetwork, navbarID{"monitor", "network"}},
+		{views.DashboardSecurity, navbarID{"monitor", "security"}},
+		{views.DashboardVPN, navbarID{"monitor", "vpn"}},
+		{views.DashboardConfig, navbarID{"tools", "config"}},
+	},
+	ViewPolicies:     {{0, navbarID{"analyze", "policies"}}},
+	ViewNATPolicies:  {{0, navbarID{"analyze", "nat"}}},
+	ViewSessions:     {{0, navbarID{"analyze", "sessions"}}},
+	ViewInterfaces:   {{0, navbarID{"analyze", "interfaces"}}},
+	ViewRoutes:       {{0, navbarID{"analyze", "routes"}}},
+	ViewIPSecTunnels: {{0, navbarID{"analyze", "ipsec"}}},
+	ViewGPUsers:      {{0, navbarID{"analyze", "gpusers"}}},
+	ViewLogs:         {{0, navbarID{"analyze", "logs"}}},
+}
+
 // handleNavGroupKey handles number key presses for navigation
 func (m Model) handleNavGroupKey(groupIndex int) (tea.Model, tea.Cmd) {
 	currentGroup := m.navbar.ActiveGroupIndex()
@@ -33,84 +177,19 @@ func (m Model) navigateToCurrentItem() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	target, ok := navTargets[item.ID]
+	if !ok {
+		return m, nil
+	}
+
+	m.currentView = target.view
+	if target.view == ViewDashboard {
+		m.currentDashboard = target.dashboard
+	}
+
 	var cmd tea.Cmd
-
-	switch item.ID {
-	// Monitor group
-	case "overview":
-		m.currentView = ViewDashboard
-		m.currentDashboard = views.DashboardMain
-		if !m.dashboard.HasData() {
-			cmd = m.fetchDashboardData()
-		}
-	case "network":
-		m.currentView = ViewDashboard
-		m.currentDashboard = views.DashboardNetwork
-		if !m.networkDashboard.HasData() {
-			cmd = m.fetchNetworkDashboardData()
-		}
-	case "security":
-		m.currentView = ViewDashboard
-		m.currentDashboard = views.DashboardSecurity
-		if !m.securityDashboard.HasData() {
-			cmd = m.fetchSecurityDashboardData()
-		}
-	case "vpn":
-		m.currentView = ViewDashboard
-		m.currentDashboard = views.DashboardVPN
-		if !m.vpnDashboard.HasData() {
-			cmd = m.fetchVPNDashboardData()
-		}
-
-	// Analyze group
-	case "policies":
-		m.currentView = ViewPolicies
-		if !m.policies.HasData() {
-			m.policies = m.policies.SetLoading(true)
-			cmd = m.fetchPolicies()
-		}
-	case "nat":
-		m.currentView = ViewNATPolicies
-		if !m.natPolicies.HasData() {
-			m.natPolicies = m.natPolicies.SetLoading(true)
-			cmd = m.fetchNATPolicies()
-		}
-	case "sessions":
-		m.currentView = ViewSessions
-		if !m.sessions.HasData() {
-			m.sessions = m.sessions.SetLoading(true)
-			cmd = m.fetchSessions()
-		}
-	case "interfaces":
-		m.currentView = ViewInterfaces
-		if !m.interfaces.HasData() {
-			m.interfaces = m.interfaces.SetLoading(true)
-			cmd = m.fetchInterfaces()
-		}
-	case "routes":
-		m.currentView = ViewRoutes
-		if !m.routes.HasData() {
-			m.routes = m.routes.SetLoading(true)
-			cmd = m.fetchRoutesData()
-		}
-	case "logs":
-		m.currentView = ViewLogs
-		if !m.logs.HasData() {
-			m.logs = m.logs.SetLoading(true)
-			cmd = m.fetchLogs()
-		}
-
-	// Tools group
-	case "config":
-		m.currentView = ViewDashboard
-		m.currentDashboard = views.DashboardConfig
-		if !m.configDashboard.HasData() {
-			cmd = m.fetchConfigDashboardData()
-		}
-
-	// Connections group
-	case "picker":
-		m.currentView = ViewPicker
+	if target.fetch != nil && !target.hasData(&m) {
+		cmd = target.fetch(&m)
 	}
 
 	return m, cmd
@@ -118,33 +197,14 @@ func (m Model) navigateToCurrentItem() (tea.Model, tea.Cmd) {
 
 // syncNavbarToCurrentView syncs the navbar state to match the current view
 func (m *Model) syncNavbarToCurrentView() {
-	switch m.currentView {
-	case ViewDashboard:
-		switch m.currentDashboard {
-		case views.DashboardMain:
-			m.navbar = m.navbar.SetActiveByID("monitor", "overview")
-		case views.DashboardNetwork:
-			m.navbar = m.navbar.SetActiveByID("monitor", "network")
-		case views.DashboardSecurity:
-			m.navbar = m.navbar.SetActiveByID("monitor", "security")
-		case views.DashboardVPN:
-			m.navbar = m.navbar.SetActiveByID("monitor", "vpn")
-		case views.DashboardConfig:
-			m.navbar = m.navbar.SetActiveByID("tools", "config")
+	entries, ok := viewToNavbar[m.currentView]
+	if !ok {
+		return
+	}
+	for _, e := range entries {
+		if m.currentView != ViewDashboard || e.dashboard == m.currentDashboard {
+			m.navbar = m.navbar.SetActiveByID(e.id.group, e.id.item)
+			return
 		}
-	case ViewPolicies:
-		m.navbar = m.navbar.SetActiveByID("analyze", "policies")
-	case ViewNATPolicies:
-		m.navbar = m.navbar.SetActiveByID("analyze", "nat")
-	case ViewSessions:
-		m.navbar = m.navbar.SetActiveByID("analyze", "sessions")
-	case ViewInterfaces:
-		m.navbar = m.navbar.SetActiveByID("analyze", "interfaces")
-	case ViewRoutes:
-		m.navbar = m.navbar.SetActiveByID("analyze", "routes")
-	case ViewLogs:
-		m.navbar = m.navbar.SetActiveByID("analyze", "logs")
-	case ViewPicker:
-		m.navbar = m.navbar.SetActiveByID("connections", "picker")
 	}
 }

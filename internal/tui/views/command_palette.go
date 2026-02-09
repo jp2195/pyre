@@ -218,12 +218,17 @@ func (m CommandPaletteModel) View() string {
 	descStyle := DetailDimStyle
 
 	// Calculate modal width
+	const commandPaletteMinWidth = 30
 	modalWidth := 60
-	if m.width < modalWidth+10 {
-		modalWidth = m.width - 10
+	if m.width < modalWidth+4 {
+		modalWidth = m.width - 4
 	}
-	if modalWidth < 40 {
-		modalWidth = 40
+	if modalWidth < commandPaletteMinWidth {
+		modalWidth = commandPaletteMinWidth
+	}
+	if m.width < commandPaletteMinWidth+4 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
+			"Terminal too narrow for command palette")
 	}
 
 	// Build content
@@ -312,11 +317,7 @@ func (m CommandPaletteModel) View() string {
 				// Truncate description to fit
 				maxDescLen := modalWidth - len(label) - len(shortcut) - 10
 				if maxDescLen > 0 && len(cmd.Description) > 0 {
-					d := cmd.Description
-					if len(d) > maxDescLen {
-						d = d[:maxDescLen-3] + "..."
-					}
-					desc = descStyle.Render("  " + d)
+					desc = descStyle.Render("  " + truncateEllipsis(cmd.Description, maxDescLen))
 				}
 			}
 

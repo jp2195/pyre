@@ -96,6 +96,9 @@ type ErrorMsg struct {
 	Err error
 }
 
+// ErrorDismissMsg is sent after a timeout to clear the error from the footer
+type ErrorDismissMsg struct{}
+
 type ManagedDevicesMsg struct {
 	Devices []models.ManagedDevice
 	Err     error

@@ -19,6 +19,7 @@ type NATRule struct {
 	Disabled    bool
 	Description string
 	Tags        []string
+	RuleBase    RuleBase // pre, local, post - indicates rule origin
 
 	// Match criteria
 	SourceZones   []string

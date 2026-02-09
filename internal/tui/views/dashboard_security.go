@@ -343,16 +343,18 @@ func (m SecurityDashboardModel) renderMostHitRules(width int) string {
 	// Show top rules with hits
 	maxShow := 8
 	shown := 0
+	totalWithHits := 0
 	nameWidth := width - 20
 	if nameWidth > 25 {
 		nameWidth = 25
 	}
 
 	for _, rule := range sorted {
-		if shown >= maxShow {
-			break
-		}
 		if rule.HitCount == 0 {
+			continue
+		}
+		totalWithHits++
+		if shown >= maxShow {
 			continue
 		}
 
@@ -379,5 +381,10 @@ func (m SecurityDashboardModel) renderMostHitRules(width int) string {
 		b.WriteString(dimStyle().Render("No rules have been hit"))
 	}
 
-	return panelStyle().Width(width).Render(strings.TrimSuffix(b.String(), "\n"))
+	result := strings.TrimSuffix(b.String(), "\n")
+	if totalWithHits > maxShow {
+		result += "\n" + dimStyle().Render(fmt.Sprintf("... and %d more rules", totalWithHits-maxShow))
+	}
+
+	return panelStyle().Width(width).Render(result)
 }

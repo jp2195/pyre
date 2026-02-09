@@ -151,7 +151,7 @@ func (m LoginModel) ClearPassword() LoginModel {
 }
 
 func (m LoginModel) CanSubmit() bool {
-	return m.Host() != "" && m.Username() != "" && m.Password() != ""
+	return m.Host() != "" && validateHost(m.Host()) == "" && m.Username() != "" && m.Password() != ""
 }
 
 func (m LoginModel) Update(msg tea.Msg) (LoginModel, tea.Cmd) {
@@ -191,6 +191,10 @@ func (m LoginModel) View() string {
 		b.WriteString(focusedInputStyle.Render(m.hostInput.View()))
 	} else {
 		b.WriteString(inputStyle.Render(m.hostInput.View()))
+	}
+	if hostErr := validateHost(m.Host()); hostErr != "" {
+		b.WriteString("\n")
+		b.WriteString(errorStyle.Render(hostErr))
 	}
 	b.WriteString("\n")
 

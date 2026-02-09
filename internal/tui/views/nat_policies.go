@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -71,6 +70,7 @@ func (m *NATPoliciesModel) applyFilter() {
 		for _, r := range m.rules {
 			if strings.Contains(strings.ToLower(r.Name), query) ||
 				strings.Contains(strings.ToLower(r.Description), query) ||
+				strings.Contains(strings.ToLower(string(r.RuleBase)), query) ||
 				containsAny(r.Tags, query) ||
 				containsAny(r.SourceZones, query) ||
 				containsAny(r.DestZones, query) ||
@@ -112,9 +112,9 @@ func (m *NATPoliciesModel) cycleSort() {
 }
 
 func (m NATPoliciesModel) sortLabel() string {
-	dir := "down"
+	dir := "↓"
 	if m.SortAsc {
-		dir = "up"
+		dir = "↑"
 	}
 	switch m.sortBy {
 	case NATSortName:
@@ -285,19 +285,25 @@ func (m NATPoliciesModel) renderTable() string {
 }
 
 func (m NATPoliciesModel) formatHeaderRow(width int) string {
-	if width >= 140 {
-		return fmt.Sprintf("%-4s %-20s %-16s %-16s %-18s %-18s %-10s %-10s",
-			"#", "Name", "Src Zone", "Dst Zone", "Src NAT", "Dst NAT", "Hits", "Last Hit")
-	} else if width >= 110 {
-		return fmt.Sprintf("%-4s %-18s %-14s %-14s %-16s %-16s %-10s",
-			"#", "Name", "Zones", "Service", "Src NAT", "Dst NAT", "Hits")
+	if width >= 150 {
+		return fmt.Sprintf("%-4s %-5s %-20s %-16s %-16s %-18s %-18s %-10s %-10s",
+			"#", "Base", "Name", "Src Zone", "Dst Zone", "Src NAT", "Dst NAT", "Hits", "Last Hit")
+	} else if width >= 120 {
+		return fmt.Sprintf("%-4s %-5s %-18s %-14s %-14s %-16s %-16s %-10s",
+			"#", "Base", "Name", "Zones", "Service", "Src NAT", "Dst NAT", "Hits")
+	} else if width >= 100 {
+		return fmt.Sprintf("%-4s %-5s %-14s %-12s %-14s %-14s %-8s",
+			"#", "Base", "Name", "Zones", "Src NAT", "Dst NAT", "Hits")
 	} else {
-		return fmt.Sprintf("%-4s %-14s %-12s %-14s %-14s %-8s",
-			"#", "Name", "Zones", "Src NAT", "Dst NAT", "Hits")
+		return fmt.Sprintf("%-4s %-14s %-12s %-14s %-8s",
+			"#", "Name", "Zones", "Src NAT", "Hits")
 	}
 }
 
 func (m NATPoliciesModel) formatRuleRow(r models.NATRule, width int, dimStyle lipgloss.Style) string {
+	// Format rulebase indicator
+	base := formatRuleBase(r.RuleBase)
+
 	// Format zones
 	srcZone := formatZoneCompact(r.SourceZones)
 	dstZone := formatZoneCompact(r.DestZones)
@@ -319,7 +325,7 @@ func (m NATPoliciesModel) formatRuleRow(r models.NATRule, width int, dimStyle li
 	hits := formatHitCount(r.HitCount)
 
 	// Format last hit
-	lastHit := formatNATLastHit(r.LastHit)
+	lastHit := formatLastHit(r.LastHit)
 
 	// Format name with tags indicator
 	name := r.Name
@@ -327,22 +333,27 @@ func (m NATPoliciesModel) formatRuleRow(r models.NATRule, width int, dimStyle li
 		name = name + " *"
 	}
 
-	if width >= 140 {
-		return fmt.Sprintf("%-4d %-20s %-16s %-16s %-18s %-18s %-10s %-10s",
-			r.Position, truncateEllipsis(name, 20),
+	if width >= 150 {
+		return fmt.Sprintf("%-4d %-5s %-20s %-16s %-16s %-18s %-18s %-10s %-10s",
+			r.Position, base, truncateEllipsis(name, 20),
 			truncateEllipsis(srcZone, 16), truncateEllipsis(dstZone, 16),
 			truncateEllipsis(srcNAT, 18), truncateEllipsis(dstNAT, 18),
 			hits, lastHit)
-	} else if width >= 110 {
-		return fmt.Sprintf("%-4d %-18s %-14s %-14s %-16s %-16s %-10s",
-			r.Position, truncateEllipsis(name, 18),
+	} else if width >= 120 {
+		return fmt.Sprintf("%-4d %-5s %-18s %-14s %-14s %-16s %-16s %-10s",
+			r.Position, base, truncateEllipsis(name, 18),
 			truncateEllipsis(zones, 14), truncateEllipsis(service, 14),
 			truncateEllipsis(srcNAT, 16), truncateEllipsis(dstNAT, 16), hits)
-	} else {
-		return fmt.Sprintf("%-4d %-14s %-12s %-14s %-14s %-8s",
-			r.Position, truncateEllipsis(name, 14),
+	} else if width >= 100 {
+		return fmt.Sprintf("%-4d %-5s %-14s %-12s %-14s %-14s %-8s",
+			r.Position, base, truncateEllipsis(name, 14),
 			truncateEllipsis(zones, 12),
 			truncateEllipsis(srcNAT, 14), truncateEllipsis(dstNAT, 14), hits)
+	} else {
+		return fmt.Sprintf("%-4d %-14s %-12s %-14s %-8s",
+			r.Position, truncateEllipsis(name, 14),
+			truncateEllipsis(zones, 12),
+			truncateEllipsis(srcNAT, 14), hits)
 	}
 }
 
@@ -373,26 +384,6 @@ func formatDestNAT(r models.NATRule) string {
 	return result
 }
 
-func formatNATLastHit(t time.Time) string {
-	if t.IsZero() {
-		return "never"
-	}
-	d := time.Since(t)
-	if d < time.Minute {
-		return "just now"
-	}
-	if d < time.Hour {
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	}
-	if d < 24*time.Hour {
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	}
-	if d < 7*24*time.Hour {
-		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-	}
-	return t.Format("Jan 2")
-}
-
 func (m NATPoliciesModel) renderDetail(r models.NATRule) string {
 	c := theme.Colors()
 	boxStyle := ViewPanelStyle.
@@ -414,6 +405,11 @@ func (m NATPoliciesModel) renderDetail(r models.NATRule) string {
 		title += dimValueStyle.Render(" (disabled)")
 	}
 	b.WriteString(titleStyle.Render(title))
+	b.WriteString("\n")
+
+	// Rule metadata (position and rulebase)
+	ruleInfo := fmt.Sprintf("Position: %d | %s", r.Position, formatRuleBaseFull(r.RuleBase))
+	b.WriteString(dimValueStyle.Render(ruleInfo))
 	b.WriteString("\n")
 
 	// Tags

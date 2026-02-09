@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/xml"
+	"log"
 
 	"github.com/jp2195/pyre/internal/models"
 )
@@ -35,7 +36,7 @@ func (c *Client) GetHAStatus(ctx context.Context) (*models.HAStatus, error) {
 		} `xml:"group"`
 	}
 	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
-		// Return disabled HA if parsing fails
+		log.Printf("[API Warning] failed to parse HA status XML: %v", err)
 		return &models.HAStatus{Enabled: false}, nil
 	}
 

@@ -87,7 +87,7 @@ func (m Model) currentViewName() string {
 		case views.DashboardVPN:
 			return "Monitor/VPN"
 		case views.DashboardConfig:
-			return "Monitor/Config"
+			return "Tools/Config"
 		default:
 			return "Monitor/Overview"
 		}
@@ -98,7 +98,13 @@ func (m Model) currentViewName() string {
 	case ViewSessions:
 		return "Analyze/Sessions"
 	case ViewInterfaces:
-		return "Tools/Interfaces"
+		return "Analyze/Interfaces"
+	case ViewRoutes:
+		return "Analyze/Routes"
+	case ViewIPSecTunnels:
+		return "Analyze/IPSec"
+	case ViewGPUsers:
+		return "Analyze/GP Users"
 	case ViewLogs:
 		return "Analyze/Logs"
 	case ViewPicker:
@@ -117,33 +123,44 @@ func (m Model) renderFooter() string {
 		return FooterStyle.Render(m.spinner.View() + " Loading...")
 	}
 
+	var sections []string
+
+	// Show error if set
+	if m.err != nil {
+		errLine := ErrorStyle.Render("Error: " + m.err.Error())
+		sections = append(sections, errLine)
+	}
+
 	// Show navigation hint based on current state
 	// Get active group key for hint
 	group := m.navbar.ActiveGroup()
 	var navHint string
 	if group != nil {
-		navHint = HelpKeyStyle.Render("1-4") + HelpDescStyle.Render(" section") +
-			HelpKeyStyle.Render("  "+group.Key) + HelpDescStyle.Render(" cycle")
+		navHint = views.HelpKeyStyle.Render("1-3") + views.HelpDescStyle.Render(" section") +
+			views.HelpKeyStyle.Render("  "+group.Key) + views.HelpDescStyle.Render(" cycle")
 	} else {
-		navHint = HelpKeyStyle.Render("1-4") + HelpDescStyle.Render(" section")
+		navHint = views.HelpKeyStyle.Render("1-3") + views.HelpDescStyle.Render(" section")
 	}
 
 	// Show devices hint for Panorama connections
 	var devicesHint string
 	conn := m.session.GetActiveConnection()
 	if conn != nil && conn.IsPanorama {
-		devicesHint = HelpKeyStyle.Render("  d") + HelpDescStyle.Render(" devices")
+		devicesHint = views.HelpKeyStyle.Render("  d") + views.HelpDescStyle.Render(" devices")
 	}
 
 	help := navHint +
 		devicesHint +
-		HelpKeyStyle.Render("  Tab/S-Tab") + HelpDescStyle.Render(" next/prev") +
-		HelpKeyStyle.Render("  r") + HelpDescStyle.Render(" refresh") +
-		HelpKeyStyle.Render("  Ctrl+P") + HelpDescStyle.Render(" search") +
-		HelpKeyStyle.Render("  ?") + HelpDescStyle.Render(" help") +
-		HelpKeyStyle.Render("  q") + HelpDescStyle.Render(" quit")
+		views.HelpKeyStyle.Render("  Tab/S-Tab") + views.HelpDescStyle.Render(" next/prev") +
+		views.HelpKeyStyle.Render("  r") + views.HelpDescStyle.Render(" refresh") +
+		views.HelpKeyStyle.Render("  :") + views.HelpDescStyle.Render(" conn") +
+		views.HelpKeyStyle.Render("  Ctrl+P") + views.HelpDescStyle.Render(" commands") +
+		views.HelpKeyStyle.Render("  ?") + views.HelpDescStyle.Render(" help") +
+		views.HelpKeyStyle.Render("  q") + views.HelpDescStyle.Render(" quit")
 
-	return FooterStyle.Render(help)
+	sections = append(sections, FooterStyle.Render(help))
+
+	return strings.Join(sections, "\n")
 }
 
 func (m Model) renderHelp() string {

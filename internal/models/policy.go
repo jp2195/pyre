@@ -11,6 +11,15 @@ const (
 	RuleTypeInterzone RuleType = "interzone"
 )
 
+// RuleBase indicates which rulebase a rule belongs to
+type RuleBase string
+
+const (
+	RuleBasePre   RuleBase = "pre"
+	RuleBaseLocal RuleBase = "local"
+	RuleBasePost  RuleBase = "post"
+)
+
 type SecurityRule struct {
 	Name        string
 	Position    int
@@ -18,6 +27,7 @@ type SecurityRule struct {
 	Description string
 	Tags        []string
 	RuleType    RuleType // universal, intrazone, interzone
+	RuleBase    RuleBase // pre, local, post - indicates rule origin
 	Action      string   // allow, deny, drop, reset-client, reset-server, reset-both
 
 	// Source criteria

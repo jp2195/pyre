@@ -4,9 +4,17 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/jp2195/pyre/internal/models"
+)
+
+const (
+	// logPollMaxAttempts is the maximum number of poll attempts for log queries.
+	logPollMaxAttempts = 30
+	// logPollInterval is the delay between log query poll attempts.
+	logPollInterval = 500 * time.Millisecond
 )
 
 // parseLogTime parses various PAN-OS time formats
@@ -25,6 +33,7 @@ func parseLogTime(timeStr string) time.Time {
 			return t
 		}
 	}
+	log.Printf("[API Warning] failed to parse log time %q: no matching layout", timeStr)
 	return time.Time{}
 }
 
@@ -58,8 +67,8 @@ func (c *Client) GetSystemLogs(ctx context.Context, query string, maxLogs int) (
 
 	// Poll for results with timeout
 	var logs []models.SystemLogEntry
-	for i := 0; i < 30; i++ { // Max 30 attempts (15 seconds)
-		time.Sleep(500 * time.Millisecond)
+	for i := 0; i < logPollMaxAttempts; i++ {
+		time.Sleep(logPollInterval)
 
 		resultResp, err := c.LogGet(ctx, jobResult.Job)
 		if err != nil {
@@ -139,8 +148,8 @@ func (c *Client) GetTrafficLogs(ctx context.Context, query string, maxLogs int) 
 
 	// Poll for results
 	var logs []models.TrafficLogEntry
-	for i := 0; i < 30; i++ {
-		time.Sleep(500 * time.Millisecond)
+	for i := 0; i < logPollMaxAttempts; i++ {
+		time.Sleep(logPollInterval)
 
 		resultResp, err := c.LogGet(ctx, jobResult.Job)
 		if err != nil {
@@ -266,8 +275,8 @@ func (c *Client) GetThreatLogs(ctx context.Context, query string, maxLogs int) (
 
 	// Poll for results
 	var logs []models.ThreatLogEntry
-	for i := 0; i < 30; i++ {
-		time.Sleep(500 * time.Millisecond)
+	for i := 0; i < logPollMaxAttempts; i++ {
+		time.Sleep(logPollInterval)
 
 		resultResp, err := c.LogGet(ctx, jobResult.Job)
 		if err != nil {

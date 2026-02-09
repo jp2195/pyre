@@ -67,10 +67,12 @@ pyre uses these third-party libraries:
 - `github.com/charmbracelet/bubbletea` - TUI framework
 - `github.com/charmbracelet/bubbles` - TUI components
 - `github.com/charmbracelet/lipgloss` - Styling
-- `gopkg.in/yaml.v3` - YAML parsing
+- `go.yaml.in/yaml/v4` - YAML parsing
 
 We monitor dependencies for vulnerabilities and update promptly when issues are disclosed.
 
 ## Audit Logging
 
 pyre does not maintain its own audit logs. Firewall API calls are logged by PAN-OS according to your firewall's logging configuration. Review firewall logs to audit pyre usage.
+
+

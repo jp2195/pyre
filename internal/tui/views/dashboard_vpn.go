@@ -243,6 +243,9 @@ func (m VPNDashboardModel) renderIPSecTunnels(width int) string {
 		b.WriteString(dimStyle().Render(fmt.Sprintf("... and %d more", len(m.tunnels)-maxShow)))
 	}
 
+	b.WriteString("\n")
+	b.WriteString(dimStyle().Render("[Tab to IPSec view for details]"))
+
 	return panelStyle().Width(width).Render(b.String())
 }
 
@@ -347,6 +350,9 @@ func (m VPNDashboardModel) renderGlobalProtectUsers(width int) string {
 		b.WriteString("\n")
 		b.WriteString(dimStyle().Render(fmt.Sprintf("... and %d more", len(m.gpUsers)-maxShow)))
 	}
+
+	b.WriteString("\n")
+	b.WriteString(dimStyle().Render("[Tab to GP Users view for details]"))
 
 	return panelStyle().Width(width).Render(b.String())
 }
