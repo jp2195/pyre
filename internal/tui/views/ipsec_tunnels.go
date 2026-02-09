@@ -368,7 +368,7 @@ func (m IPSecTunnelsModel) renderDetail(t models.IPSecTunnel) string {
 
 	// Title with state indicator
 	title := t.Name
-	stateStyle := lipgloss.NewStyle()
+	var stateStyle lipgloss.Style
 	switch t.State {
 	case "up":
 		stateStyle = lipgloss.NewStyle().Foreground(c.Success).Bold(true)

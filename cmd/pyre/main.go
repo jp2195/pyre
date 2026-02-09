@@ -80,7 +80,7 @@ func main() {
 					fmt.Fprintf(os.Stderr, "Warning: could not enable debug logging: %v\n", err)
 					log.SetOutput(io.Discard)
 				} else {
-					defer f.Close()
+					defer f.Close() //nolint:errcheck // best-effort log file close
 					fmt.Fprintf(os.Stderr, "Debug logging: %s\n", logPath)
 				}
 			}
