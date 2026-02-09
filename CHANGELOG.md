@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0](https://github.com/jp2195/pyre/compare/v1.1.1...v1.2.0) (2026-02-09)
+
+
+### Features
+
+* **tui:** add IPSec Tunnels & GP Users views, UX improvements ([9a0198b](https://github.com/jp2195/pyre/commit/9a0198b952107f58bdca2e7777780c0af811c464))
+* **tui:** add IPSec Tunnels & GP Users views, UX improvements ([931cce5](https://github.com/jp2195/pyre/commit/931cce5c85c3b106ae0abb1cada59e0b93d31598))
+
+
+### Bug Fixes
+
+* **ci:** pin Go version to 1.25.7 across all workflows ([f2830a4](https://github.com/jp2195/pyre/commit/f2830a47cc1e52c05b5f02d56cdd48cd9ff7e865))
+* resolve lint errors and pin CI Go version to 1.25.7 ([66809e2](https://github.com/jp2195/pyre/commit/66809e2670f65a40e7598cdea32149632461c7e3))
+
 ## [1.1.1](https://github.com/jp2195/pyre/compare/v1.1.0...v1.1.1) (2026-02-03)
 
 
