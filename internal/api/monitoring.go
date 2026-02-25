@@ -93,6 +93,38 @@ func (c *Client) GetGlobalProtectInfo(ctx context.Context) (*models.GlobalProtec
 	return info, nil
 }
 
+// jobEntry is the shared XML structure for job entries across different PAN-OS response formats.
+type jobEntry struct {
+	ID        int    `xml:"id"`
+	Type      string `xml:"type"`
+	Status    string `xml:"status"`
+	Result    string `xml:"result"`
+	Progress  string `xml:"progress"`
+	Details   string `xml:"details>line"`
+	TEnq      string `xml:"tenq"` // Time enqueued
+	TDeq      string `xml:"tdeq"` // Time dequeued (started)
+	Tfin      string `xml:"tfin"` // Time finished
+	User      string `xml:"user"`
+	Stoppable string `xml:"stoppable"`
+}
+
+// parseJobTimestamp tries multiple time layouts to parse a PAN-OS job timestamp.
+func parseJobTimestamp(s string) time.Time {
+	if s == "" {
+		return time.Time{}
+	}
+	for _, layout := range []string{
+		"2006/01/02 15:04:05",
+		"2006-01-02 15:04:05",
+		"Mon Jan 2 15:04:05 2006",
+	} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t
+		}
+	}
+	return time.Time{}
+}
+
 func (c *Client) GetJobs(ctx context.Context) ([]models.Job, error) {
 	resp, err := c.Op(ctx, "<show><jobs><all></all></jobs></show>")
 	if err != nil {
@@ -106,71 +138,28 @@ func (c *Client) GetJobs(ctx context.Context) ([]models.Job, error) {
 		return []models.Job{}, nil
 	}
 
-	var result struct {
-		Entry []struct {
-			ID        int    `xml:"id"`
-			Type      string `xml:"type"`
-			Status    string `xml:"status"`
-			Result    string `xml:"result"`
-			Progress  string `xml:"progress"`
-			Details   string `xml:"details>line"`
-			TEnq      string `xml:"tenq"` // Time enqueued
-			TDeq      string `xml:"tdeq"` // Time dequeued (started)
-			Tfin      string `xml:"tfin"` // Time finished
-			User      string `xml:"user"`
-			Stoppable string `xml:"stoppable"`
-		} `xml:"job"`
+	var entries []jobEntry
+
+	// Try <job> wrapper first (most common)
+	var jobResult struct {
+		Entry []jobEntry `xml:"job"`
+	}
+	if xml.Unmarshal(WrapInner(resp.Result.Inner), &jobResult) == nil && len(jobResult.Entry) > 0 {
+		entries = jobResult.Entry
 	}
 
-	// Try multiple parsing approaches
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil || len(result.Entry) == 0 {
-		// Try alternate structure with entry wrapper
-		var alt struct {
-			Entry []struct {
-				ID       int    `xml:"id"`
-				Type     string `xml:"type"`
-				Status   string `xml:"status"`
-				Result   string `xml:"result"`
-				Progress string `xml:"progress"`
-				Details  string `xml:"details>line"`
-				TEnq     string `xml:"tenq"`
-				TDeq     string `xml:"tdeq"`
-				Tfin     string `xml:"tfin"`
-				User     string `xml:"user"`
-			} `xml:"entry"`
+	// Fall back to <entry> wrapper
+	if len(entries) == 0 {
+		var entryResult struct {
+			Entry []jobEntry `xml:"entry"`
 		}
-		if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &alt); err == nil {
-			for _, e := range alt.Entry {
-				result.Entry = append(result.Entry, struct {
-					ID        int    `xml:"id"`
-					Type      string `xml:"type"`
-					Status    string `xml:"status"`
-					Result    string `xml:"result"`
-					Progress  string `xml:"progress"`
-					Details   string `xml:"details>line"`
-					TEnq      string `xml:"tenq"`
-					TDeq      string `xml:"tdeq"`
-					Tfin      string `xml:"tfin"`
-					User      string `xml:"user"`
-					Stoppable string `xml:"stoppable"`
-				}{
-					ID:       e.ID,
-					Type:     e.Type,
-					Status:   e.Status,
-					Result:   e.Result,
-					Progress: e.Progress,
-					Details:  e.Details,
-					TEnq:     e.TEnq,
-					TDeq:     e.TDeq,
-					Tfin:     e.Tfin,
-					User:     e.User,
-				})
-			}
+		if xml.Unmarshal(WrapInner(resp.Result.Inner), &entryResult) == nil {
+			entries = entryResult.Entry
 		}
 	}
 
-	jobs := make([]models.Job, 0, len(result.Entry))
-	for _, e := range result.Entry {
+	jobs := make([]models.Job, 0, len(entries))
+	for _, e := range entries {
 		job := models.Job{
 			ID:      e.ID,
 			Type:    e.Type,
@@ -180,34 +169,12 @@ func (c *Client) GetJobs(ctx context.Context) ([]models.Job, error) {
 			User:    e.User,
 		}
 
-		// Parse progress - ignore error, zero value acceptable for non-numeric progress
 		if e.Progress != "" {
 			job.Progress, _ = strconv.Atoi(strings.TrimSuffix(e.Progress, "%")) //nolint:errcheck // intentional - default to 0 on parse error
 		}
 
-		// Parse timestamps - PAN-OS typically uses format like "2024/01/15 10:30:45"
-		timeLayouts := []string{
-			"2006/01/02 15:04:05",
-			"2006-01-02 15:04:05",
-			"Mon Jan 2 15:04:05 2006",
-		}
-
-		for _, layout := range timeLayouts {
-			if e.TDeq != "" {
-				if t, err := time.Parse(layout, e.TDeq); err == nil {
-					job.StartTime = t
-					break
-				}
-			}
-		}
-		for _, layout := range timeLayouts {
-			if e.Tfin != "" {
-				if t, err := time.Parse(layout, e.Tfin); err == nil {
-					job.EndTime = t
-					break
-				}
-			}
-		}
+		job.StartTime = parseJobTimestamp(e.TDeq)
+		job.EndTime = parseJobTimestamp(e.Tfin)
 
 		jobs = append(jobs, job)
 	}

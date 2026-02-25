@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/jp2195/pyre/internal/tui/theme"
@@ -205,23 +207,20 @@ func InitStyles() {
 }
 
 func RenderProgressBar(percent float64, width int) string {
-	filled := int(percent / 100 * float64(width))
-	if filled > width {
-		filled = width
-	}
+	filled := min(int(percent/100*float64(width)), width)
 	if filled < 0 {
 		filled = 0
 	}
 
-	bar := ""
-	for i := 0; i < width; i++ {
+	var bar strings.Builder
+	for i := range width {
 		if i < filled {
-			bar += ProgressBarStyle.Render("█")
+			bar.WriteString(ProgressBarStyle.Render("█"))
 		} else {
-			bar += ProgressBarBgStyle.Render("░")
+			bar.WriteString(ProgressBarBgStyle.Render("░"))
 		}
 	}
-	return bar
+	return bar.String()
 }
 
 func StatusStyle(up bool) lipgloss.Style {

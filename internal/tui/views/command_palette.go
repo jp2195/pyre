@@ -183,10 +183,7 @@ func (m CommandPaletteModel) Update(msg tea.Msg) (CommandPaletteModel, tea.Cmd) 
 			return m, nil
 
 		case "pgdown":
-			m.cursor = min(len(m.filtered)-1, m.cursor+10)
-			if m.cursor < 0 {
-				m.cursor = 0
-			}
+			m.cursor = max(min(len(m.filtered)-1, m.cursor+10), 0)
 			return m, nil
 		}
 	}
@@ -211,27 +208,12 @@ func (m CommandPaletteModel) View() string {
 		return "Loading..."
 	}
 
-	// Styles
-	categoryStyle := DetailDimStyle.Bold(true).MarginTop(1)
-	itemStyle := TableRowNormalStyle
-	shortcutStyle := DetailLabelStyle
-	descStyle := DetailDimStyle
-
-	// Calculate modal width
-	const commandPaletteMinWidth = 30
-	modalWidth := 60
-	if m.width < modalWidth+4 {
-		modalWidth = m.width - 4
-	}
-	if modalWidth < commandPaletteMinWidth {
-		modalWidth = commandPaletteMinWidth
-	}
-	if m.width < commandPaletteMinWidth+4 {
+	modalWidth := m.modalWidth()
+	if modalWidth < 0 {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
 			"Terminal too narrow for command palette")
 	}
 
-	// Build content
 	var b strings.Builder
 
 	// Input field
@@ -239,46 +221,74 @@ func (m CommandPaletteModel) View() string {
 	b.WriteString(ModalInputStyle.Render(m.textInput.View()))
 	b.WriteString("\n")
 
-	// Group commands by category
+	// Command list
+	m.renderCommandList(&b, modalWidth)
+
+	// Help text
+	helpText := "Up/Down navigate  Enter select  Esc close  Type to filter"
+	b.WriteString(ModalHelpStyle.Width(modalWidth - 4).Render(helpText))
+
+	// Wrap in modal and center
+	modal := ModalStyle.Width(modalWidth).Render(b.String())
+	c := theme.Colors()
+	return lipgloss.Place(
+		m.width, m.height,
+		lipgloss.Center, lipgloss.Center,
+		modal,
+		lipgloss.WithWhitespaceChars(" "),
+		lipgloss.WithWhitespaceForeground(c.Overlay),
+	)
+}
+
+// modalWidth calculates the modal width, returning -1 if the terminal is too narrow.
+func (m CommandPaletteModel) modalWidth() int {
+	const minWidth = 30
+	modalWidth := 60
+	if m.width < modalWidth+4 {
+		modalWidth = m.width - 4
+	}
+	if modalWidth < minWidth {
+		modalWidth = minWidth
+	}
+	if m.width < minWidth+4 {
+		return -1
+	}
+	return modalWidth
+}
+
+// renderCommandList renders the categorized, scrollable command list.
+func (m CommandPaletteModel) renderCommandList(b *strings.Builder, modalWidth int) {
+	categoryStyle := DetailDimStyle.Bold(true).MarginTop(1)
+	itemStyle := TableRowNormalStyle
+	shortcutStyle := DetailLabelStyle
+	descStyle := DetailDimStyle
+
 	categoryOrder := []string{"Monitor", "Analyze", "Tools", "Connections", "Actions", "System"}
 	commandsByCategory := make(map[string][]Command)
 	for _, cmd := range m.filtered {
 		commandsByCategory[cmd.Category] = append(commandsByCategory[cmd.Category], cmd)
 	}
 
-	// Calculate visible area (reserve space for input, help, borders)
-	maxVisible := m.height - 12
-	if maxVisible < 5 {
-		maxVisible = 5
-	}
-
-	// Track current index for cursor highlighting
+	maxVisible := max(m.height-12, 5)
 	currentIdx := 0
 	visibleCount := 0
 
-	// Calculate scroll offset
 	scrollOffset := 0
 	if m.cursor >= maxVisible {
 		scrollOffset = m.cursor - maxVisible + 1
 	}
 
-	// Render categories and items
 	for _, cat := range categoryOrder {
 		commands, ok := commandsByCategory[cat]
 		if !ok || len(commands) == 0 {
 			continue
 		}
 
-		// Calculate if this category header should be visible
-		categoryStartIdx := currentIdx
-
-		// Skip items before scroll offset
 		if currentIdx+len(commands) <= scrollOffset {
 			currentIdx += len(commands)
 			continue
 		}
 
-		// Only show category header if at least one item is visible
 		if visibleCount < maxVisible && currentIdx >= scrollOffset {
 			b.WriteString(categoryStyle.Render("  " + cat))
 			b.WriteString("\n")
@@ -289,50 +299,37 @@ func (m CommandPaletteModel) View() string {
 				currentIdx++
 				continue
 			}
-
 			if visibleCount >= maxVisible {
 				currentIdx++
 				continue
 			}
 
-			// Build item line
 			indicator := "  "
 			style := itemStyle
-
 			if currentIdx == m.cursor {
 				indicator = "> "
 				style = ModalSelectedStyle
 			}
 
-			// Shortcut display
 			shortcut := ""
 			if cmd.Shortcut != "" {
 				shortcut = shortcutStyle.Render("[" + cmd.Shortcut + "] ")
 			}
 
-			// Label and description
-			label := cmd.Label
 			desc := ""
 			if cmd.Description != "" {
-				// Truncate description to fit
-				maxDescLen := modalWidth - len(label) - len(shortcut) - 10
-				if maxDescLen > 0 && len(cmd.Description) > 0 {
+				maxDescLen := modalWidth - len(cmd.Label) - len(shortcut) - 10
+				if maxDescLen > 0 {
 					desc = descStyle.Render("  " + truncateEllipsis(cmd.Description, maxDescLen))
 				}
 			}
 
-			line := indicator + shortcut + style.Render(label) + desc
-			b.WriteString(line + "\n")
-
+			b.WriteString(indicator + shortcut + style.Render(cmd.Label) + desc + "\n")
 			visibleCount++
 			currentIdx++
 		}
-
-		// Don't show category header if we started after scroll offset
-		_ = categoryStartIdx
 	}
 
-	// Show scroll indicator if needed
 	if len(m.filtered) > maxVisible {
 		scrollInfo := StatusMutedStyle.
 			Align(lipgloss.Right).
@@ -341,26 +338,6 @@ func (m CommandPaletteModel) View() string {
 				"(" + itoa(m.cursor+1) + "/" + itoa(len(m.filtered)) + ")")
 		b.WriteString(scrollInfo + "\n")
 	}
-
-	// Help text
-	helpText := "Up/Down navigate  Enter select  Esc close  Type to filter"
-	b.WriteString(ModalHelpStyle.Width(modalWidth - 4).Render(helpText))
-
-	// Wrap in modal
-	content := b.String()
-	modal := ModalStyle.Width(modalWidth).Render(content)
-
-	// Center in terminal
-	c := theme.Colors()
-	return lipgloss.Place(
-		m.width,
-		m.height,
-		lipgloss.Center,
-		lipgloss.Center,
-		modal,
-		lipgloss.WithWhitespaceChars(" "),
-		lipgloss.WithWhitespaceForeground(c.Overlay),
-	)
 }
 
 // Helper function to convert int to string without importing strconv

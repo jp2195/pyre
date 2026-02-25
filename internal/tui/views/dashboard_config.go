@@ -13,15 +13,13 @@ import (
 
 // ConfigDashboardModel represents the configuration-focused dashboard
 type ConfigDashboardModel struct {
+	DashboardBase
+
 	policies       []models.SecurityRule
 	pendingChanges []models.PendingChange
 
 	policyErr  error
 	changesErr error
-
-	width        int
-	height       int
-	SpinnerFrame string
 }
 
 // NewConfigDashboardModel creates a new config dashboard model
@@ -37,8 +35,8 @@ func (m ConfigDashboardModel) SetSpinnerFrame(frame string) ConfigDashboardModel
 
 // SetSize sets the terminal dimensions
 func (m ConfigDashboardModel) SetSize(width, height int) ConfigDashboardModel {
-	m.width = width
-	m.height = height
+	m.Width = width
+	m.Height = height
 	return m
 }
 
@@ -68,15 +66,13 @@ func (m ConfigDashboardModel) HasData() bool {
 
 // View renders the config dashboard
 func (m ConfigDashboardModel) View() string {
-	if m.width == 0 {
+	if m.Width == 0 {
 		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
-	totalWidth := m.width - 4
-	leftColWidth := totalWidth / 2
-	rightColWidth := totalWidth - leftColWidth - 2
+	totalWidth, leftColWidth, rightColWidth := m.ColumnWidths()
 
-	if leftColWidth < 35 {
+	if m.IsNarrow() {
 		return m.renderSingleColumn(totalWidth)
 	}
 
@@ -85,26 +81,23 @@ func (m ConfigDashboardModel) View() string {
 		m.renderPolicyStats(leftColWidth),
 		m.renderPendingChanges(leftColWidth),
 	}
-	leftCol := lipgloss.JoinVertical(lipgloss.Left, leftPanels...)
 
 	// Right column: rule analysis
 	rightPanels := []string{
 		m.renderZeroHitRules(rightColWidth),
 		m.renderMostHitRules(rightColWidth),
 	}
-	rightCol := lipgloss.JoinVertical(lipgloss.Left, rightPanels...)
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, leftCol, "  ", rightCol)
+	return m.RenderTwoColumn(leftPanels, rightPanels)
 }
 
 func (m ConfigDashboardModel) renderSingleColumn(width int) string {
-	panels := []string{
+	return m.RenderSingleColumn([]string{
 		m.renderPolicyStats(width),
 		m.renderPendingChanges(width),
 		m.renderZeroHitRules(width),
 		m.renderMostHitRules(width),
-	}
-	return lipgloss.JoinVertical(lipgloss.Left, panels...)
+	})
 }
 
 func (m ConfigDashboardModel) renderPolicyStats(width int) string {
@@ -229,10 +222,7 @@ func (m ConfigDashboardModel) renderPendingChanges(width int) string {
 	}
 
 	// Show recent changes
-	maxShow := 4
-	if len(m.pendingChanges) < maxShow {
-		maxShow = len(m.pendingChanges)
-	}
+	maxShow := min(len(m.pendingChanges), 4)
 
 	if maxShow > 0 {
 		b.WriteString("\n")
@@ -310,15 +300,9 @@ func (m ConfigDashboardModel) renderZeroHitRules(width int) string {
 	b.WriteString("\n\n")
 
 	// List rules
-	maxShow := 8
-	if len(zeroHitRules) < maxShow {
-		maxShow = len(zeroHitRules)
-	}
+	maxShow := min(len(zeroHitRules), 8)
 
-	nameWidth := width - 15
-	if nameWidth > 30 {
-		nameWidth = 30
-	}
+	nameWidth := min(width-15, 30)
 
 	for i := 0; i < maxShow; i++ {
 		rule := zeroHitRules[i]
@@ -380,10 +364,7 @@ func (m ConfigDashboardModel) renderMostHitRules(width int) string {
 	maxShow := 10
 	shown := 0
 	totalWithHits := 0
-	nameWidth := width - 20
-	if nameWidth > 25 {
-		nameWidth = 25
-	}
+	nameWidth := min(width-20, 25)
 
 	for _, rule := range sorted {
 		if rule.HitCount == 0 {

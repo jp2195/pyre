@@ -14,15 +14,13 @@ import (
 
 // SecurityDashboardModel represents the security-focused dashboard
 type SecurityDashboardModel struct {
+	DashboardBase
+
 	threatSummary *models.ThreatSummary
 	policies      []models.SecurityRule
 
 	threatErr error
 	policyErr error
-
-	width        int
-	height       int
-	SpinnerFrame string
 }
 
 // NewSecurityDashboardModel creates a new security dashboard model
@@ -38,8 +36,8 @@ func (m SecurityDashboardModel) SetSpinnerFrame(frame string) SecurityDashboardM
 
 // SetSize sets the terminal dimensions
 func (m SecurityDashboardModel) SetSize(width, height int) SecurityDashboardModel {
-	m.width = width
-	m.height = height
+	m.Width = width
+	m.Height = height
 	return m
 }
 
@@ -69,15 +67,13 @@ func (m SecurityDashboardModel) HasData() bool {
 
 // View renders the security dashboard
 func (m SecurityDashboardModel) View() string {
-	if m.width == 0 {
+	if m.Width == 0 {
 		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
-	totalWidth := m.width - 4
-	leftColWidth := totalWidth / 2
-	rightColWidth := totalWidth - leftColWidth - 2
+	totalWidth, leftColWidth, rightColWidth := m.ColumnWidths()
 
-	if leftColWidth < 35 {
+	if m.IsNarrow() {
 		return m.renderSingleColumn(totalWidth)
 	}
 
@@ -86,26 +82,23 @@ func (m SecurityDashboardModel) View() string {
 		m.renderThreatBreakdown(leftColWidth),
 		m.renderThreatSeverity(leftColWidth),
 	}
-	leftCol := lipgloss.JoinVertical(lipgloss.Left, leftPanels...)
 
 	// Right column: policy analysis
 	rightPanels := []string{
 		m.renderZeroHitRules(rightColWidth),
 		m.renderMostHitRules(rightColWidth),
 	}
-	rightCol := lipgloss.JoinVertical(lipgloss.Left, rightPanels...)
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, leftCol, "  ", rightCol)
+	return m.RenderTwoColumn(leftPanels, rightPanels)
 }
 
 func (m SecurityDashboardModel) renderSingleColumn(width int) string {
-	panels := []string{
+	return m.RenderSingleColumn([]string{
 		m.renderThreatBreakdown(width),
 		m.renderThreatSeverity(width),
 		m.renderZeroHitRules(width),
 		m.renderMostHitRules(width),
-	}
-	return lipgloss.JoinVertical(lipgloss.Left, panels...)
+	})
 }
 
 func (m SecurityDashboardModel) renderThreatBreakdown(width int) string {
@@ -140,10 +133,7 @@ func (m SecurityDashboardModel) renderThreatBreakdown(width int) string {
 	b.WriteString(subtitleStyle().Render("Actions:"))
 	b.WriteString("\n")
 
-	barWidth := width - 20
-	if barWidth < 10 {
-		barWidth = 10
-	}
+	barWidth := max(width-20, 10)
 
 	c := theme.Colors()
 
@@ -190,10 +180,7 @@ func (m SecurityDashboardModel) renderThreatSeverity(width int) string {
 	mediumStyle := SeverityMediumStyle
 	lowStyle := SeverityLowStyle
 
-	barWidth := width - 20
-	if barWidth < 10 {
-		barWidth = 10
-	}
+	barWidth := max(width-20, 10)
 
 	// Critical
 	if ts.CriticalCount > 0 {
@@ -274,15 +261,9 @@ func (m SecurityDashboardModel) renderZeroHitRules(width int) string {
 	b.WriteString("\n\n")
 
 	// List first few zero-hit rules
-	maxShow := 6
-	if len(zeroHitRules) < maxShow {
-		maxShow = len(zeroHitRules)
-	}
+	maxShow := min(len(zeroHitRules), 6)
 
-	nameWidth := width - 12
-	if nameWidth > 30 {
-		nameWidth = 30
-	}
+	nameWidth := min(width-12, 30)
 
 	for i := 0; i < maxShow; i++ {
 		rule := zeroHitRules[i]
@@ -344,10 +325,7 @@ func (m SecurityDashboardModel) renderMostHitRules(width int) string {
 	maxShow := 8
 	shown := 0
 	totalWithHits := 0
-	nameWidth := width - 20
-	if nameWidth > 25 {
-		nameWidth = 25
-	}
+	nameWidth := min(width-20, 25)
 
 	for _, rule := range sorted {
 		if rule.HitCount == 0 {

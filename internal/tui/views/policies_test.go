@@ -13,11 +13,14 @@ import (
 func TestNewPoliciesModel(t *testing.T) {
 	m := NewPoliciesModel()
 
-	if m.Cursor != 0 {
-		t.Errorf("expected Cursor=0, got %d", m.Cursor)
+	if m.list.Cursor != 0 {
+		t.Errorf("expected Cursor=0, got %d", m.list.Cursor)
 	}
-	if m.sortBy != PolicySortPosition {
-		t.Errorf("expected default sort by Position, got %d", m.sortBy)
+	if !m.HasData() == true {
+		// HasData should be false for a new model
+	}
+	if m.HasData() {
+		t.Error("expected HasData=false for new model")
 	}
 }
 
@@ -25,11 +28,11 @@ func TestPoliciesModel_SetSize(t *testing.T) {
 	m := NewPoliciesModel()
 	m = m.SetSize(100, 50)
 
-	if m.Width != 100 {
-		t.Errorf("expected Width=100, got %d", m.Width)
+	if m.list.Width != 100 {
+		t.Errorf("expected Width=100, got %d", m.list.Width)
 	}
-	if m.Height != 50 {
-		t.Errorf("expected Height=50, got %d", m.Height)
+	if m.list.Height != 50 {
+		t.Errorf("expected Height=50, got %d", m.list.Height)
 	}
 }
 
@@ -37,12 +40,12 @@ func TestPoliciesModel_SetLoading(t *testing.T) {
 	m := NewPoliciesModel()
 
 	m = m.SetLoading(true)
-	if !m.Loading {
+	if !m.list.Loading {
 		t.Error("expected Loading=true")
 	}
 
 	m = m.SetLoading(false)
-	if m.Loading {
+	if m.list.Loading {
 		t.Error("expected Loading=false")
 	}
 }
@@ -57,13 +60,13 @@ func TestPoliciesModel_SetPolicies(t *testing.T) {
 
 	m = m.SetPolicies(policies, nil)
 
-	if len(m.policies) != 2 {
-		t.Errorf("expected 2 policies, got %d", len(m.policies))
+	if len(m.list.Items()) != 2 {
+		t.Errorf("expected 2 policies, got %d", len(m.list.Items()))
 	}
-	if m.Loading {
+	if m.list.Loading {
 		t.Error("expected Loading=false after SetPolicies")
 	}
-	if m.Cursor != 0 {
+	if m.list.Cursor != 0 {
 		t.Error("expected Cursor to reset to 0")
 	}
 }
@@ -74,7 +77,7 @@ func TestPoliciesModel_SetPolicies_WithError(t *testing.T) {
 	err := errors.New("API error")
 	m = m.SetPolicies(nil, err)
 
-	if m.Err != err {
+	if m.list.Err != err {
 		t.Error("expected error to be set")
 	}
 }
@@ -92,32 +95,32 @@ func TestPoliciesModel_Filtering(t *testing.T) {
 	m = m.SetPolicies(policies, nil)
 
 	// Initially all policies should be visible
-	if len(m.filtered) != 3 {
-		t.Errorf("expected 3 filtered policies, got %d", len(m.filtered))
+	if len(m.list.Filtered()) != 3 {
+		t.Errorf("expected 3 filtered policies, got %d", len(m.list.Filtered()))
 	}
 
 	// Filter by name
-	m.Filter.SetValue("Allow")
-	m.applyFilter()
+	m.list.Filter.SetValue("Allow")
+	m.list.applyFilter()
 
-	if len(m.filtered) != 2 {
-		t.Errorf("expected 2 filtered policies for 'Allow', got %d", len(m.filtered))
+	if len(m.list.Filtered()) != 2 {
+		t.Errorf("expected 2 filtered policies for 'Allow', got %d", len(m.list.Filtered()))
 	}
 
 	// Filter by application
-	m.Filter.SetValue("ssh")
-	m.applyFilter()
+	m.list.Filter.SetValue("ssh")
+	m.list.applyFilter()
 
-	if len(m.filtered) != 1 {
-		t.Errorf("expected 1 filtered policy for 'ssh', got %d", len(m.filtered))
+	if len(m.list.Filtered()) != 1 {
+		t.Errorf("expected 1 filtered policy for 'ssh', got %d", len(m.list.Filtered()))
 	}
 
 	// Clear filter
-	m.Filter.SetValue("")
-	m.applyFilter()
+	m.list.Filter.SetValue("")
+	m.list.applyFilter()
 
-	if len(m.filtered) != 3 {
-		t.Errorf("expected 3 filtered policies after clear, got %d", len(m.filtered))
+	if len(m.list.Filtered()) != 3 {
+		t.Errorf("expected 3 filtered policies after clear, got %d", len(m.list.Filtered()))
 	}
 }
 
@@ -133,19 +136,19 @@ func TestPoliciesModel_Filtering_ByZone(t *testing.T) {
 	m = m.SetPolicies(policies, nil)
 
 	// Filter by source zone
-	m.Filter.SetValue("trust")
-	m.applyFilter()
+	m.list.Filter.SetValue("trust")
+	m.list.applyFilter()
 
-	if len(m.filtered) != 1 {
-		t.Errorf("expected 1 filtered policy for 'trust', got %d", len(m.filtered))
+	if len(m.list.Filtered()) != 1 {
+		t.Errorf("expected 1 filtered policy for 'trust', got %d", len(m.list.Filtered()))
 	}
 
 	// Filter by destination zone
-	m.Filter.SetValue("internal")
-	m.applyFilter()
+	m.list.Filter.SetValue("internal")
+	m.list.applyFilter()
 
-	if len(m.filtered) != 1 {
-		t.Errorf("expected 1 filtered policy for 'internal', got %d", len(m.filtered))
+	if len(m.list.Filtered()) != 1 {
+		t.Errorf("expected 1 filtered policy for 'internal', got %d", len(m.list.Filtered()))
 	}
 }
 
@@ -162,14 +165,14 @@ func TestPoliciesModel_Update_Navigation(t *testing.T) {
 
 	// Move down
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	if m.Cursor != 1 {
-		t.Errorf("expected Cursor=1 after j, got %d", m.Cursor)
+	if m.list.Cursor != 1 {
+		t.Errorf("expected Cursor=1 after j, got %d", m.list.Cursor)
 	}
 
 	// Move up
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
-	if m.Cursor != 0 {
-		t.Errorf("expected Cursor=0 after k, got %d", m.Cursor)
+	if m.list.Cursor != 0 {
+		t.Errorf("expected Cursor=0 after k, got %d", m.list.Cursor)
 	}
 }
 
@@ -202,20 +205,5 @@ func TestPoliciesModel_View_ZeroWidth(t *testing.T) {
 	view := m.View()
 	if !strings.Contains(view, "Loading...") {
 		t.Errorf("expected view to contain 'Loading...' with zero width, got %q", view)
-	}
-}
-
-func TestPolicySortField_Constants(t *testing.T) {
-	if PolicySortPosition != 0 {
-		t.Errorf("expected PolicySortPosition=0, got %d", PolicySortPosition)
-	}
-	if PolicySortName != 1 {
-		t.Errorf("expected PolicySortName=1, got %d", PolicySortName)
-	}
-	if PolicySortHits != 2 {
-		t.Errorf("expected PolicySortHits=2, got %d", PolicySortHits)
-	}
-	if PolicySortLastHit != 3 {
-		t.Errorf("expected PolicySortLastHit=3, got %d", PolicySortLastHit)
 	}
 }

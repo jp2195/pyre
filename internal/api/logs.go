@@ -67,8 +67,12 @@ func (c *Client) GetSystemLogs(ctx context.Context, query string, maxLogs int) (
 
 	// Poll for results with timeout
 	var logs []models.SystemLogEntry
-	for i := 0; i < logPollMaxAttempts; i++ {
-		time.Sleep(logPollInterval)
+	for range logPollMaxAttempts {
+		select {
+		case <-time.After(logPollInterval):
+		case <-ctx.Done():
+			return logs, ctx.Err()
+		}
 
 		resultResp, err := c.LogGet(ctx, jobResult.Job)
 		if err != nil {
@@ -148,8 +152,12 @@ func (c *Client) GetTrafficLogs(ctx context.Context, query string, maxLogs int) 
 
 	// Poll for results
 	var logs []models.TrafficLogEntry
-	for i := 0; i < logPollMaxAttempts; i++ {
-		time.Sleep(logPollInterval)
+	for range logPollMaxAttempts {
+		select {
+		case <-time.After(logPollInterval):
+		case <-ctx.Done():
+			return logs, ctx.Err()
+		}
 
 		resultResp, err := c.LogGet(ctx, jobResult.Job)
 		if err != nil {
@@ -275,8 +283,12 @@ func (c *Client) GetThreatLogs(ctx context.Context, query string, maxLogs int) (
 
 	// Poll for results
 	var logs []models.ThreatLogEntry
-	for i := 0; i < logPollMaxAttempts; i++ {
-		time.Sleep(logPollInterval)
+	for range logPollMaxAttempts {
+		select {
+		case <-time.After(logPollInterval):
+		case <-ctx.Done():
+			return logs, ctx.Err()
+		}
 
 		resultResp, err := c.LogGet(ctx, jobResult.Job)
 		if err != nil {

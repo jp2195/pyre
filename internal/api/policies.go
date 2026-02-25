@@ -175,6 +175,54 @@ func convertSecurityRuleEntry(e securityRuleEntry, position int, ruleBase models
 	}
 }
 
+// hitStats holds parsed hit count statistics for a rule.
+type hitStats struct {
+	count     int64
+	lastHit   time.Time
+	firstHit  time.Time
+	lastReset time.Time
+}
+
+// parseUnixTimestamp parses a string unix timestamp into a time.Time.
+// Returns zero time for empty strings, "0", or unparseable values.
+func parseUnixTimestamp(s string) time.Time {
+	if s == "" || s == "0" {
+		return time.Time{}
+	}
+	if ts, _ := strconv.ParseInt(s, 10, 64); ts > 0 { //nolint:errcheck // intentional - default to zero time on parse error
+		return time.Unix(ts, 0)
+	}
+	return time.Time{}
+}
+
+// parseRuleHitCounts parses the XML response from a rule hit count op command
+// and returns a map of rule name to hit statistics.
+func parseRuleHitCounts(inner []byte) map[string]hitStats {
+	var hitResult struct {
+		Entry []struct {
+			Name      string `xml:"name,attr"`
+			HitCount  int64  `xml:"hit-count"`
+			LastHit   string `xml:"last-hit-timestamp"`
+			FirstHit  string `xml:"first-hit-timestamp"`
+			LastReset string `xml:"last-reset-timestamp"`
+		} `xml:"rule-hit-count>vsys>entry>rule-base>entry>rules>entry"`
+	}
+	if xml.Unmarshal(inner, &hitResult) != nil {
+		return nil
+	}
+
+	hitMap := make(map[string]hitStats, len(hitResult.Entry))
+	for _, h := range hitResult.Entry {
+		hitMap[h.Name] = hitStats{
+			count:     h.HitCount,
+			lastHit:   parseUnixTimestamp(h.LastHit),
+			firstHit:  parseUnixTimestamp(h.FirstHit),
+			lastReset: parseUnixTimestamp(h.LastReset),
+		}
+	}
+	return hitMap
+}
+
 // fetchRulesFromPaths tries to fetch rules from multiple XPaths, using the provided parse function.
 func fetchRulesFromPaths[T any](c *Client, ctx context.Context, xpaths []string, parse func([]byte) []T) []T {
 	for _, xpath := range xpaths {
@@ -250,7 +298,7 @@ func (c *Client) GetSecurityPolicies(ctx context.Context) ([]models.SecurityRule
 		return []models.SecurityRule{}, nil
 	}
 
-	// Fetch rule hit counts with extended stats
+	// Fetch and apply rule hit counts
 	hitCountResp, err := c.Op(ctx, "<show><rule-hit-count><vsys><vsys-name><entry name='vsys1'><rule-base><entry name='security'><rules><all/></rules></entry></rule-base></entry></vsys-name></vsys></rule-hit-count></show>")
 	if err != nil {
 		log.Printf("[API Warning] failed to fetch security rule hit counts: %v", err)
@@ -258,42 +306,7 @@ func (c *Client) GetSecurityPolicies(ctx context.Context) ([]models.SecurityRule
 		log.Printf("[API Warning] security rule hit count request returned non-success: %s", hitCountResp.Error())
 	}
 	if err == nil && hitCountResp.IsSuccess() {
-		var hitResult struct {
-			Entry []struct {
-				Name      string `xml:"name,attr"`
-				HitCount  int64  `xml:"hit-count"`
-				LastHit   string `xml:"last-hit-timestamp"`
-				FirstHit  string `xml:"first-hit-timestamp"`
-				LastReset string `xml:"last-reset-timestamp"`
-			} `xml:"rule-hit-count>vsys>entry>rule-base>entry>rules>entry"`
-		}
-		if xml.Unmarshal(hitCountResp.Result.Inner, &hitResult) == nil {
-			type hitStats struct {
-				count     int64
-				lastHit   time.Time
-				firstHit  time.Time
-				lastReset time.Time
-			}
-			hitMap := make(map[string]hitStats)
-			for _, h := range hitResult.Entry {
-				stats := hitStats{count: h.HitCount}
-				if h.LastHit != "" && h.LastHit != "0" {
-					if ts, _ := strconv.ParseInt(h.LastHit, 10, 64); ts > 0 { //nolint:errcheck // intentional - default to zero time on parse error
-						stats.lastHit = time.Unix(ts, 0)
-					}
-				}
-				if h.FirstHit != "" && h.FirstHit != "0" {
-					if ts, _ := strconv.ParseInt(h.FirstHit, 10, 64); ts > 0 { //nolint:errcheck // intentional - default to zero time on parse error
-						stats.firstHit = time.Unix(ts, 0)
-					}
-				}
-				if h.LastReset != "" && h.LastReset != "0" {
-					if ts, _ := strconv.ParseInt(h.LastReset, 10, 64); ts > 0 { //nolint:errcheck // intentional - default to zero time on parse error
-						stats.lastReset = time.Unix(ts, 0)
-					}
-				}
-				hitMap[h.Name] = stats
-			}
+		if hitMap := parseRuleHitCounts(hitCountResp.Result.Inner); hitMap != nil {
 			for i := range rules {
 				if hit, ok := hitMap[rules[i].Name]; ok {
 					rules[i].HitCount = hit.count
@@ -491,7 +504,7 @@ func (c *Client) GetNATRules(ctx context.Context) ([]models.NATRule, error) {
 		return []models.NATRule{}, nil
 	}
 
-	// Fetch NAT rule hit counts
+	// Fetch and apply NAT rule hit counts
 	hitCountResp, err := c.Op(ctx, "<show><rule-hit-count><vsys><vsys-name><entry name='vsys1'><rule-base><entry name='nat'><rules><all/></rules></entry></rule-base></entry></vsys-name></vsys></rule-hit-count></show>")
 	if err != nil {
 		log.Printf("[API Warning] failed to fetch NAT rule hit counts: %v", err)
@@ -499,42 +512,7 @@ func (c *Client) GetNATRules(ctx context.Context) ([]models.NATRule, error) {
 		log.Printf("[API Warning] NAT rule hit count request returned non-success: %s", hitCountResp.Error())
 	}
 	if err == nil && hitCountResp.IsSuccess() {
-		var hitResult struct {
-			Entry []struct {
-				Name      string `xml:"name,attr"`
-				HitCount  int64  `xml:"hit-count"`
-				LastHit   string `xml:"last-hit-timestamp"`
-				FirstHit  string `xml:"first-hit-timestamp"`
-				LastReset string `xml:"last-reset-timestamp"`
-			} `xml:"rule-hit-count>vsys>entry>rule-base>entry>rules>entry"`
-		}
-		if xml.Unmarshal(hitCountResp.Result.Inner, &hitResult) == nil {
-			type hitStats struct {
-				count     int64
-				lastHit   time.Time
-				firstHit  time.Time
-				lastReset time.Time
-			}
-			hitMap := make(map[string]hitStats)
-			for _, h := range hitResult.Entry {
-				stats := hitStats{count: h.HitCount}
-				if h.LastHit != "" && h.LastHit != "0" {
-					if ts, _ := strconv.ParseInt(h.LastHit, 10, 64); ts > 0 { //nolint:errcheck // intentional - default to zero time on parse error
-						stats.lastHit = time.Unix(ts, 0)
-					}
-				}
-				if h.FirstHit != "" && h.FirstHit != "0" {
-					if ts, _ := strconv.ParseInt(h.FirstHit, 10, 64); ts > 0 { //nolint:errcheck // intentional - default to zero time on parse error
-						stats.firstHit = time.Unix(ts, 0)
-					}
-				}
-				if h.LastReset != "" && h.LastReset != "0" {
-					if ts, _ := strconv.ParseInt(h.LastReset, 10, 64); ts > 0 { //nolint:errcheck // intentional - default to zero time on parse error
-						stats.lastReset = time.Unix(ts, 0)
-					}
-				}
-				hitMap[h.Name] = stats
-			}
+		if hitMap := parseRuleHitCounts(hitCountResp.Result.Inner); hitMap != nil {
 			for i := range rules {
 				if hit, ok := hitMap[rules[i].Name]; ok {
 					rules[i].HitCount = hit.count

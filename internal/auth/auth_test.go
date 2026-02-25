@@ -26,7 +26,7 @@ func TestConcurrentSetActiveFirewall(t *testing.T) {
 		firewalls := []string{"10.0.0.1", "10.0.0.2", "10.0.0.3"}
 
 		// Launch concurrent SetActiveFirewall calls
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
@@ -67,15 +67,13 @@ func TestConcurrentGetActiveConnection(t *testing.T) {
 		var wg sync.WaitGroup
 
 		// Launch concurrent read operations
-		for i := 0; i < 100; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		for range 100 {
+			wg.Go(func() {
 				conn := session.GetActiveConnection()
 				if conn == nil {
 					t.Error("expected non-nil connection")
 				}
-			}()
+			})
 		}
 
 		wg.Wait()
@@ -93,7 +91,7 @@ func TestConcurrentAddRemoveConnection(t *testing.T) {
 		fwConfig := &config.ConnectionConfig{}
 
 		// Concurrent adds - use different IPs as keys
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
@@ -125,7 +123,7 @@ func TestConcurrentMixedOperations(t *testing.T) {
 		var wg sync.WaitGroup
 
 		// Writers
-		for i := 0; i < 25; i++ {
+		for i := range 25 {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
@@ -139,13 +137,11 @@ func TestConcurrentMixedOperations(t *testing.T) {
 		}
 
 		// Readers
-		for i := 0; i < 50; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		for range 50 {
+			wg.Go(func() {
 				_ = session.GetActiveConnection()
 				_ = session.ListConnections()
-			}()
+			})
 		}
 
 		wg.Wait()

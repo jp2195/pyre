@@ -125,10 +125,56 @@ func (c *Config) Save() error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, data, 0600); err != nil {
+	if err := atomicWriteFile(configPath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
 
+	return nil
+}
+
+// atomicWriteFile writes data to a file atomically by writing to a temp file
+// in the same directory and renaming it. This prevents corruption from crashes
+// or concurrent writes since rename is atomic on Unix.
+func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+	f, err := os.CreateTemp(dir, filepath.Base(path)+".tmp")
+	if err != nil {
+		return fmt.Errorf("creating temp file: %w", err)
+	}
+	tmpPath := f.Name()
+
+	// Clean up temp file on any error
+	success := false
+	defer func() {
+		if !success {
+			os.Remove(tmpPath)
+		}
+	}()
+
+	if err := f.Chmod(perm); err != nil {
+		f.Close()
+		return fmt.Errorf("setting permissions: %w", err)
+	}
+
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		return fmt.Errorf("writing data: %w", err)
+	}
+
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return fmt.Errorf("syncing file: %w", err)
+	}
+
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("closing temp file: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("renaming temp file: %w", err)
+	}
+
+	success = true
 	return nil
 }
 

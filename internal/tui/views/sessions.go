@@ -323,10 +323,7 @@ func (m SessionsModel) renderTable() string {
 	b.WriteString(headerStyle.Render(header) + "\n")
 
 	visibleRows := m.visibleRows()
-	end := m.Offset + visibleRows
-	if end > len(m.filtered) {
-		end = len(m.filtered)
-	}
+	end := min(m.Offset+visibleRows, len(m.filtered))
 
 	for i := m.Offset; i < end; i++ {
 		s := m.filtered[i]

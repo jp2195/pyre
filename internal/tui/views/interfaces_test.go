@@ -132,16 +132,16 @@ func TestInterfacesModel_Update_Navigation(t *testing.T) {
 	}
 	m = m.SetInterfaces(interfaces, nil)
 
-	// Move down (table uses down arrow or j)
+	// Move down
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	if m.TableCursor() != 1 {
-		t.Errorf("expected TableCursor=1 after down, got %d", m.TableCursor())
+	if m.Cursor != 1 {
+		t.Errorf("expected Cursor=1 after down, got %d", m.Cursor)
 	}
 
 	// Move up
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
-	if m.TableCursor() != 0 {
-		t.Errorf("expected TableCursor=0 after up, got %d", m.TableCursor())
+	if m.Cursor != 0 {
+		t.Errorf("expected Cursor=0 after up, got %d", m.Cursor)
 	}
 }
 
@@ -207,23 +207,22 @@ func TestInterfacesModel_SetSize_ClampsCursor(t *testing.T) {
 	m = m.SetInterfaces(interfaces, nil)
 
 	// Move cursor to end using table navigation
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	}
-	if m.TableCursor() != 4 {
-		t.Errorf("expected cursor at 4, got %d", m.TableCursor())
+	if m.Cursor != 4 {
+		t.Errorf("expected cursor at 4, got %d", m.Cursor)
 	}
 
 	// Apply filter that reduces items
 	m.Filter.SetValue("ethernet1/1")
 	m.applyFilter()
-	m.updateTableRows()
 
 	// Now resize - cursor should be clamped
 	m = m.SetSize(100, 50)
 
 	// Cursor should be clamped to valid range (0 since only 1 item matches)
-	if m.TableCursor() >= len(m.filtered) {
-		t.Errorf("cursor %d should be less than filtered count %d after resize", m.TableCursor(), len(m.filtered))
+	if m.Cursor >= len(m.filtered) {
+		t.Errorf("cursor %d should be less than filtered count %d after resize", m.Cursor, len(m.filtered))
 	}
 }

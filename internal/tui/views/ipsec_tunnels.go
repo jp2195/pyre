@@ -255,10 +255,7 @@ func (m IPSecTunnelsModel) renderTable() string {
 	b.WriteString("\n")
 
 	visibleRows := m.visibleRows()
-	end := m.Offset + visibleRows
-	if end > len(m.filtered) {
-		end = len(m.filtered)
-	}
+	end := min(m.Offset+visibleRows, len(m.filtered))
 
 	for i := m.Offset; i < end; i++ {
 		t := m.filtered[i]
@@ -354,20 +351,9 @@ func (m IPSecTunnelsModel) stateStyledRow(row, state string) string {
 
 func (m IPSecTunnelsModel) renderDetail(t models.IPSecTunnel) string {
 	c := theme.Colors()
-	boxStyle := ViewPanelStyle.
-		BorderForeground(c.Primary).
-		Width(m.Width - 10)
-
-	titleStyle := ViewTitleStyle
-	labelStyle := DetailLabelStyle.Width(18)
-	valueStyle := DetailValueStyle
-	dimValueStyle := DetailDimStyle
-	sectionStyle := DetailSectionStyle.Foreground(c.Primary)
-
-	var b strings.Builder
+	dr := NewDetailRenderer(m.Width, 18)
 
 	// Title with state indicator
-	title := t.Name
 	var stateStyle lipgloss.Style
 	switch t.State {
 	case "up":
@@ -377,56 +363,34 @@ func (m IPSecTunnelsModel) renderDetail(t models.IPSecTunnel) string {
 	default:
 		stateStyle = lipgloss.NewStyle().Foreground(c.Error).Bold(true)
 	}
-	b.WriteString(titleStyle.Render(title))
-	b.WriteString("  ")
-	b.WriteString(stateStyle.Render(strings.ToUpper(t.State)))
-	b.WriteString("\n\n")
+	dr.Raw(ViewTitleStyle.Render(t.Name) + "  " + stateStyle.Render(strings.ToUpper(t.State)) + "\n")
+	dr.Newline()
 
-	// Connection section
-	b.WriteString(sectionStyle.Render("Connection"))
-	b.WriteString("\n")
-	b.WriteString(labelStyle.Render("Gateway:") + " " + valueStyle.Render(t.Gateway) + "\n")
-	if t.LocalIP != "" {
-		b.WriteString(labelStyle.Render("Local IP:") + " " + valueStyle.Render(t.LocalIP) + "\n")
-	}
-	if t.RemoteIP != "" {
-		b.WriteString(labelStyle.Render("Remote IP:") + " " + valueStyle.Render(t.RemoteIP) + "\n")
-	}
+	dr.Section("Connection")
+	dr.Field("Gateway:", t.Gateway)
+	dr.FieldIf("Local IP:", t.LocalIP)
+	dr.FieldIf("Remote IP:", t.RemoteIP)
 
-	// Security section
-	b.WriteString("\n")
-	b.WriteString(sectionStyle.Render("Security"))
-	b.WriteString("\n")
-	if t.Protocol != "" {
-		b.WriteString(labelStyle.Render("Protocol:") + " " + valueStyle.Render(t.Protocol) + "\n")
-	}
-	if t.Encryption != "" {
-		b.WriteString(labelStyle.Render("Encryption:") + " " + valueStyle.Render(t.Encryption) + "\n")
-	}
-	if t.Auth != "" {
-		b.WriteString(labelStyle.Render("Authentication:") + " " + valueStyle.Render(t.Auth) + "\n")
-	}
+	dr.Section("Security")
+	dr.FieldIf("Protocol:", t.Protocol)
+	dr.FieldIf("Encryption:", t.Encryption)
+	dr.FieldIf("Authentication:", t.Auth)
 	if t.LocalSPI != "" {
-		b.WriteString(labelStyle.Render("Local SPI:") + " " + dimValueStyle.Render(t.LocalSPI) + "\n")
+		dr.FieldDim("Local SPI:", t.LocalSPI)
 	}
 	if t.RemoteSPI != "" {
-		b.WriteString(labelStyle.Render("Remote SPI:") + " " + dimValueStyle.Render(t.RemoteSPI) + "\n")
+		dr.FieldDim("Remote SPI:", t.RemoteSPI)
 	}
 
-	// Traffic section
-	b.WriteString("\n")
-	b.WriteString(sectionStyle.Render("Traffic Statistics"))
-	b.WriteString("\n")
-	b.WriteString(labelStyle.Render("Bytes In:") + " " + valueStyle.Render(formatBytes(t.BytesIn)) + "\n")
-	b.WriteString(labelStyle.Render("Bytes Out:") + " " + valueStyle.Render(formatBytes(t.BytesOut)) + "\n")
-	b.WriteString(labelStyle.Render("Packets In:") + " " + valueStyle.Render(fmt.Sprintf("%d", t.PacketsIn)) + "\n")
-	b.WriteString(labelStyle.Render("Packets Out:") + " " + valueStyle.Render(fmt.Sprintf("%d", t.PacketsOut)) + "\n")
-	if t.Uptime != "" {
-		b.WriteString(labelStyle.Render("Uptime:") + " " + valueStyle.Render(t.Uptime) + "\n")
-	}
+	dr.Section("Traffic Statistics")
+	dr.Field("Bytes In:", formatBytes(t.BytesIn))
+	dr.Field("Bytes Out:", formatBytes(t.BytesOut))
+	dr.Field("Packets In:", fmt.Sprintf("%d", t.PacketsIn))
+	dr.Field("Packets Out:", fmt.Sprintf("%d", t.PacketsOut))
+	dr.FieldIf("Uptime:", t.Uptime)
 	if t.Errors > 0 {
-		b.WriteString(labelStyle.Render("Errors:") + " " + lipgloss.NewStyle().Foreground(c.Error).Render(fmt.Sprintf("%d", t.Errors)) + "\n")
+		dr.FieldStyled("Errors:", lipgloss.NewStyle().Foreground(c.Error).Render(fmt.Sprintf("%d", t.Errors)))
 	}
 
-	return boxStyle.Render(b.String())
+	return dr.Render()
 }

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -44,8 +43,8 @@ type RoutesModel struct {
 
 	sortBy         RouteSortField
 	lastRefresh    time.Time
-	table          table.Model
-	neighborsTable table.Model
+	neighborCursor int
+	neighborOffset int
 
 	activeTab      RoutesTab
 	protocolFilter string // Filter by protocol: "", "connected", "static", "bgp", "ospf"
@@ -55,101 +54,25 @@ func NewRoutesModel() RoutesModel {
 	base := NewTableBase("Filter routes...")
 	base.SortAsc = true
 
-	// Initialize routes table with columns
-	routeColumns := []table.Column{
-		{Title: "Proto", Width: 5},
-		{Title: "Destination", Width: 20},
-		{Title: "Next Hop", Width: 18},
-		{Title: "Interface", Width: 14},
-		{Title: "Metric", Width: 6},
-		{Title: "VR", Width: 12},
-	}
-
-	t := table.New(
-		table.WithColumns(routeColumns),
-		table.WithFocused(true),
-		table.WithHeight(10),
-	)
-
-	// Initialize neighbors table
-	neighborColumns := []table.Column{
-		{Title: "Type", Width: 5},
-		{Title: "Peer/Neighbor", Width: 16},
-		{Title: "State", Width: 12},
-		{Title: "AS/Area", Width: 10},
-		{Title: "Prefixes", Width: 8},
-		{Title: "Uptime", Width: 12},
-		{Title: "VR", Width: 12},
-	}
-
-	nt := table.New(
-		table.WithColumns(neighborColumns),
-		table.WithFocused(true),
-		table.WithHeight(10),
-	)
-
-	// Apply theme-aware styles to both tables
-	s := table.DefaultStyles()
-	c := theme.Colors()
-	s.Header = s.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(c.Border).
-		BorderBottom(true).
-		Bold(true).
-		Foreground(c.TextLabel)
-	s.Selected = s.Selected.
-		Foreground(c.White).
-		Background(c.Primary).
-		Bold(false)
-	t.SetStyles(s)
-	nt.SetStyles(s)
-
 	return RoutesModel{
-		TableBase:      base,
-		table:          t,
-		neighborsTable: nt,
-		activeTab:      RoutesTabRoutes,
+		TableBase: base,
+		activeTab: RoutesTabRoutes,
 	}
 }
 
 func (m RoutesModel) SetSize(width, height int) RoutesModel {
 	m.TableBase = m.TableBase.SetSize(width, height)
 
-	// Update table dimensions
-	tableHeight := height - 10 // Account for header, tabs, filter, help
-	if tableHeight < 3 {
-		tableHeight = 3
+	// Clamp route cursor
+	count := len(m.filtered)
+	if m.Cursor >= count && count > 0 {
+		m.Cursor = count - 1
 	}
-	m.table.SetHeight(tableHeight)
-	m.neighborsTable.SetHeight(tableHeight)
 
-	// Update column widths proportionally
-	availWidth := width - 4
-
-	routeColumns := []table.Column{
-		{Title: "Proto", Width: 6},
-		{Title: "Destination", Width: maxInt(18, availWidth*22/100)},
-		{Title: "Next Hop", Width: maxInt(15, availWidth*20/100)},
-		{Title: "Interface", Width: maxInt(12, availWidth*15/100)},
-		{Title: "Metric", Width: 6},
-		{Title: "VR", Width: maxInt(10, availWidth*12/100)},
-	}
-	m.table.SetColumns(routeColumns)
-
-	neighborColumns := []table.Column{
-		{Title: "Type", Width: 5},
-		{Title: "Peer/Neighbor", Width: maxInt(15, availWidth*18/100)},
-		{Title: "State", Width: maxInt(10, availWidth*14/100)},
-		{Title: "AS/Area", Width: maxInt(10, availWidth*12/100)},
-		{Title: "Prefixes", Width: 8},
-		{Title: "Uptime", Width: maxInt(10, availWidth*14/100)},
-		{Title: "VR", Width: maxInt(10, availWidth*12/100)},
-	}
-	m.neighborsTable.SetColumns(neighborColumns)
-
-	// Clamp cursor to valid range after resize
-	if m.table.Cursor() >= len(m.filtered) && len(m.filtered) > 0 {
-		m.table.SetCursor(len(m.filtered) - 1)
+	// Clamp neighbor cursor
+	neighborCount := len(m.bgpNeighbors) + len(m.ospfNeighbors)
+	if m.neighborCursor >= neighborCount && neighborCount > 0 {
+		m.neighborCursor = neighborCount - 1
 	}
 
 	return m
@@ -170,22 +93,21 @@ func (m RoutesModel) SetRoutes(routes []models.RouteEntry, err error) RoutesMode
 	m.routeErr = err
 	m.Loading = false
 	m.lastRefresh = time.Now()
+	m.Cursor = 0
+	m.Offset = 0
 	m.applyFilter()
-	m.updateTableRows()
 	return m
 }
 
 func (m RoutesModel) SetBGPNeighbors(neighbors []models.BGPNeighbor, err error) RoutesModel {
 	m.bgpNeighbors = neighbors
 	m.bgpErr = err
-	m.updateNeighborsTable()
 	return m
 }
 
 func (m RoutesModel) SetOSPFNeighbors(neighbors []models.OSPFNeighbor, err error) RoutesModel {
 	m.ospfNeighbors = neighbors
 	m.ospfErr = err
-	m.updateNeighborsTable()
 	return m
 }
 
@@ -239,90 +161,12 @@ func (m *RoutesModel) sortRoutes() {
 	})
 }
 
-func (m *RoutesModel) updateTableRows() {
-	rows := make([]table.Row, len(m.filtered))
-	for i, route := range m.filtered {
-		proto := route.Protocol
-		if proto == "" {
-			proto = "static"
-		}
-		// Abbreviate protocol names
-		switch proto {
-		case "connected":
-			proto = "C"
-		case "static":
-			proto = "S"
-		case "local":
-			proto = "L"
-		case "bgp":
-			proto = "B"
-		case "ospf":
-			proto = "O"
-		}
-
-		nexthop := route.Nexthop
-		if nexthop == "" || nexthop == "directly connected" {
-			nexthop = "direct"
-		}
-
-		metric := ""
-		if route.Metric > 0 {
-			metric = fmt.Sprintf("%d", route.Metric)
-		}
-
-		rows[i] = table.Row{
-			proto,
-			route.Destination,
-			nexthop,
-			route.Interface,
-			metric,
-			route.VirtualRouter,
-		}
+func (m RoutesModel) visibleRows() int {
+	rows := m.Height - 10
+	if rows < 1 {
+		rows = 1
 	}
-	m.table.SetRows(rows)
-}
-
-func (m *RoutesModel) updateNeighborsTable() {
-	rows := make([]table.Row, 0, len(m.bgpNeighbors)+len(m.ospfNeighbors))
-
-	// Add BGP neighbors
-	for _, n := range m.bgpNeighbors {
-		state := n.State
-		stateAbbr := state
-		if len(stateAbbr) > 12 {
-			stateAbbr = stateAbbr[:12]
-		}
-
-		prefixes := ""
-		if n.PrefixesReceived > 0 {
-			prefixes = fmt.Sprintf("%d", n.PrefixesReceived)
-		}
-
-		rows = append(rows, table.Row{
-			"BGP",
-			n.PeerAddress,
-			stateAbbr,
-			fmt.Sprintf("AS%d", n.PeerAS),
-			prefixes,
-			n.Uptime,
-			n.VirtualRouter,
-		})
-	}
-
-	// Add OSPF neighbors
-	for _, n := range m.ospfNeighbors {
-		rows = append(rows, table.Row{
-			"OSPF",
-			n.NeighborID,
-			n.State,
-			n.Area,
-			"-",
-			n.DeadTime,
-			n.VirtualRouter,
-		})
-	}
-
-	m.neighborsTable.SetRows(rows)
+	return rows
 }
 
 func (m RoutesModel) Update(msg tea.Msg) (RoutesModel, tea.Cmd) {
@@ -349,40 +193,66 @@ func (m RoutesModel) Update(msg tea.Msg) (RoutesModel, tea.Cmd) {
 			case "a": // All protocols
 				m.protocolFilter = ""
 				m.applyFilter()
-				m.updateTableRows()
 				return m, nil
 			case "c": // Connected
 				m.protocolFilter = "connected"
 				m.applyFilter()
-				m.updateTableRows()
 				return m, nil
 			case "s": // Static
 				m.protocolFilter = "static"
 				m.applyFilter()
-				m.updateTableRows()
 				return m, nil
 			case "b": // BGP
 				m.protocolFilter = "bgp"
 				m.applyFilter()
-				m.updateTableRows()
 				return m, nil
 			case "o": // OSPF
 				m.protocolFilter = "ospf"
 				m.applyFilter()
-				m.updateTableRows()
-				return m, nil
-			case "/":
-				m.FilterMode = true
-				m.Filter.Focus()
 				return m, nil
 			}
-		}
 
-		// Handle table navigation
-		if m.activeTab == RoutesTabRoutes {
-			m.table, _ = m.table.Update(msg)
+			// Delegate to TableBase for common navigation
+			visible := m.visibleRows()
+			base, handled, cmd := m.HandleNavigation(msg, len(m.filtered), visible)
+			if handled {
+				m.TableBase = base
+				return m, cmd
+			}
 		} else {
-			m.neighborsTable, _ = m.neighborsTable.Update(msg)
+			// Neighbors tab navigation
+			neighborCount := len(m.bgpNeighbors) + len(m.ospfNeighbors)
+			visible := m.visibleRows()
+			switch msg.String() {
+			case "j", "down":
+				if m.neighborCursor < neighborCount-1 {
+					m.neighborCursor++
+					if m.neighborCursor >= m.neighborOffset+visible {
+						m.neighborOffset = m.neighborCursor - visible + 1
+					}
+				}
+				return m, nil
+			case "k", "up":
+				if m.neighborCursor > 0 {
+					m.neighborCursor--
+					if m.neighborCursor < m.neighborOffset {
+						m.neighborOffset = m.neighborCursor
+					}
+				}
+				return m, nil
+			case "g", "home":
+				m.neighborCursor = 0
+				m.neighborOffset = 0
+				return m, nil
+			case "G", "end":
+				if neighborCount > 0 {
+					m.neighborCursor = neighborCount - 1
+					if m.neighborCursor >= m.neighborOffset+visible {
+						m.neighborOffset = m.neighborCursor - visible + 1
+					}
+				}
+				return m, nil
+			}
 		}
 	}
 
@@ -394,7 +264,6 @@ func (m RoutesModel) updateFilterMode(msg tea.Msg) (RoutesModel, tea.Cmd) {
 	m.TableBase = base
 	if exited {
 		m.applyFilter()
-		m.updateTableRows()
 	}
 	return m, cmd
 }
@@ -482,9 +351,109 @@ func (m RoutesModel) renderRoutesTab() string {
 	}
 
 	// Routes table
-	b.WriteString(m.table.View())
+	b.WriteString(m.renderRoutesTable())
 
 	return b.String()
+}
+
+func (m RoutesModel) renderRoutesTable() string {
+	headerStyle := DetailLabelStyle.Bold(true)
+	selectedStyle := TableRowSelectedStyle.Bold(true)
+	normalStyle := DetailValueStyle
+	dimStyle := DetailDimStyle
+
+	availableWidth := m.Width - 6
+
+	var b strings.Builder
+
+	// Header
+	header := m.formatRouteHeaderRow(availableWidth)
+	b.WriteString(headerStyle.Render(header))
+	b.WriteString("\n")
+	b.WriteString(dimStyle.Render(strings.Repeat("─", minInt(availableWidth, len(header)+10))))
+	b.WriteString("\n")
+
+	visibleRows := m.visibleRows()
+	end := min(m.Offset+visibleRows, len(m.filtered))
+
+	for i := m.Offset; i < end; i++ {
+		route := m.filtered[i]
+		isSelected := i == m.Cursor
+
+		row := m.formatRouteRow(route, availableWidth)
+
+		if isSelected {
+			b.WriteString(selectedStyle.Render(row))
+		} else {
+			b.WriteString(normalStyle.Render(row))
+		}
+		b.WriteString("\n")
+	}
+
+	// Show scroll indicator if needed
+	if len(m.filtered) > visibleRows {
+		scrollInfo := fmt.Sprintf("  Showing %d-%d of %d", m.Offset+1, end, len(m.filtered))
+		b.WriteString(dimStyle.Render(scrollInfo))
+	}
+
+	return b.String()
+}
+
+func (m RoutesModel) formatRouteHeaderRow(width int) string {
+	if width >= 100 {
+		return fmt.Sprintf("%-6s %-22s %-18s %-14s %-6s %-12s",
+			"Proto", "Destination", "Next Hop", "Interface", "Metric", "VR")
+	} else if width >= 70 {
+		return fmt.Sprintf("%-6s %-20s %-16s %-12s %-6s",
+			"Proto", "Destination", "Next Hop", "Interface", "Metric")
+	}
+	return fmt.Sprintf("%-6s %-18s %-16s",
+		"Proto", "Destination", "Next Hop")
+}
+
+func (m RoutesModel) formatRouteRow(route models.RouteEntry, width int) string {
+	proto := route.Protocol
+	if proto == "" {
+		proto = "static"
+	}
+	// Abbreviate protocol names
+	switch proto {
+	case "connected":
+		proto = "C"
+	case "static":
+		proto = "S"
+	case "local":
+		proto = "L"
+	case "bgp":
+		proto = "B"
+	case "ospf":
+		proto = "O"
+	}
+
+	nexthop := route.Nexthop
+	if nexthop == "" || nexthop == "directly connected" {
+		nexthop = "direct"
+	}
+
+	metric := ""
+	if route.Metric > 0 {
+		metric = fmt.Sprintf("%d", route.Metric)
+	}
+
+	if width >= 100 {
+		return fmt.Sprintf("%-6s %-22s %-18s %-14s %-6s %-12s",
+			proto, truncateStr(route.Destination, 22),
+			truncateStr(nexthop, 18), truncateStr(route.Interface, 14),
+			metric, truncateStr(route.VirtualRouter, 12))
+	} else if width >= 70 {
+		return fmt.Sprintf("%-6s %-20s %-16s %-12s %-6s",
+			proto, truncateStr(route.Destination, 20),
+			truncateStr(nexthop, 16), truncateStr(route.Interface, 12),
+			metric)
+	}
+	return fmt.Sprintf("%-6s %-18s %-16s",
+		proto, truncateStr(route.Destination, 18),
+		truncateStr(nexthop, 16))
 }
 
 func (m RoutesModel) renderNeighborsTab() string {
@@ -516,9 +485,123 @@ func (m RoutesModel) renderNeighborsTab() string {
 	b.WriteString("\n")
 
 	// Neighbors table
-	b.WriteString(m.neighborsTable.View())
+	b.WriteString(m.renderNeighborsTable())
 
 	return b.String()
+}
+
+func (m RoutesModel) renderNeighborsTable() string {
+	headerStyle := DetailLabelStyle.Bold(true)
+	selectedStyle := TableRowSelectedStyle.Bold(true)
+	normalStyle := DetailValueStyle
+	dimStyle := DetailDimStyle
+
+	availableWidth := m.Width - 6
+
+	var b strings.Builder
+
+	// Header
+	header := m.formatNeighborHeaderRow(availableWidth)
+	b.WriteString(headerStyle.Render(header))
+	b.WriteString("\n")
+	b.WriteString(dimStyle.Render(strings.Repeat("─", minInt(availableWidth, len(header)+10))))
+	b.WriteString("\n")
+
+	// Build combined neighbor list
+	type neighborRow struct {
+		nType   string
+		peer    string
+		state   string
+		asArea  string
+		prefix  string
+		uptime  string
+		vr      string
+	}
+
+	var rows []neighborRow
+	for _, n := range m.bgpNeighbors {
+		state := n.State
+		if len(state) > 12 {
+			state = state[:12]
+		}
+		prefixes := ""
+		if n.PrefixesReceived > 0 {
+			prefixes = fmt.Sprintf("%d", n.PrefixesReceived)
+		}
+		rows = append(rows, neighborRow{
+			nType:  "BGP",
+			peer:   n.PeerAddress,
+			state:  state,
+			asArea: fmt.Sprintf("AS%d", n.PeerAS),
+			prefix: prefixes,
+			uptime: n.Uptime,
+			vr:     n.VirtualRouter,
+		})
+	}
+	for _, n := range m.ospfNeighbors {
+		rows = append(rows, neighborRow{
+			nType:  "OSPF",
+			peer:   n.NeighborID,
+			state:  n.State,
+			asArea: n.Area,
+			prefix: "-",
+			uptime: n.DeadTime,
+			vr:     n.VirtualRouter,
+		})
+	}
+
+	visibleRows := m.visibleRows()
+	end := min(m.neighborOffset+visibleRows, len(rows))
+
+	for i := m.neighborOffset; i < end; i++ {
+		r := rows[i]
+		isSelected := i == m.neighborCursor
+
+		row := m.formatNeighborRow(r.nType, r.peer, r.state, r.asArea, r.prefix, r.uptime, r.vr, availableWidth)
+
+		if isSelected {
+			b.WriteString(selectedStyle.Render(row))
+		} else {
+			b.WriteString(normalStyle.Render(row))
+		}
+		b.WriteString("\n")
+	}
+
+	// Show scroll indicator if needed
+	if len(rows) > visibleRows {
+		scrollInfo := fmt.Sprintf("  Showing %d-%d of %d", m.neighborOffset+1, end, len(rows))
+		b.WriteString(dimStyle.Render(scrollInfo))
+	}
+
+	return b.String()
+}
+
+func (m RoutesModel) formatNeighborHeaderRow(width int) string {
+	if width >= 100 {
+		return fmt.Sprintf("%-5s %-16s %-12s %-10s %-8s %-12s %-12s",
+			"Type", "Peer/Neighbor", "State", "AS/Area", "Prefixes", "Uptime", "VR")
+	} else if width >= 70 {
+		return fmt.Sprintf("%-5s %-16s %-12s %-10s %-8s %-12s",
+			"Type", "Peer/Neighbor", "State", "AS/Area", "Prefixes", "Uptime")
+	}
+	return fmt.Sprintf("%-5s %-16s %-12s %-10s",
+		"Type", "Peer/Neighbor", "State", "AS/Area")
+}
+
+func (m RoutesModel) formatNeighborRow(nType, peer, state, asArea, prefix, uptime, vr string, width int) string {
+	if width >= 100 {
+		return fmt.Sprintf("%-5s %-16s %-12s %-10s %-8s %-12s %-12s",
+			nType, truncateStr(peer, 16), truncateStr(state, 12),
+			truncateStr(asArea, 10), prefix, truncateStr(uptime, 12),
+			truncateStr(vr, 12))
+	} else if width >= 70 {
+		return fmt.Sprintf("%-5s %-16s %-12s %-10s %-8s %-12s",
+			nType, truncateStr(peer, 16), truncateStr(state, 12),
+			truncateStr(asArea, 10), prefix, truncateStr(uptime, 12))
+	}
+	return fmt.Sprintf("%-5s %-16s %-12s %-10s",
+		nType, truncateStr(peer, 16), truncateStr(state, 12),
+		truncateStr(asArea, 10))
 }
 
 // IsFilterMode returns true if the filter input is active

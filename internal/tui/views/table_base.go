@@ -126,10 +126,7 @@ func (t TableBase) HandleNavigation(msg tea.KeyMsg, itemCount, visibleRows int) 
 		return t, true, nil
 
 	case "ctrl+d", "pgdown":
-		pageSize := visibleRows
-		if pageSize < 10 {
-			pageSize = 10
-		}
+		pageSize := max(visibleRows, 10)
 		t.Cursor += pageSize
 		if t.Cursor >= itemCount {
 			t.Cursor = itemCount - 1
@@ -141,10 +138,7 @@ func (t TableBase) HandleNavigation(msg tea.KeyMsg, itemCount, visibleRows int) 
 		return t, true, nil
 
 	case "ctrl+u", "pgup":
-		pageSize := visibleRows
-		if pageSize < 10 {
-			pageSize = 10
-		}
+		pageSize := max(visibleRows, 10)
 		t.Cursor -= pageSize
 		if t.Cursor < 0 {
 			t.Cursor = 0

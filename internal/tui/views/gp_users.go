@@ -8,7 +8,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/jp2195/pyre/internal/models"
-	"github.com/jp2195/pyre/internal/tui/theme"
 )
 
 type GPSortField int
@@ -255,10 +254,7 @@ func (m GPUsersModel) renderTable() string {
 	b.WriteString("\n")
 
 	visibleRows := m.visibleRows()
-	end := m.Offset + visibleRows
-	if end > len(m.filtered) {
-		end = len(m.filtered)
-	}
+	end := min(m.Offset+visibleRows, len(m.filtered))
 
 	for i := m.Offset; i < end; i++ {
 		u := m.filtered[i]
@@ -328,73 +324,32 @@ func (m GPUsersModel) formatUserRow(u models.GlobalProtectUser, width int) strin
 }
 
 func (m GPUsersModel) renderDetail(u models.GlobalProtectUser) string {
-	c := theme.Colors()
-	boxStyle := ViewPanelStyle.
-		BorderForeground(c.Primary).
-		Width(m.Width - 10)
+	dr := NewDetailRenderer(m.Width, 18)
+	dr.Title(u.Username)
+	dr.Newline()
 
-	titleStyle := ViewTitleStyle
-	labelStyle := DetailLabelStyle.Width(18)
-	valueStyle := DetailValueStyle
-	dimValueStyle := DetailDimStyle
-	sectionStyle := DetailSectionStyle.Foreground(c.Primary)
+	dr.Section("User Information")
+	dr.FieldIf("Domain:", u.Domain)
+	dr.FieldIf("Computer:", u.Computer)
+	dr.FieldIf("Client Version:", u.Client)
 
-	var b strings.Builder
+	dr.Section("Connection")
+	dr.FieldIf("Gateway:", u.Gateway)
+	dr.FieldIf("Virtual IP:", u.VirtualIP)
+	dr.FieldIf("Public IP:", u.ClientIP)
+	dr.FieldIf("Source Region:", u.SourceRegion)
 
-	b.WriteString(titleStyle.Render(u.Username))
-	b.WriteString("\n\n")
-
-	// User Info section
-	b.WriteString(sectionStyle.Render("User Information"))
-	b.WriteString("\n")
-	if u.Domain != "" {
-		b.WriteString(labelStyle.Render("Domain:") + " " + valueStyle.Render(u.Domain) + "\n")
-	}
-	if u.Computer != "" {
-		b.WriteString(labelStyle.Render("Computer:") + " " + valueStyle.Render(u.Computer) + "\n")
-	}
-	if u.Client != "" {
-		b.WriteString(labelStyle.Render("Client Version:") + " " + valueStyle.Render(u.Client) + "\n")
-	}
-
-	// Connection section
-	b.WriteString("\n")
-	b.WriteString(sectionStyle.Render("Connection"))
-	b.WriteString("\n")
-	if u.Gateway != "" {
-		b.WriteString(labelStyle.Render("Gateway:") + " " + valueStyle.Render(u.Gateway) + "\n")
-	}
-	if u.VirtualIP != "" {
-		b.WriteString(labelStyle.Render("Virtual IP:") + " " + valueStyle.Render(u.VirtualIP) + "\n")
-	}
-	if u.ClientIP != "" {
-		b.WriteString(labelStyle.Render("Public IP:") + " " + valueStyle.Render(u.ClientIP) + "\n")
-	}
-	if u.SourceRegion != "" {
-		b.WriteString(labelStyle.Render("Source Region:") + " " + valueStyle.Render(u.SourceRegion) + "\n")
-	}
-
-	// Session section
-	b.WriteString("\n")
-	b.WriteString(sectionStyle.Render("Session"))
-	b.WriteString("\n")
+	dr.Section("Session")
 	if !u.LoginTime.IsZero() {
-		b.WriteString(labelStyle.Render("Login Time:") + " " + valueStyle.Render(u.LoginTime.Format("2006-01-02 15:04:05")) + "\n")
+		dr.Field("Login Time:", u.LoginTime.Format("2006-01-02 15:04:05"))
 	}
-	if u.Duration != "" {
-		b.WriteString(labelStyle.Render("Duration:") + " " + valueStyle.Render(u.Duration) + "\n")
-	}
+	dr.FieldIf("Duration:", u.Duration)
 
-	// Traffic section
 	if u.BytesIn > 0 || u.BytesOut > 0 {
-		b.WriteString("\n")
-		b.WriteString(sectionStyle.Render("Traffic"))
-		b.WriteString("\n")
-		b.WriteString(labelStyle.Render("Bytes In:") + " " + valueStyle.Render(formatBytes(u.BytesIn)) + "\n")
-		b.WriteString(labelStyle.Render("Bytes Out:") + " " + valueStyle.Render(formatBytes(u.BytesOut)) + "\n")
+		dr.Section("Traffic")
+		dr.Field("Bytes In:", formatBytes(u.BytesIn))
+		dr.Field("Bytes Out:", formatBytes(u.BytesOut))
 	}
 
-	_ = dimValueStyle // keep import clean
-
-	return boxStyle.Render(b.String())
+	return dr.Render()
 }
