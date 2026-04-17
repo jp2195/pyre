@@ -3,9 +3,9 @@ module github.com/jp2195/pyre
 go 1.25.7
 
 require (
-	github.com/charmbracelet/bubbles v0.21.1
-	github.com/charmbracelet/bubbletea v1.3.10
-	github.com/charmbracelet/lipgloss v1.1.0
+	github.com/charmbracelet/bubbles/v2 v2.1.0
+	github.com/charmbracelet/bubbletea/v2 v2.0.6
+	github.com/charmbracelet/lipgloss/v2 v2.0.3
 	go.yaml.in/yaml/v4 v4.0.0-rc.4
 	golang.org/x/crypto v0.48.0
 )
