@@ -26,7 +26,6 @@ type TroubleshootModel struct {
 	selected int
 	mode     TroubleshootMode
 	result   *troubleshoot.RunbookResult
-	hasSSH   bool
 	width    int
 	height   int
 
@@ -34,11 +33,6 @@ type TroubleshootModel struct {
 	currentStep  int
 	stepStatuses []troubleshoot.StepStatus
 	stepOutputs  []string
-
-	// SSH connection state
-	sshConfigured bool // SSH settings exist in config
-	sshConnecting bool
-	sshError      error
 
 	// Error
 	err error
@@ -69,30 +63,6 @@ func (m TroubleshootModel) SetRunbooks(runbooks []*troubleshoot.Runbook) Trouble
 		return runbooks[i].Category < runbooks[j].Category
 	})
 	m.runbooks = runbooks
-	return m
-}
-
-// SetSSHAvailable indicates whether SSH is available.
-func (m TroubleshootModel) SetSSHAvailable(available bool) TroubleshootModel {
-	m.hasSSH = available
-	return m
-}
-
-// SetSSHConfigured indicates whether SSH settings exist in config.
-func (m TroubleshootModel) SetSSHConfigured(configured bool) TroubleshootModel {
-	m.sshConfigured = configured
-	return m
-}
-
-// SetSSHConnecting sets the SSH connecting state.
-func (m TroubleshootModel) SetSSHConnecting(connecting bool) TroubleshootModel {
-	m.sshConnecting = connecting
-	return m
-}
-
-// SetSSHError sets the SSH error.
-func (m TroubleshootModel) SetSSHError(err error) TroubleshootModel {
-	m.sshError = err
 	return m
 }
 
@@ -209,7 +179,6 @@ func (m TroubleshootModel) renderList() string {
 	panelStyle := ViewPanelStyle.Width(m.width - 4)
 	selectedStyle := TableRowSelectedStyle.Bold(true)
 	normalStyle := DetailValueStyle
-	sshRequiredStyle := StatusWarningStyle
 	categoryStyle := DetailDimStyle.Italic(true)
 	descStyle := DetailDimStyle
 
@@ -241,17 +210,7 @@ func (m TroubleshootModel) renderList() string {
 				prefix = "> "
 			}
 
-			// SSH indicator
-			sshIndicator := ""
-			if rb.RequiresSSH {
-				if m.hasSSH {
-					sshIndicator = " [SSH]"
-				} else {
-					sshIndicator = sshRequiredStyle.Render(" [SSH*]")
-				}
-			}
-
-			name := style.Render(prefix + rb.Name + sshIndicator)
+			name := style.Render(prefix + rb.Name)
 			b.WriteString(name)
 			b.WriteString("\n")
 
@@ -264,31 +223,6 @@ func (m TroubleshootModel) renderList() string {
 	}
 
 	b.WriteString("\n")
-
-	// SSH status messages
-	if m.sshConnecting {
-		b.WriteString(SeverityLowStyle.Render("Connecting to SSH..."))
-		b.WriteString("\n")
-	} else if m.sshError != nil {
-		b.WriteString(ErrorMsgStyle.Render("SSH connection failed: " + m.sshError.Error()))
-		b.WriteString("\n")
-		b.WriteString(sshRequiredStyle.Render("Press R to retry SSH connection"))
-		b.WriteString("\n")
-	} else if !m.hasSSH {
-		if m.sshConfigured {
-			// SSH is configured but not connected yet
-			b.WriteString(sshRequiredStyle.Render("* SSH not connected - some runbooks unavailable"))
-			b.WriteString("\n")
-			b.WriteString(sshRequiredStyle.Render("Press R to connect SSH"))
-			b.WriteString("\n")
-		} else {
-			// SSH is not configured at all
-			b.WriteString(descStyle.Render("* SSH not configured - some runbooks unavailable"))
-			b.WriteString("\n")
-			b.WriteString(descStyle.Render("  Add SSH settings to ~/.pyre.yaml or set PYRE_SSH_USERNAME"))
-			b.WriteString("\n")
-		}
-	}
 
 	b.WriteString(descStyle.Render("Press Enter to run selected runbook, j/k to navigate"))
 
@@ -377,7 +311,7 @@ func (m TroubleshootModel) renderResult() string {
 		return panelStyle.Render("No result available")
 	}
 
-	// Show result-level error (e.g., SSH not available)
+	// Show result-level error
 	if m.result.Error != nil {
 		b.WriteString(titleStyle.Render(m.result.Runbook.Name))
 		b.WriteString("  ")

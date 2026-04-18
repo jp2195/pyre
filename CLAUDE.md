@@ -24,8 +24,8 @@ go fix ./...                  # Apply modernizers (safe, behavior-preserving)
 - `internal/models/` - Data models
 - `internal/config/` - Config/state persistence (~/.pyre.yaml)
 - `internal/auth/` - Session/connection management
-- `internal/ssh/` - SSH client for firewall access
 - `internal/troubleshoot/` - Troubleshooting patterns
+- SSH access is intentionally removed; Pyre currently uses only the PAN-OS XML API. SSH may return in a future redesign.
 
 ## Key Patterns
 

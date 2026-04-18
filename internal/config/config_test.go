@@ -260,52 +260,6 @@ connections:
 	}
 }
 
-func TestSSHConfig(t *testing.T) {
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "ssh-test.yaml")
-
-	configContent := `
-connections:
-  10.0.0.1:
-    ssh:
-      port: 2222
-      username: admin
-      password: secret
-      private_key_path: /path/to/key
-      timeout: 60
-`
-	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
-		t.Fatalf("failed to write test config: %v", err)
-	}
-
-	flags := CLIFlags{Config: configPath}
-	cfg, err := LoadWithFlags(flags)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	conn, ok := cfg.GetConnection("10.0.0.1")
-	if !ok {
-		t.Fatal("expected to find 10.0.0.1")
-	}
-
-	if conn.SSH.Port != 2222 {
-		t.Errorf("expected SSH port 2222, got %d", conn.SSH.Port)
-	}
-	if conn.SSH.Username != "admin" {
-		t.Errorf("expected SSH username 'admin', got %q", conn.SSH.Username)
-	}
-	if conn.SSH.Password != "secret" {
-		t.Errorf("expected SSH password 'secret', got %q", conn.SSH.Password)
-	}
-	if conn.SSH.PrivateKeyPath != "/path/to/key" {
-		t.Errorf("expected SSH key path '/path/to/key', got %q", conn.SSH.PrivateKeyPath)
-	}
-	if conn.SSH.Timeout != 60 {
-		t.Errorf("expected SSH timeout 60, got %d", conn.SSH.Timeout)
-	}
-}
-
 func TestConnectionType(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "type-test.yaml")
@@ -430,60 +384,6 @@ func TestSettings_AllFields(t *testing.T) {
 	}
 	if settings.DefaultView != "policies" {
 		t.Errorf("expected DefaultView 'policies', got %q", settings.DefaultView)
-	}
-}
-
-func TestSSHConfig_AllFields(t *testing.T) {
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "ssh-all-fields.yaml")
-
-	configContent := `
-connections:
-  10.0.0.1:
-    insecure: true
-    type: firewall
-    ssh:
-      port: 2222
-      username: admin
-      password: secret123
-      private_key_path: /path/to/key
-      timeout: 120
-`
-	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
-		t.Fatalf("failed to write test config: %v", err)
-	}
-
-	flags := CLIFlags{Config: configPath}
-	cfg, err := LoadWithFlags(flags)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	conn, ok := cfg.GetConnection("10.0.0.1")
-	if !ok {
-		t.Fatal("expected to find 10.0.0.1")
-	}
-
-	if !conn.Insecure {
-		t.Error("expected Insecure to be true")
-	}
-	if conn.Type != "firewall" {
-		t.Errorf("expected Type 'firewall', got %q", conn.Type)
-	}
-	if conn.SSH.Port != 2222 {
-		t.Errorf("expected SSH Port 2222, got %d", conn.SSH.Port)
-	}
-	if conn.SSH.Username != "admin" {
-		t.Errorf("expected SSH Username 'admin', got %q", conn.SSH.Username)
-	}
-	if conn.SSH.Password != "secret123" {
-		t.Errorf("expected SSH Password 'secret123', got %q", conn.SSH.Password)
-	}
-	if conn.SSH.PrivateKeyPath != "/path/to/key" {
-		t.Errorf("expected SSH PrivateKeyPath '/path/to/key', got %q", conn.SSH.PrivateKeyPath)
-	}
-	if conn.SSH.Timeout != 120 {
-		t.Errorf("expected SSH Timeout 120, got %d", conn.SSH.Timeout)
 	}
 }
 

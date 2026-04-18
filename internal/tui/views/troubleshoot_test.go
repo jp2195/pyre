@@ -62,64 +62,6 @@ func TestTroubleshootModel_SetRunbooks(t *testing.T) {
 	}
 }
 
-func TestTroubleshootModel_SetSSHAvailable(t *testing.T) {
-	m := NewTroubleshootModel()
-
-	if m.hasSSH {
-		t.Error("expected hasSSH=false initially")
-	}
-
-	m = m.SetSSHAvailable(true)
-	if !m.hasSSH {
-		t.Error("expected hasSSH=true after SetSSHAvailable(true)")
-	}
-
-	m = m.SetSSHAvailable(false)
-	if m.hasSSH {
-		t.Error("expected hasSSH=false after SetSSHAvailable(false)")
-	}
-}
-
-func TestTroubleshootModel_SetSSHConfigured(t *testing.T) {
-	m := NewTroubleshootModel()
-
-	if m.sshConfigured {
-		t.Error("expected sshConfigured=false initially")
-	}
-
-	m = m.SetSSHConfigured(true)
-	if !m.sshConfigured {
-		t.Error("expected sshConfigured=true")
-	}
-}
-
-func TestTroubleshootModel_SetSSHConnecting(t *testing.T) {
-	m := NewTroubleshootModel()
-
-	if m.sshConnecting {
-		t.Error("expected sshConnecting=false initially")
-	}
-
-	m = m.SetSSHConnecting(true)
-	if !m.sshConnecting {
-		t.Error("expected sshConnecting=true")
-	}
-}
-
-func TestTroubleshootModel_SetSSHError(t *testing.T) {
-	m := NewTroubleshootModel()
-
-	if m.sshError != nil {
-		t.Error("expected sshError=nil initially")
-	}
-
-	err := errors.New("connection refused")
-	m = m.SetSSHError(err)
-	if m.sshError != err {
-		t.Error("expected sshError to be set")
-	}
-}
-
 func TestTroubleshootModel_SetRunning(t *testing.T) {
 	m := NewTroubleshootModel()
 

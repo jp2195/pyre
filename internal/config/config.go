@@ -13,26 +13,15 @@ type Config struct {
 	Default     string                      `yaml:"default,omitempty"`
 	Connections map[string]ConnectionConfig `yaml:"connections,omitempty"`
 	Settings    Settings                    `yaml:"settings"`
-	Warnings    []string                    `yaml:"-"` // Security warnings from config validation
 }
 
-type SSHConfig struct {
-	Port           int    `yaml:"port"` // Default: 22
-	Username       string `yaml:"username"`
-	Password       string `yaml:"password,omitempty"` // Deprecated: use env vars instead
-	PrivateKeyPath string `yaml:"private_key_path"`
-	Timeout        int    `yaml:"timeout"`          // Seconds, default: 30
-	KnownHostsPath string `yaml:"known_hosts_path"` // Default: ~/.ssh/known_hosts
-	Insecure       bool   `yaml:"insecure"`         // Skip host key verification (not recommended)
-}
-
-// ConnectionConfig represents a firewall or Panorama connection configuration
+// ConnectionConfig describes a single PAN-OS endpoint.
+// SSH is intentionally unsupported; access is XML API only.
 // Note: The host/IP is used as the map key in Config.Connections, not stored here
 type ConnectionConfig struct {
-	Username string    `yaml:"username,omitempty"` // Username for API authentication
-	Type     string    `yaml:"type,omitempty"`     // "firewall" (default) or "panorama"
-	Insecure bool      `yaml:"insecure,omitempty"`
-	SSH      SSHConfig `yaml:"ssh,omitempty"`
+	Username string `yaml:"username,omitempty"` // Username for API authentication
+	Type     string `yaml:"type,omitempty"`     // "firewall" (default) or "panorama"
+	Insecure bool   `yaml:"insecure,omitempty"`
 }
 
 type Settings struct {
@@ -279,22 +268,7 @@ func LoadWithFlags(flags CLIFlags) (*Config, error) {
 	}
 
 	cfg.ApplyFlags(flags)
-	cfg.validateSecuritySettings()
 	return cfg, nil
-}
-
-// validateSecuritySettings checks for deprecated or insecure configuration settings
-// and adds warnings to the config.
-func (c *Config) validateSecuritySettings() {
-	for host, conn := range c.Connections {
-		// Warn about SSH password in config file (deprecated)
-		if conn.SSH.Password != "" {
-			c.Warnings = append(c.Warnings, fmt.Sprintf(
-				"SECURITY WARNING: Connection %q has SSH password in config file. "+
-					"Use PYRE_SSH_PASSWORD environment variable instead.",
-				host))
-		}
-	}
 }
 
 // HasConnections returns true if there are any configured connections

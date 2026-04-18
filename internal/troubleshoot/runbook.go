@@ -13,12 +13,11 @@ import (
 //go:embed runbooks/*.yaml
 var embeddedRunbooks embed.FS
 
-// StepType represents the type of step (API or SSH).
+// StepType represents the type of step.
 type StepType string
 
 const (
 	StepTypeAPI StepType = "api"
-	StepTypeSSH StepType = "ssh"
 )
 
 // Severity represents the severity level of an issue.
@@ -39,7 +38,6 @@ type Runbook struct {
 	Category    string   `yaml:"category"`
 	Tags        []string `yaml:"tags"`
 	Steps       []Step   `yaml:"steps"`
-	RequiresSSH bool     `yaml:"requires_ssh"`
 }
 
 // Step represents a single troubleshooting step.
@@ -48,7 +46,6 @@ type Step struct {
 	Name        string    `yaml:"name"`
 	Description string    `yaml:"description"`
 	Type        StepType  `yaml:"type"`
-	Command     string    `yaml:"command"`  // For SSH steps
 	APICall     string    `yaml:"api_call"` // For API steps
 	Patterns    []Pattern `yaml:"patterns"`
 	Required    bool      `yaml:"required"` // Stop on failure?
