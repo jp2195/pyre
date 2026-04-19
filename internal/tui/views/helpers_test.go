@@ -55,46 +55,6 @@ func TestTruncateEllipsis(t *testing.T) {
 	}
 }
 
-func TestMinInt(t *testing.T) {
-	tests := []struct {
-		a, b int
-		want int
-	}{
-		{1, 2, 1},
-		{2, 1, 1},
-		{5, 5, 5},
-		{-1, 1, -1},
-		{0, 0, 0},
-	}
-
-	for _, tt := range tests {
-		got := minInt(tt.a, tt.b)
-		if got != tt.want {
-			t.Errorf("minInt(%d, %d) = %d, want %d", tt.a, tt.b, got, tt.want)
-		}
-	}
-}
-
-func TestMaxInt(t *testing.T) {
-	tests := []struct {
-		a, b int
-		want int
-	}{
-		{1, 2, 2},
-		{2, 1, 2},
-		{5, 5, 5},
-		{-1, 1, 1},
-		{0, 0, 0},
-	}
-
-	for _, tt := range tests {
-		got := maxInt(tt.a, tt.b)
-		if got != tt.want {
-			t.Errorf("maxInt(%d, %d) = %d, want %d", tt.a, tt.b, got, tt.want)
-		}
-	}
-}
-
 func TestFormatNumberWithCommas(t *testing.T) {
 	tests := []struct {
 		input int64

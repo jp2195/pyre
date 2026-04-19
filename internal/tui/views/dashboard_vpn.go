@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -134,18 +135,18 @@ func (m VPNDashboardModel) renderIPSecSummary(width int) string {
 	}
 
 	// Status indicators
-	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", upCount)))
+	b.WriteString(highlightStyle().Render(strconv.Itoa(upCount)))
 	b.WriteString(dimStyle().Render(" up"))
 
 	if downCount > 0 {
 		b.WriteString(dimStyle().Render("  "))
-		b.WriteString(errorStyle().Render(fmt.Sprintf("%d", downCount)))
+		b.WriteString(errorStyle().Render(strconv.Itoa(downCount)))
 		b.WriteString(dimStyle().Render(" down"))
 	}
 
 	if initCount > 0 {
 		b.WriteString(dimStyle().Render("  "))
-		b.WriteString(warningStyle().Render(fmt.Sprintf("%d", initCount)))
+		b.WriteString(warningStyle().Render(strconv.Itoa(initCount)))
 		b.WriteString(dimStyle().Render(" init"))
 	}
 
@@ -256,7 +257,7 @@ func (m VPNDashboardModel) renderGlobalProtectSummary(width int) string {
 	}
 
 	// User count
-	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", len(m.gpUsers))))
+	b.WriteString(highlightStyle().Render(strconv.Itoa(len(m.gpUsers))))
 	b.WriteString(dimStyle().Render(" active users"))
 
 	// Count by gateway if available
@@ -276,7 +277,7 @@ func (m VPNDashboardModel) renderGlobalProtectSummary(width int) string {
 		for gw, count := range gatewayCounts {
 			gwName := truncateEllipsis(gw, 20)
 			b.WriteString(labelStyle().Render(fmt.Sprintf("  %-20s ", gwName)))
-			b.WriteString(valueStyle().Render(fmt.Sprintf("%d", count)))
+			b.WriteString(valueStyle().Render(strconv.Itoa(count)))
 			b.WriteString("\n")
 		}
 	}

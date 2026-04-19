@@ -15,6 +15,15 @@ func (m Model) handleLoginKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case msg.String() == "ctrl+c":
 		return m, tea.Quit
 
+	case msg.String() == "esc":
+		// Reset the login form so any typed credentials (password included)
+		// do not linger in the textinput buffers after leaving the view.
+		// Keeps secret in-memory lifetime as short as possible — see the
+		// "Credential Resolution" section of CLAUDE.md.
+		m.login = views.NewLoginModel(&auth.Credentials{})
+		m.currentView = ViewConnectionHub
+		return m, nil
+
 	case msg.String() == "enter":
 		if m.login.CanSubmit() {
 			m.loading = true
@@ -263,7 +272,10 @@ func (m Model) buildCommandRegistry() []views.Command {
 			Description: "Exit application",
 			Category:    "System",
 			Shortcut:    "q",
-			Action:      func() tea.Msg { return tea.Quit() },
+			// tea.Quit is itself a tea.Cmd (func() tea.Msg) — use it
+			// directly so tea.QuitMsg is produced at invocation time, not
+			// at registry-build time.
+			Action: tea.Quit,
 		},
 	}
 

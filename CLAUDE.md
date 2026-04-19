@@ -82,13 +82,16 @@ unexpected failures are never swallowed.
 ## Dependencies
 
 - TUI: Bubble Tea v2 (`charm.land/bubbletea/v2`), lipgloss v2 (`charm.land/lipgloss/v2`), bubbles v2 (`charm.land/bubbles/v2`). Migrated from `github.com/charmbracelet/{bubbletea,lipgloss,bubbles}` on 2026-04-18.
-- YAML: `go.yaml.in/yaml/v4` (not gopkg.in/yaml.v3)
+- YAML: `go.yaml.in/yaml/v4` (not gopkg.in/yaml.v3). Pinned to `v4.0.0-rc.4` pending a stable `v4.Y.Z` release upstream; only release-candidate tags exist today. Revisit quarterly: `go list -m -versions go.yaml.in/yaml/v4`.
 - `maxResponseSize = 50MB` const in `client.go`, used with `io.LimitReader`
 - Log polling: `logPollMaxAttempts=30`, `logPollInterval=500ms` in `api/logs.go`
 
 ## Go 1.26 (Current Version)
 
-Released February 10, 2026. Key features relevant to this project:
+`go.mod` is pinned to `go 1.26.2` (stdlib CVE patch release). Go 1.26.0 and
+1.26.1 had several stdlib vulnerabilities in `crypto/tls` and `crypto/x509`,
+all fixed in 1.26.2. CI pins `go-version: '1.26.2'`. Released February 10,
+2026. Key features relevant to this project:
 
 ### Language Changes
 - **Enhanced `new()` builtin**: `new` now accepts an expression as initial value - `new(expr)` allocates and initializes in one step. Useful for pointer fields: `Age: new(yearsSince(born))`

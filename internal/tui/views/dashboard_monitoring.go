@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -66,7 +67,7 @@ func (m DashboardModel) renderGlobalProtect(width int) string {
 	// Users and gateways on one line
 	b.WriteString(dimStyle().Render("Users: "))
 	if m.gpInfo.ActiveUsers > 0 {
-		b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", m.gpInfo.ActiveUsers)))
+		b.WriteString(highlightStyle().Render(strconv.Itoa(m.gpInfo.ActiveUsers)))
 	} else {
 		b.WriteString(dimStyle().Render("0"))
 	}
@@ -108,16 +109,16 @@ func (m DashboardModel) renderLicenses(width int) string {
 	}
 
 	// Summary line
-	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", valid)))
+	b.WriteString(highlightStyle().Render(strconv.Itoa(valid)))
 	b.WriteString(dimStyle().Render(" valid"))
 	if expiring > 0 {
 		b.WriteString(dimStyle().Render("  "))
-		b.WriteString(warningStyle().Render(fmt.Sprintf("%d", expiring)))
+		b.WriteString(warningStyle().Render(strconv.Itoa(expiring)))
 		b.WriteString(dimStyle().Render(" expiring"))
 	}
 	if expired > 0 {
 		b.WriteString(dimStyle().Render("  "))
-		b.WriteString(errorStyle().Render(fmt.Sprintf("%d", expired)))
+		b.WriteString(errorStyle().Render(strconv.Itoa(expired)))
 		b.WriteString(dimStyle().Render(" expired"))
 	}
 
@@ -333,9 +334,9 @@ func (m DashboardModel) renderThreatSummary(width int) string {
 
 	// Actions on second line
 	b.WriteString("\n")
-	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", ts.BlockedCount)))
+	b.WriteString(highlightStyle().Render(strconv.FormatInt(ts.BlockedCount, 10)))
 	b.WriteString(dimStyle().Render(" blocked  "))
-	b.WriteString(warningStyle().Render(fmt.Sprintf("%d", ts.AlertedCount)))
+	b.WriteString(warningStyle().Render(strconv.FormatInt(ts.AlertedCount, 10)))
 	b.WriteString(dimStyle().Render(" alerted"))
 
 	return panelStyle().Width(width).Render(b.String())
@@ -374,16 +375,16 @@ func (m DashboardModel) renderCertificates(width int) string {
 	}
 
 	// Summary
-	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", valid)))
+	b.WriteString(highlightStyle().Render(strconv.Itoa(valid)))
 	b.WriteString(dimStyle().Render(" valid"))
 	if expiring > 0 {
 		b.WriteString(dimStyle().Render("  "))
-		b.WriteString(warningStyle().Render(fmt.Sprintf("%d", expiring)))
+		b.WriteString(warningStyle().Render(strconv.Itoa(expiring)))
 		b.WriteString(dimStyle().Render(" expiring"))
 	}
 	if expired > 0 {
 		b.WriteString(dimStyle().Render("  "))
-		b.WriteString(errorStyle().Render(fmt.Sprintf("%d", expired)))
+		b.WriteString(errorStyle().Render(strconv.Itoa(expired)))
 		b.WriteString(dimStyle().Render(" expired"))
 	}
 

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -263,7 +264,7 @@ func (c *Client) Log(ctx context.Context, logType string, nlogs int, query, targ
 	params.Set("type", "log")
 	params.Set("log-type", logType)
 	if nlogs > 0 {
-		params.Set("nlogs", fmt.Sprintf("%d", nlogs))
+		params.Set("nlogs", strconv.Itoa(nlogs))
 	}
 	if query != "" {
 		params.Set("query", query)

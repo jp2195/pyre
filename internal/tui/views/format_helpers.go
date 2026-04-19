@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -114,7 +115,7 @@ func formatHitCount(count int64) string {
 	if count >= 1_000 {
 		return fmt.Sprintf("%.1fK", float64(count)/1_000)
 	}
-	return fmt.Sprintf("%d", count)
+	return strconv.FormatInt(count, 10)
 }
 
 // formatHitCountFull formats a hit count with thousand separators.
@@ -122,7 +123,7 @@ func formatHitCountFull(count int64) string {
 	if count == 0 {
 		return "0"
 	}
-	s := fmt.Sprintf("%d", count)
+	s := strconv.FormatInt(count, 10)
 	n := len(s)
 	if n <= 3 {
 		return s

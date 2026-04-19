@@ -53,6 +53,12 @@ func (m GPUsersModel) SetLoading(loading bool) GPUsersModel {
 	return m
 }
 
+// SetSpinnerFrame updates the current spinner animation frame.
+func (m GPUsersModel) SetSpinnerFrame(frame string) GPUsersModel {
+	m.TableBase = m.TableBase.SetSpinnerFrame(frame)
+	return m
+}
+
 // HasData returns true if user data has been loaded.
 func (m GPUsersModel) HasData() bool {
 	return m.users != nil
@@ -250,7 +256,7 @@ func (m GPUsersModel) renderTable() string {
 	header := m.formatHeaderRow(availableWidth)
 	b.WriteString(headerStyle.Render(header))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(strings.Repeat("-", minInt(availableWidth, len(header)+10))))
+	b.WriteString(dimStyle.Render(strings.Repeat("-", min(availableWidth, len(header)+10))))
 	b.WriteString("\n")
 
 	visibleRows := m.visibleRows()

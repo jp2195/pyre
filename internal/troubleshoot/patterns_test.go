@@ -220,20 +220,26 @@ func TestPatternMatcher_Concurrent(t *testing.T) {
 		{Regex: `info\d+`},
 	}
 
+	// Collect errors from goroutines on a buffered channel and assert on the
+	// main goroutine. Calling t.Errorf from inside a goroutine is not
+	// guaranteed safe for every testing hook (e.g. t.FailNow semantics), so
+	// we drain after wg.Wait().
+	errCh := make(chan error, 100*len(patterns))
 	var wg sync.WaitGroup
-	for i := range 100 {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+	for range 100 {
+		wg.Go(func() {
 			for _, p := range patterns {
-				_, err := pm.Match(p, "error1 warning2 info3")
-				if err != nil {
-					t.Errorf("concurrent match error: %v", err)
+				if _, err := pm.Match(p, "error1 warning2 info3"); err != nil {
+					errCh <- err
 				}
 			}
-		}(i)
+		})
 	}
 	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Errorf("concurrent match error: %v", err)
+	}
 }
 
 func TestPrecompiledPatterns(t *testing.T) {

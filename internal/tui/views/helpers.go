@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -29,25 +30,9 @@ func truncateEllipsis(s string, maxLen int) string {
 	return s[:maxLen-1] + "…"
 }
 
-// minInt returns the minimum of two ints
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// maxInt returns the maximum of two ints
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 // formatNumberWithCommas formats a number with thousand separators
 func formatNumberWithCommas(n int64) string {
-	s := fmt.Sprintf("%d", n)
+	s := strconv.FormatInt(n, 10)
 	if len(s) <= 3 {
 		return s
 	}
@@ -85,7 +70,7 @@ func formatPackets(packets int64) string {
 		return "0"
 	}
 	if packets < 1000 {
-		return fmt.Sprintf("%d", packets)
+		return strconv.FormatInt(packets, 10)
 	}
 	if packets < 1000000 {
 		return fmt.Sprintf("%.1fK", float64(packets)/1000)

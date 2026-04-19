@@ -261,7 +261,7 @@ func (m RuleListModel[T]) renderTable() string {
 	header := m.config.FormatHeaderRow(availableWidth)
 	b.WriteString(headerStyle.Render(header))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(strings.Repeat("─", minInt(availableWidth, len(header)+10))))
+	b.WriteString(dimStyle.Render(strings.Repeat("─", min(availableWidth, len(header)+10))))
 	b.WriteString("\n")
 
 	visibleRows := m.visibleRows()

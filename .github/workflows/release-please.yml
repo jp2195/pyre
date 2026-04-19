@@ -20,7 +20,6 @@ jobs:
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
-      upload_url: ${{ steps.release.outputs.upload_url }}
 
     steps:
       - uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
@@ -30,83 +29,32 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-  build-release:
-    name: Build Release (${{ matrix.goos }}/${{ matrix.goarch }})
+  goreleaser:
+    name: GoReleaser
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - goos: darwin
-            goarch: arm64
-            output: pyre-darwin-arm64
-          - goos: darwin
-            goarch: amd64
-            output: pyre-darwin-amd64
-          - goos: linux
-            goarch: amd64
-            output: pyre-linux-amd64
-          - goos: linux
-            goarch: arm64
-            output: pyre-linux-arm64
-          - goos: windows
-            goarch: amd64
-            output: pyre-windows-amd64.exe
-
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Set up Go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
-        with:
-          go-version: '1.26.0'
-          cache: true
-
-      - name: Build
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 0
-        run: |
-          go build -ldflags="-s -w -X main.version=${{ needs.release-please.outputs.tag_name }}" -o ${{ matrix.output }} ./cmd/pyre
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: ${{ matrix.output }}
-          path: ${{ matrix.output }}
-
-  upload-assets:
-    name: Upload Release Assets
-    needs: [release-please, build-release]
-    if: ${{ needs.release-please.outputs.release_created }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     permissions:
       contents: write
 
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          path: artifacts
-          pattern: pyre-*
-          merge-multiple: true
+          fetch-depth: 0
 
-      - name: Generate checksums
-        run: |
-          cd artifacts
-          sha256sum * > checksums.txt
-          cat checksums.txt
+      - name: Set up Go
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version: '1.26.2'
+          cache: true
 
-      - name: Upload assets to release
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552 # v6.3.0
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          cd artifacts
-          for file in *; do
-            gh release upload ${{ needs.release-please.outputs.tag_name }} "$file" --repo ${{ github.repository }}
-          done
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ needs.release-please.outputs.tag_name }}
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean

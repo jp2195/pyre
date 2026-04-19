@@ -3,6 +3,7 @@ package views
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -58,6 +59,12 @@ func (m SessionsModel) SetSize(width, height int) SessionsModel {
 
 func (m SessionsModel) SetLoading(loading bool) SessionsModel {
 	m.TableBase = m.TableBase.SetLoading(loading)
+	return m
+}
+
+// SetSpinnerFrame updates the current spinner animation frame.
+func (m SessionsModel) SetSpinnerFrame(frame string) SessionsModel {
+	m.TableBase = m.TableBase.SetSpinnerFrame(frame)
 	return m
 }
 
@@ -479,8 +486,8 @@ func (m SessionsModel) renderDetail(s models.Session) string {
 		b.WriteString("\n")
 		b.WriteString(sectionStyle.Render("Traffic Statistics"))
 		b.WriteString("\n")
-		b.WriteString(labelStyle.Render("Pkts to Client:") + valueStyle.Render(fmt.Sprintf("%d", d.PacketsToClient)) + "\n")
-		b.WriteString(labelStyle.Render("Pkts to Server:") + valueStyle.Render(fmt.Sprintf("%d", d.PacketsToServer)) + "\n")
+		b.WriteString(labelStyle.Render("Pkts to Client:") + valueStyle.Render(strconv.FormatInt(d.PacketsToClient, 10)) + "\n")
+		b.WriteString(labelStyle.Render("Pkts to Server:") + valueStyle.Render(strconv.FormatInt(d.PacketsToServer, 10)) + "\n")
 		b.WriteString(labelStyle.Render("Bytes to Client:") + valueStyle.Render(formatBytes(d.BytesToClient)) + "\n")
 		b.WriteString(labelStyle.Render("Bytes to Server:") + valueStyle.Render(formatBytes(d.BytesToServer)) + "\n")
 

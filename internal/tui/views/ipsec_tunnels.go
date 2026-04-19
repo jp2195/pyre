@@ -3,6 +3,7 @@ package views
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -52,6 +53,12 @@ func (m IPSecTunnelsModel) SetSize(width, height int) IPSecTunnelsModel {
 
 func (m IPSecTunnelsModel) SetLoading(loading bool) IPSecTunnelsModel {
 	m.TableBase = m.TableBase.SetLoading(loading)
+	return m
+}
+
+// SetSpinnerFrame updates the current spinner animation frame.
+func (m IPSecTunnelsModel) SetSpinnerFrame(frame string) IPSecTunnelsModel {
+	m.TableBase = m.TableBase.SetSpinnerFrame(frame)
 	return m
 }
 
@@ -251,7 +258,7 @@ func (m IPSecTunnelsModel) renderTable() string {
 	header := m.formatHeaderRow(availableWidth)
 	b.WriteString(headerStyle.Render(header))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(strings.Repeat("-", minInt(availableWidth, len(header)+10))))
+	b.WriteString(dimStyle.Render(strings.Repeat("-", min(availableWidth, len(header)+10))))
 	b.WriteString("\n")
 
 	visibleRows := m.visibleRows()
@@ -385,11 +392,11 @@ func (m IPSecTunnelsModel) renderDetail(t models.IPSecTunnel) string {
 	dr.Section("Traffic Statistics")
 	dr.Field("Bytes In:", formatBytes(t.BytesIn))
 	dr.Field("Bytes Out:", formatBytes(t.BytesOut))
-	dr.Field("Packets In:", fmt.Sprintf("%d", t.PacketsIn))
-	dr.Field("Packets Out:", fmt.Sprintf("%d", t.PacketsOut))
+	dr.Field("Packets In:", strconv.FormatInt(t.PacketsIn, 10))
+	dr.Field("Packets Out:", strconv.FormatInt(t.PacketsOut, 10))
 	dr.FieldIf("Uptime:", t.Uptime)
 	if t.Errors > 0 {
-		dr.FieldStyled("Errors:", lipgloss.NewStyle().Foreground(c.Error).Render(fmt.Sprintf("%d", t.Errors)))
+		dr.FieldStyled("Errors:", lipgloss.NewStyle().Foreground(c.Error).Render(strconv.Itoa(t.Errors)))
 	}
 
 	return dr.Render()

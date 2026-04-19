@@ -3,6 +3,7 @@ package views
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -106,7 +107,7 @@ func (m LogsModel) renderTrafficDetail(log models.TrafficLogEntry) string {
 	lines = append(lines, DetailSectionStyle.Render("Session"))
 	lines = append(lines, labelStyle.Render("Time")+DetailValueStyle.Render(log.Time.Format("2006-01-02 15:04:05")))
 	lines = append(lines, labelStyle.Render("Action")+colorByAction(log.Action, log.Action))
-	lines = append(lines, labelStyle.Render("Session ID")+DetailValueStyle.Render(fmt.Sprintf("%d", log.SessionID)))
+	lines = append(lines, labelStyle.Render("Session ID")+DetailValueStyle.Render(strconv.FormatInt(log.SessionID, 10)))
 	lines = append(lines, labelStyle.Render("Duration")+DetailValueStyle.Render(fmt.Sprintf("%ds", log.Duration)))
 
 	lines = append(lines, DetailSectionStyle.Render("Source / Destination"))

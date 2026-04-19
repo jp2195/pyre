@@ -121,16 +121,8 @@ func parseLogTime(timeStr string) time.Time {
 	if timeStr == "" {
 		return time.Time{}
 	}
-	layouts := []string{
-		"2006/01/02 15:04:05",
-		"2006-01-02 15:04:05",
-		"Mon Jan 2 15:04:05 2006",
-		"01/02/2006 15:04:05",
-	}
-	for _, layout := range layouts {
-		if t, err := time.Parse(layout, timeStr); err == nil {
-			return t
-		}
+	if t, err := parsePANTime(timeStr); err == nil {
+		return t
 	}
 	log.Printf("[API Warning] failed to parse log time %q: no matching layout", timeStr)
 	return time.Time{}

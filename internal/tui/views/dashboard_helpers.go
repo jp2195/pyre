@@ -3,6 +3,7 @@ package views
 import (
 	"fmt"
 	"image/color"
+	"strconv"
 	"strings"
 	"time"
 
@@ -84,7 +85,7 @@ func renderBar(percent float64, width int, c color.Color) string {
 }
 
 func formatNumber(n int64) string {
-	s := fmt.Sprintf("%d", n)
+	s := strconv.FormatInt(n, 10)
 	if len(s) <= 3 {
 		return s
 	}

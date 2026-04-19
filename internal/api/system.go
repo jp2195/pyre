@@ -115,20 +115,9 @@ func (c *Client) GetSystemInfo(ctx context.Context, target string) (*models.Syst
 
 	// Parse current time
 	if si.Time != "" {
-		layouts := []string{
-			"Mon Jan 2 15:04:05 2006",
-			"Mon Jan 02 15:04:05 2006",
-			"2006-01-02 15:04:05",
-		}
-		parsed := false
-		for _, layout := range layouts {
-			if t, err := time.Parse(layout, si.Time); err == nil {
-				info.CurrentTime = t
-				parsed = true
-				break
-			}
-		}
-		if !parsed {
+		if t, err := parsePANTime(si.Time); err == nil {
+			info.CurrentTime = t
+		} else {
 			log.Printf("[API Warning] failed to parse system time %q: no matching layout", si.Time)
 		}
 	}
@@ -187,16 +176,8 @@ func (c *Client) GetLoggedInAdmins(ctx context.Context, target string) ([]models
 		}
 		// Parse session start time
 		if e.Time != "" {
-			layouts := []string{
-				"01/02/2006 15:04:05",
-				"2006-01-02 15:04:05",
-				"Mon Jan 2 15:04:05 2006",
-			}
-			for _, layout := range layouts {
-				if t, err := time.Parse(layout, e.Time); err == nil {
-					admin.SessionStart = t
-					break
-				}
+			if t, err := parsePANTime(e.Time); err == nil {
+				admin.SessionStart = t
 			}
 		}
 		admins = append(admins, admin)

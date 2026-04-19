@@ -3,6 +3,7 @@ package views
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -60,6 +61,12 @@ func (m InterfacesModel) SetSize(width, height int) InterfacesModel {
 
 func (m InterfacesModel) SetLoading(loading bool) InterfacesModel {
 	m.TableBase = m.TableBase.SetLoading(loading)
+	return m
+}
+
+// SetSpinnerFrame updates the current spinner animation frame.
+func (m InterfacesModel) SetSpinnerFrame(frame string) InterfacesModel {
+	m.TableBase = m.TableBase.SetSpinnerFrame(frame)
 	return m
 }
 
@@ -330,7 +337,7 @@ func (m InterfacesModel) renderTable() string {
 	header := m.formatHeaderRow(availableWidth)
 	b.WriteString(headerStyle.Render(header))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(strings.Repeat("─", minInt(availableWidth, len(header)+10))))
+	b.WriteString(dimStyle.Render(strings.Repeat("─", min(availableWidth, len(header)+10))))
 	b.WriteString("\n")
 
 	visibleRows := m.visibleRows()
@@ -449,10 +456,10 @@ func (m InterfacesModel) renderDetailPanel(iface models.Interface) string {
 	lines = append(lines, row("MAC Address", iface.MAC))
 	lines = append(lines, row("Virtual Router", iface.VirtualRouter))
 	if iface.MTU > 0 {
-		lines = append(lines, labelStyle.Render("MTU")+valueStyle.Render(fmt.Sprintf("%d", iface.MTU)))
+		lines = append(lines, labelStyle.Render("MTU")+valueStyle.Render(strconv.Itoa(iface.MTU)))
 	}
 	if iface.Tag > 0 {
-		lines = append(lines, labelStyle.Render("VLAN Tag")+valueStyle.Render(fmt.Sprintf("%d", iface.Tag)))
+		lines = append(lines, labelStyle.Render("VLAN Tag")+valueStyle.Render(strconv.Itoa(iface.Tag)))
 	}
 
 	// Physical

@@ -4,11 +4,17 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
+	"regexp"
 	"sync"
+	"time"
 
 	"go.yaml.in/yaml/v4"
 )
+
+// defaultStepTimeout is the per-step timeout used when Step.Timeout is unset.
+const defaultStepTimeout = 30 * time.Second
 
 //go:embed runbooks/*.yaml
 var embeddedRunbooks embed.FS
@@ -42,13 +48,22 @@ type Runbook struct {
 
 // Step represents a single troubleshooting step.
 type Step struct {
-	ID          string    `yaml:"id"`
-	Name        string    `yaml:"name"`
-	Description string    `yaml:"description"`
-	Type        StepType  `yaml:"type"`
-	APICall     string    `yaml:"api_call"` // For API steps
-	Patterns    []Pattern `yaml:"patterns"`
-	Required    bool      `yaml:"required"` // Stop on failure?
+	ID          string        `yaml:"id"`
+	Name        string        `yaml:"name"`
+	Description string        `yaml:"description"`
+	Type        StepType      `yaml:"type"`
+	APICall     string        `yaml:"api_call"` // For API steps
+	Patterns    []Pattern     `yaml:"patterns"`
+	Required    bool          `yaml:"required"`          // Stop on failure?
+	Timeout     time.Duration `yaml:"timeout,omitempty"` // Per-step timeout; zero means defaultStepTimeout.
+}
+
+// effectiveTimeout returns Step.Timeout if positive, else defaultStepTimeout.
+func (s *Step) effectiveTimeout() time.Duration {
+	if s.Timeout > 0 {
+		return s.Timeout
+	}
+	return defaultStepTimeout
 }
 
 // Pattern represents a regex pattern to match in output.
@@ -96,14 +111,58 @@ func (r *Registry) LoadEmbedded() error {
 			return fmt.Errorf("failed to parse runbook %s: %w", path, err)
 		}
 
+		if err := runbook.Validate(); err != nil {
+			return fmt.Errorf("invalid runbook %s: %w", path, err)
+		}
+
 		r.Register(&runbook)
 		return nil
 	})
 }
 
-// LoadFromFile loads a runbook from a YAML file.
+// Validate checks that the runbook is structurally valid.
+func (rb *Runbook) Validate() error {
+	if rb.ID == "" {
+		return fmt.Errorf("runbook ID must not be empty")
+	}
+	if rb.Name == "" {
+		return fmt.Errorf("runbook %q: name must not be empty", rb.ID)
+	}
+	if len(rb.Steps) == 0 {
+		return fmt.Errorf("runbook %q: must have at least one step", rb.ID)
+	}
+	for i, step := range rb.Steps {
+		if err := step.Validate(); err != nil {
+			return fmt.Errorf("runbook %q: step %d: %w", rb.ID, i, err)
+		}
+	}
+	return nil
+}
+
+// validStepTypes enumerates the accepted Step.Type values.
+var validStepTypes = map[StepType]struct{}{
+	StepTypeAPI: {},
+}
+
+// Validate checks that the step is structurally valid.
+func (s *Step) Validate() error {
+	if s.ID == "" {
+		return fmt.Errorf("step ID must not be empty")
+	}
+	if _, ok := validStepTypes[s.Type]; !ok {
+		return fmt.Errorf("step %q: unknown type %q", s.ID, s.Type)
+	}
+	for i, p := range s.Patterns {
+		if _, err := regexp.Compile(p.Regex); err != nil {
+			return fmt.Errorf("step %q: pattern %d (%q): invalid regex: %w", s.ID, i, p.ID, err)
+		}
+	}
+	return nil
+}
+
+// LoadFromFile loads a runbook from a YAML file on the local filesystem.
 func (r *Registry) LoadFromFile(path string) error {
-	data, err := fs.ReadFile(embeddedRunbooks, path)
+	data, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return fmt.Errorf("failed to read runbook file: %w", err)
 	}
@@ -111,6 +170,10 @@ func (r *Registry) LoadFromFile(path string) error {
 	var runbook Runbook
 	if err := yaml.Unmarshal(data, &runbook); err != nil {
 		return fmt.Errorf("failed to parse runbook: %w", err)
+	}
+
+	if err := runbook.Validate(); err != nil {
+		return fmt.Errorf("invalid runbook: %w", err)
 	}
 
 	r.Register(&runbook)

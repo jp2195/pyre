@@ -287,7 +287,8 @@ func (m Model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			)
 			return m, nil
 		}
-		return m, nil
+		// Not Panorama — fall through to view-level handler so 'd' reaches
+		// views (e.g. sessions) that bind it to their own action.
 
 	case key.Matches(msg, m.keys.Refresh):
 		return m.handleRefresh()
@@ -357,12 +358,12 @@ func (m Model) handleSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
 	frame := m.spinner.View()
 	m.policies = m.policies.SetSpinnerFrame(frame)
 	m.natPolicies = m.natPolicies.SetSpinnerFrame(frame)
-	m.sessions.SpinnerFrame = frame
-	m.interfaces.SpinnerFrame = frame
-	m.routes.SpinnerFrame = frame
-	m.ipsecTunnels.SpinnerFrame = frame
-	m.gpUsers.SpinnerFrame = frame
-	m.logs.SpinnerFrame = frame
+	m.sessions = m.sessions.SetSpinnerFrame(frame)
+	m.interfaces = m.interfaces.SetSpinnerFrame(frame)
+	m.routes = m.routes.SetSpinnerFrame(frame)
+	m.ipsecTunnels = m.ipsecTunnels.SetSpinnerFrame(frame)
+	m.gpUsers = m.gpUsers.SetSpinnerFrame(frame)
+	m.logs = m.logs.SetSpinnerFrame(frame)
 
 	// Share spinner frame with dashboard views
 	m.dashboard = m.dashboard.SetSpinnerFrame(frame)

@@ -3,6 +3,7 @@ package views
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -108,7 +109,7 @@ func (m LogsModel) renderThreatDetail(log models.ThreatLogEntry) string {
 	lines = append(lines, labelStyle.Render("Time")+DetailValueStyle.Render(log.Time.Format("2006-01-02 15:04:05")))
 	lines = append(lines, labelStyle.Render("Severity")+colorBySeverity(log.Severity, log.Severity))
 	lines = append(lines, labelStyle.Render("Threat Name")+DetailValueStyle.Render(log.ThreatName))
-	lines = append(lines, labelStyle.Render("Threat ID")+DetailValueStyle.Render(fmt.Sprintf("%d", log.ThreatID)))
+	lines = append(lines, labelStyle.Render("Threat ID")+DetailValueStyle.Render(strconv.FormatInt(log.ThreatID, 10)))
 	lines = append(lines, labelStyle.Render("Category")+DetailValueStyle.Render(log.ThreatCategory))
 	lines = append(lines, labelStyle.Render("Subtype")+DetailValueStyle.Render(log.Subtype))
 	lines = append(lines, labelStyle.Render("Action")+colorByAction(log.Action, log.Action))

@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/jp2195/pyre/internal/tui/theme"
@@ -145,7 +146,7 @@ func (m DashboardModel) renderSessionsCompact(width int) string {
 
 	// CPS and throughput on one line
 	b.WriteString(dimStyle().Render("CPS: "))
-	b.WriteString(valueStyle().Render(fmt.Sprintf("%d", si.CPS)))
+	b.WriteString(valueStyle().Render(strconv.Itoa(si.CPS)))
 	b.WriteString(dimStyle().Render("  Thru: "))
 	b.WriteString(valueStyle().Render(formatThroughput(si.ThroughputKbps)))
 

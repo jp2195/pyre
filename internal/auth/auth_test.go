@@ -27,12 +27,10 @@ func TestConcurrentSetActiveFirewall(t *testing.T) {
 
 		// Launch concurrent SetActiveFirewall calls
 		for i := range 100 {
-			wg.Add(1)
-			go func(idx int) {
-				defer wg.Done()
-				fw := firewalls[idx%len(firewalls)]
+			wg.Go(func() {
+				fw := firewalls[i%len(firewalls)]
 				session.SetActiveFirewall(fw)
-			}(i)
+			})
 		}
 
 		wg.Wait()
@@ -92,12 +90,10 @@ func TestConcurrentAddRemoveConnection(t *testing.T) {
 
 		// Concurrent adds - use different IPs as keys
 		for i := range 50 {
-			wg.Add(1)
-			go func(idx int) {
-				defer wg.Done()
-				host := "10.0.0." + string(rune('a'+idx%26))
+			wg.Go(func() {
+				host := "10.0.0." + string(rune('a'+i%26))
 				_, _ = session.AddConnection(host, fwConfig, "key")
-			}(i)
+			})
 		}
 
 		wg.Wait()
@@ -124,16 +120,14 @@ func TestConcurrentMixedOperations(t *testing.T) {
 
 		// Writers
 		for i := range 25 {
-			wg.Add(1)
-			go func(idx int) {
-				defer wg.Done()
-				if idx%2 == 0 {
+			wg.Go(func() {
+				if i%2 == 0 {
 					session.SetActiveFirewall("10.0.0.1")
 				} else {
-					host := "10.1.0." + string(rune('a'+idx%26))
+					host := "10.1.0." + string(rune('a'+i%26))
 					_, _ = session.AddConnection(host, fwConfig, "key")
 				}
-			}(i)
+			})
 		}
 
 		// Readers

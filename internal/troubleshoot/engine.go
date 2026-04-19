@@ -87,9 +87,17 @@ func (e *Engine) executeStep(ctx context.Context, index int, step Step) StepResu
 	var output string
 	var err error
 
+	// Apply per-step timeout so a hung API call cannot stall the whole runbook.
+	// This context scopes both the step-type dispatch below AND the subsequent
+	// MatchAll pass: `defer cancel()` fires at function return, so any work
+	// that consults stepCtx before we return (including pattern matching)
+	// inherits the same deadline.
+	stepCtx, cancel := context.WithTimeout(ctx, step.effectiveTimeout())
+	defer cancel()
+
 	switch step.Type {
 	case StepTypeAPI:
-		output, err = e.executeAPIStep(ctx, step)
+		output, err = e.executeAPIStep(stepCtx, step)
 	default:
 		err = fmt.Errorf("unknown step type: %s", step.Type)
 	}

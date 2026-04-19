@@ -3,6 +3,7 @@ package views
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -80,6 +81,12 @@ func (m RoutesModel) SetSize(width, height int) RoutesModel {
 
 func (m RoutesModel) SetLoading(loading bool) RoutesModel {
 	m.TableBase = m.TableBase.SetLoading(loading)
+	return m
+}
+
+// SetSpinnerFrame updates the current spinner animation frame.
+func (m RoutesModel) SetSpinnerFrame(frame string) RoutesModel {
+	m.TableBase = m.TableBase.SetSpinnerFrame(frame)
 	return m
 }
 
@@ -370,7 +377,7 @@ func (m RoutesModel) renderRoutesTable() string {
 	header := m.formatRouteHeaderRow(availableWidth)
 	b.WriteString(headerStyle.Render(header))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(strings.Repeat("─", minInt(availableWidth, len(header)+10))))
+	b.WriteString(dimStyle.Render(strings.Repeat("─", min(availableWidth, len(header)+10))))
 	b.WriteString("\n")
 
 	visibleRows := m.visibleRows()
@@ -437,7 +444,7 @@ func (m RoutesModel) formatRouteRow(route models.RouteEntry, width int) string {
 
 	metric := ""
 	if route.Metric > 0 {
-		metric = fmt.Sprintf("%d", route.Metric)
+		metric = strconv.Itoa(route.Metric)
 	}
 
 	if width >= 100 {
@@ -504,18 +511,18 @@ func (m RoutesModel) renderNeighborsTable() string {
 	header := m.formatNeighborHeaderRow(availableWidth)
 	b.WriteString(headerStyle.Render(header))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(strings.Repeat("─", minInt(availableWidth, len(header)+10))))
+	b.WriteString(dimStyle.Render(strings.Repeat("─", min(availableWidth, len(header)+10))))
 	b.WriteString("\n")
 
 	// Build combined neighbor list
 	type neighborRow struct {
-		nType   string
-		peer    string
-		state   string
-		asArea  string
-		prefix  string
-		uptime  string
-		vr      string
+		nType  string
+		peer   string
+		state  string
+		asArea string
+		prefix string
+		uptime string
+		vr     string
 	}
 
 	var rows []neighborRow
@@ -526,7 +533,7 @@ func (m RoutesModel) renderNeighborsTable() string {
 		}
 		prefixes := ""
 		if n.PrefixesReceived > 0 {
-			prefixes = fmt.Sprintf("%d", n.PrefixesReceived)
+			prefixes = strconv.Itoa(n.PrefixesReceived)
 		}
 		rows = append(rows, neighborRow{
 			nType:  "BGP",

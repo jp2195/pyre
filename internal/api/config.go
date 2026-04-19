@@ -1,10 +1,9 @@
 package api
 
 import (
-	"context"
 	"bytes"
+	"context"
 	"strings"
-	"time"
 
 	"github.com/jp2195/pyre/internal/models"
 )
@@ -60,11 +59,8 @@ func (c *Client) GetPendingChanges(ctx context.Context, target string) ([]models
 		}
 
 		// Parse time
-		for _, layout := range []string{"2006/01/02 15:04:05", "Mon Jan 2 15:04:05 2006"} {
-			if t, err := time.Parse(layout, e.Time); err == nil {
-				change.Time = t
-				break
-			}
+		if t, err := parsePANTime(e.Time); err == nil {
+			change.Time = t
 		}
 
 		changes = append(changes, change)

@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -172,3 +173,133 @@ func TestClient_ConcurrentTargetsNoInterference(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+// serveBody starts a TLS httptest server that returns the given body with a
+// 200 OK status for every request. The returned teardown closes the server
+// and the client's idle connections.
+func serveBody(t *testing.T, body string) (*Client, func()) {
+	t.Helper()
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(body))
+	}))
+	host := strings.TrimPrefix(srv.URL, "https://")
+	c, err := NewClient(host, "K", ClientOptions{Insecure: true})
+	if err != nil {
+		srv.Close()
+		t.Fatalf("NewClient: %v", err)
+	}
+	return c, func() {
+		_ = c.Close()
+		srv.Close()
+	}
+}
+
+// opParams is a small helper returning params for a trivial "op" request
+// so tests can drive the full request() path.
+func opParams() url.Values {
+	return url.Values{"type": {"op"}, "cmd": {"<show/>"}}
+}
+
+func TestRequest_ValidSuccessResponse(t *testing.T) {
+	c, done := serveBody(t, `<response status="success"><result><foo>ok</foo></result></response>`)
+	defer done()
+
+	resp, err := c.request(context.Background(), opParams(), "")
+	if err != nil {
+		t.Fatalf("request: unexpected error: %v", err)
+	}
+	if !resp.IsSuccess() {
+		t.Fatalf("expected success, got status=%q code=%q", resp.Status, resp.Code)
+	}
+	if !strings.Contains(string(resp.Result.Inner), "<foo>ok</foo>") {
+		t.Errorf("result inner = %q, want to contain <foo>ok</foo>", resp.Result.Inner)
+	}
+}
+
+func TestRequest_ErrorResponse_PopulatesStatusAndMessage(t *testing.T) {
+	// PAN-OS error style: status="error" code="13" with a <msg><line>…</line></msg>.
+	// request() itself parses the envelope successfully (no error return); it
+	// is the caller's job to surface the error via CheckResponse. Assert both
+	// that the parsed envelope carries the diagnostic code and that
+	// CheckResponse produces a typed *APIError with the sanitized message.
+	body := `<response status="error" code="13"><msg><line>Permission denied</line></msg></response>`
+	c, done := serveBody(t, body)
+	defer done()
+
+	resp, err := c.request(context.Background(), opParams(), "")
+	if err != nil {
+		t.Fatalf("request: unexpected transport error: %v", err)
+	}
+	if resp.IsSuccess() {
+		t.Fatalf("expected non-success response, got status=%q", resp.Status)
+	}
+	if resp.Code != "13" {
+		t.Errorf("resp.Code = %q, want %q", resp.Code, "13")
+	}
+
+	checkErr := CheckResponse(resp)
+	if checkErr == nil {
+		t.Fatal("CheckResponse returned nil for an error response")
+	}
+	var apiErr *APIError
+	if !errors.As(checkErr, &apiErr) {
+		t.Fatalf("CheckResponse err = %T, want *APIError", checkErr)
+	}
+	if apiErr.Code != "13" {
+		t.Errorf("APIError.Code = %q, want %q", apiErr.Code, "13")
+	}
+	if !strings.Contains(apiErr.Error(), "Permission denied") {
+		t.Errorf("APIError.Error() = %q, want to contain %q", apiErr.Error(), "Permission denied")
+	}
+}
+
+func TestRequest_TruncatedXML_ReturnsError(t *testing.T) {
+	// Body is an unterminated element — the XML decoder must surface this as
+	// a parse error rather than panicking or returning a bogus success.
+	c, done := serveBody(t, `<response status="success"><result><foo`)
+	defer done()
+
+	resp, err := c.request(context.Background(), opParams(), "")
+	if err == nil {
+		t.Fatalf("expected parse error for truncated XML, got resp=%+v", resp)
+	}
+	if !strings.Contains(err.Error(), "parsing response") {
+		t.Errorf("err = %v, want to mention 'parsing response'", err)
+	}
+}
+
+func TestRequest_EmptyBody_ReturnsError(t *testing.T) {
+	c, done := serveBody(t, ``)
+	defer done()
+
+	resp, err := c.request(context.Background(), opParams(), "")
+	if err == nil {
+		t.Fatalf("expected error for empty body, got resp=%+v", resp)
+	}
+}
+
+func TestRequest_DoctypeRejected_NotPanic(t *testing.T) {
+	// Wire-level decodeXML rejects DOCTYPE directives; this must flow up to
+	// request() as a returned error, not a panic.
+	body := `<?xml version="1.0"?><!DOCTYPE response [<!ENTITY lol "lol">]><response status="success"><result/></response>`
+	c, done := serveBody(t, body)
+	defer done()
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("request() panicked on DOCTYPE body: %v", r)
+		}
+	}()
+
+	resp, err := c.request(context.Background(), opParams(), "")
+	if err == nil {
+		t.Fatalf("expected DOCTYPE rejection error, got resp=%+v", resp)
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "doctype") &&
+		!strings.Contains(strings.ToLower(err.Error()), "directive") {
+		t.Errorf("err = %v, want to mention doctype/directive", err)
+	}
+}
+
+

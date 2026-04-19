@@ -3,6 +3,7 @@ package views
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -282,11 +283,11 @@ func (m NetworkDashboardModel) renderARPSummary(width int) string {
 	}
 
 	// Summary
-	b.WriteString(valueStyle().Render(fmt.Sprintf("%d", len(m.arpTable))))
+	b.WriteString(valueStyle().Render(strconv.Itoa(len(m.arpTable))))
 	b.WriteString(dimStyle().Render(" entries"))
 	if completeCount > 0 {
 		b.WriteString(dimStyle().Render(" ("))
-		b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", completeCount)))
+		b.WriteString(highlightStyle().Render(strconv.Itoa(completeCount)))
 		b.WriteString(dimStyle().Render(" complete)"))
 	}
 
@@ -323,7 +324,7 @@ func (m NetworkDashboardModel) renderRoutingSummary(width int) string {
 	}
 
 	// Total routes
-	b.WriteString(valueStyle().Render(fmt.Sprintf("%d", len(m.routes))))
+	b.WriteString(valueStyle().Render(strconv.Itoa(len(m.routes))))
 	b.WriteString(dimStyle().Render(" routes"))
 	b.WriteString("\n")
 
@@ -386,7 +387,7 @@ func (m NetworkDashboardModel) renderNeighborsSummary(width int) string {
 			}
 		}
 		b.WriteString(dimStyle().Render("BGP: "))
-		b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", established)))
+		b.WriteString(highlightStyle().Render(strconv.Itoa(established)))
 		b.WriteString(dimStyle().Render(fmt.Sprintf("/%d up", len(m.bgpNeighbors))))
 		if hasOSPF {
 			b.WriteString("\n")
@@ -403,7 +404,7 @@ func (m NetworkDashboardModel) renderNeighborsSummary(width int) string {
 			}
 		}
 		b.WriteString(dimStyle().Render("OSPF: "))
-		b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", full)))
+		b.WriteString(highlightStyle().Render(strconv.Itoa(full)))
 		b.WriteString(dimStyle().Render(fmt.Sprintf("/%d full", len(m.ospfNeighbors))))
 	}
 

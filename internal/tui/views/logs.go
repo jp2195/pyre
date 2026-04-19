@@ -68,6 +68,12 @@ func (m LogsModel) SetLoading(loading bool) LogsModel {
 	return m
 }
 
+// SetSpinnerFrame updates the current spinner animation frame.
+func (m LogsModel) SetSpinnerFrame(frame string) LogsModel {
+	m.TableBase = m.TableBase.SetSpinnerFrame(frame)
+	return m
+}
+
 // HasData returns true if any logs have been loaded.
 func (m LogsModel) HasData() bool {
 	return m.systemLogs != nil || m.trafficLogs != nil || m.threatLogs != nil

@@ -1,8 +1,10 @@
 package api
 
 import (
-	"context"
 	"bytes"
+	"cmp"
+	"context"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -113,14 +115,8 @@ func parseJobTimestamp(s string) time.Time {
 	if s == "" {
 		return time.Time{}
 	}
-	for _, layout := range []string{
-		"2006/01/02 15:04:05",
-		"2006-01-02 15:04:05",
-		"Mon Jan 2 15:04:05 2006",
-	} {
-		if t, err := time.Parse(layout, s); err == nil {
-			return t
-		}
+	if t, err := parsePANTime(s); err == nil {
+		return t
 	}
 	return time.Time{}
 }
@@ -179,14 +175,10 @@ func (c *Client) GetJobs(ctx context.Context, target string) ([]models.Job, erro
 		jobs = append(jobs, job)
 	}
 
-	// Sort by ID descending (most recent first)
-	for i := 0; i < len(jobs)-1; i++ {
-		for j := i + 1; j < len(jobs); j++ {
-			if jobs[j].ID > jobs[i].ID {
-				jobs[i], jobs[j] = jobs[j], jobs[i]
-			}
-		}
-	}
+	// Sort by ID descending (most recent first).
+	slices.SortFunc(jobs, func(a, b models.Job) int {
+		return cmp.Compare(b.ID, a.ID)
+	})
 
 	return jobs, nil
 }
@@ -413,22 +405,11 @@ func (c *Client) GetCertificates(ctx context.Context, target string) ([]models.C
 		}
 
 		// Parse dates
-		dateLayouts := []string{
-			"Jan 2 15:04:05 2006 MST",
-			"2006-01-02 15:04:05",
-			"Mon Jan 2 15:04:05 2006",
+		if t, err := parsePANTime(e.NotValidBefore); err == nil {
+			cert.NotBefore = t
 		}
-		for _, layout := range dateLayouts {
-			if t, err := time.Parse(layout, e.NotValidBefore); err == nil {
-				cert.NotBefore = t
-				break
-			}
-		}
-		for _, layout := range dateLayouts {
-			if t, err := time.Parse(layout, e.NotValidAfter); err == nil {
-				cert.NotAfter = t
-				break
-			}
+		if t, err := parsePANTime(e.NotValidAfter); err == nil {
+			cert.NotAfter = t
 		}
 
 		// Calculate days left and status

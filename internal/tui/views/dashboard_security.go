@@ -3,6 +3,7 @@ package views
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -126,7 +127,7 @@ func (m SecurityDashboardModel) renderThreatBreakdown(width int) string {
 
 	// Total count
 	b.WriteString(dimStyle().Render("Total: "))
-	b.WriteString(valueStyle().Render(fmt.Sprintf("%d", ts.TotalThreats)))
+	b.WriteString(valueStyle().Render(strconv.FormatInt(ts.TotalThreats, 10)))
 	b.WriteString("\n\n")
 
 	// Action breakdown
@@ -256,7 +257,7 @@ func (m SecurityDashboardModel) renderZeroHitRules(width int) string {
 	}
 
 	pct := float64(len(zeroHitRules)) / float64(totalActive) * 100
-	b.WriteString(warningStyle().Render(fmt.Sprintf("%d", len(zeroHitRules))))
+	b.WriteString(warningStyle().Render(strconv.Itoa(len(zeroHitRules))))
 	b.WriteString(dimStyle().Render(fmt.Sprintf(" of %d rules (%.0f%%)", totalActive, pct)))
 	b.WriteString("\n\n")
 

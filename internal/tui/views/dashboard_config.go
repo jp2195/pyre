@@ -3,6 +3,7 @@ package views
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -144,25 +145,25 @@ func (m ConfigDashboardModel) renderPolicyStats(width int) string {
 	}
 
 	// Summary
-	b.WriteString(valueStyle().Render(fmt.Sprintf("%d", totalRules)))
+	b.WriteString(valueStyle().Render(strconv.Itoa(totalRules)))
 	b.WriteString(dimStyle().Render(" total rules ("))
-	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", enabledRules)))
+	b.WriteString(highlightStyle().Render(strconv.Itoa(enabledRules)))
 	b.WriteString(dimStyle().Render(" enabled)"))
 	b.WriteString("\n\n")
 
 	// Breakdown
 	labelWidth := 12
 	b.WriteString(labelStyle().Render(fmt.Sprintf("%-*s", labelWidth, "Allow:")))
-	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", allowRules)))
+	b.WriteString(highlightStyle().Render(strconv.Itoa(allowRules)))
 	b.WriteString("\n")
 
 	b.WriteString(labelStyle().Render(fmt.Sprintf("%-*s", labelWidth, "Deny/Drop:")))
-	b.WriteString(errorStyle().Render(fmt.Sprintf("%d", denyRules)))
+	b.WriteString(errorStyle().Render(strconv.Itoa(denyRules)))
 	b.WriteString("\n")
 
 	b.WriteString(labelStyle().Render(fmt.Sprintf("%-*s", labelWidth, "Zero-hit:")))
 	if zeroHitRules > 0 {
-		b.WriteString(warningStyle().Render(fmt.Sprintf("%d", zeroHitRules)))
+		b.WriteString(warningStyle().Render(strconv.Itoa(zeroHitRules)))
 	} else {
 		b.WriteString(highlightStyle().Render("0"))
 	}
@@ -196,7 +197,7 @@ func (m ConfigDashboardModel) renderPendingChanges(width int) string {
 	}
 
 	// Count
-	b.WriteString(warningStyle().Render(fmt.Sprintf("%d", len(m.pendingChanges))))
+	b.WriteString(warningStyle().Render(strconv.Itoa(len(m.pendingChanges))))
 	b.WriteString(dimStyle().Render(" uncommitted changes"))
 	b.WriteString("\n\n")
 
@@ -216,7 +217,7 @@ func (m ConfigDashboardModel) renderPendingChanges(width int) string {
 		for user, count := range userChanges {
 			userName := truncateEllipsis(user, 15)
 			b.WriteString(labelStyle().Render(fmt.Sprintf("  %-15s ", userName)))
-			b.WriteString(valueStyle().Render(fmt.Sprintf("%d", count)))
+			b.WriteString(valueStyle().Render(strconv.Itoa(count)))
 			b.WriteString("\n")
 		}
 	}
@@ -295,7 +296,7 @@ func (m ConfigDashboardModel) renderZeroHitRules(width int) string {
 	}
 
 	pct := float64(len(zeroHitRules)) / float64(totalActive) * 100
-	b.WriteString(warningStyle().Render(fmt.Sprintf("%d", len(zeroHitRules))))
+	b.WriteString(warningStyle().Render(strconv.Itoa(len(zeroHitRules))))
 	b.WriteString(dimStyle().Render(fmt.Sprintf(" of %d rules (%.0f%%)", totalActive, pct)))
 	b.WriteString("\n\n")
 
