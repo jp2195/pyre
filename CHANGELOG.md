@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/jp2195/pyre/compare/v1.2.0...v1.2.1) (2026-04-19)
+
+
+### Bug Fixes
+
+* **deps:** update module golang.org/x/crypto to v0.48.0 ([#17](https://github.com/jp2195/pyre/issues/17)) ([8c0da4a](https://github.com/jp2195/pyre/commit/8c0da4a9f697f5aecbd4681a689c1204dd089d6b))
+
 ## [1.2.0](https://github.com/jp2195/pyre/compare/v1.1.1...v1.2.0) (2026-02-09)
 
 
