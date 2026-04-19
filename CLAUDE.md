@@ -51,22 +51,21 @@ go fix ./...                  # Apply modernizers (safe, behavior-preserving)
 
 ## Credential Resolution
 
-API keys are resolved in the following order (see `auth.ResolveCredentials`):
+pyre does not persist credentials — no keychain, no token cache. API keys
+are resolved per invocation in this order (see `auth.ResolveCredentials`):
 
 1. CLI flag `--api-key` (or `flags.APIKey`).
 2. Environment variable `PYRE_API_KEY`.
 3. Host-specific environment variable `PYRE_<HOST>_API_KEY`, where `<HOST>`
    is the connection host uppercased with `.` and `-` replaced by `_`.
-4. OS keychain via `config.GetAPIKey(host)` (backed by `go-keyring`, service
-   name `pyre`, key `apikey:<host>`).
-5. Fall through to `Credentials.PromptForPassword = true` so the TUI prompts
-   the user for username/password and runs keygen. On successful login the
-   resulting API key is written to the keychain via `config.SetAPIKey`.
+4. Fall through to `Credentials.PromptForPassword = true` so the TUI
+   prompts for username/password and runs keygen. The returned API key
+   lives in session memory only; it is not saved anywhere.
 
 Credential fields (`APIKey`, `Password`) on `config.ConnectionConfig` carry
-`yaml:"-"` tags, so they NEVER round-trip to `~/.pyre.yaml`. Connections
-are zeroed in `Session.RemoveConnection` to shorten the in-memory lifetime
-of secrets.
+`yaml:"-"` tags, so they cannot round-trip to `~/.pyre.yaml`. Connections
+are zeroed in `Session.RemoveConnection`. `TestConfig_DoesNotPersistCredentials`
+regression-guards the yaml tag.
 
 ## Debugging
 

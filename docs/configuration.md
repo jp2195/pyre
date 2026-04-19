@@ -1,199 +1,141 @@
 # Configuration
 
-pyre uses a YAML configuration file for managing connections and settings.
+pyre reads `~/.pyre.yaml` for connection definitions and UI settings.
+**pyre does not store credentials.** API keys and passwords are never
+written to `~/.pyre.yaml` or anywhere else on disk — you supply them at
+each invocation via env var, CLI flag, or the interactive login flow
+(session-only). See [Credentials](#credentials) below.
 
-## Configuration File Location
+## File location
 
-pyre looks for configuration at `~/.pyre.yaml`.
+Default: `~/.pyre.yaml`. Override with `--config /path/to/file.yaml`.
 
-You can specify a custom path with the `--config` flag:
-
-```bash
-pyre --config /path/to/config.yaml
-```
-
-## Full Configuration Example
+## Example
 
 ```yaml
-# Default connection (host/IP)
+# Host/IP of the default connection
 default: 10.0.0.1
 
-# Connections keyed by host/IP
+# Keyed by host/IP
 connections:
   10.0.0.1:
-    username: admin              # Username for login
-    type: firewall               # "firewall" or "panorama"
-    insecure: true               # Skip TLS verification
+    username: admin          # for the interactive-login flow
+    type: firewall           # firewall (default) or panorama
+    insecure: true           # skip TLS cert verification (lab only)
+
+  firewall-with-private-ca.example.com:
+    type: firewall
+    ca_cert_path: /etc/pyre/corp-ca.pem   # verify against this CA
 
   panorama.example.com:
     type: panorama
     insecure: true
 
-# Global settings
+# Global UI settings
 settings:
-  session_page_size: 50         # Sessions per page
-  theme: dark                   # Color theme
-  default_view: dashboard       # Initial view on connect
-```
-
-## Connection Options
-
-Connections are keyed by host/IP address. Each connection supports:
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `username` | string | | Username for API/login authentication |
-| `type` | string | firewall | Connection type: `firewall` or `panorama` |
-| `insecure` | bool | false | Skip TLS certificate verification |
-
-### TLS Certificate Verification
-
-Set `insecure: true` to skip TLS certificate verification. This is common for firewalls with self-signed certificates:
-
-```yaml
-connections:
-  10.0.0.1:
-    insecure: true
-```
-
-## Settings Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `session_page_size` | int | 50 | Number of sessions per page |
-| `theme` | string | dark | Color theme (see Theme Options) |
-| `default_view` | string | dashboard | Initial view on connect |
-
-### Default View Options
-
-Valid values for `default_view`:
-- `dashboard` - Overview dashboard (default)
-- `policies` - Security policies
-- `sessions` - Active sessions
-- `logs` - Log viewer
-- `interfaces` - Interface status
-
-### Theme Options
-
-pyre includes 10 built-in color themes:
-
-| Theme | Description |
-|-------|-------------|
-| `dark` | Default dark theme with purple accents |
-| `light` | Light theme with purple accents |
-| `nord` | Arctic, north-bluish color palette |
-| `dracula` | Dark theme with vibrant colors |
-| `solarized` | Solarized Dark color scheme |
-| `gruvbox` | Retro groove with warm colors |
-| `tokyonight` | Clean dark theme with blue tones |
-| `catppuccin` | Soothing pastel theme (Mocha variant) |
-| `onedark` | Atom One Dark inspired |
-| `monokai` | Classic Monokai editor colors |
-
-Example:
-
-```yaml
-settings:
+  session_page_size: 50
   theme: catppuccin
+  default_view: dashboard
 ```
 
-## Configuration Precedence
+## Connection options
 
-Values are resolved in this order (highest priority first):
+| Option         | Type   | Default    | Description                                               |
+|----------------|--------|------------|-----------------------------------------------------------|
+| `username`     | string | —          | Username for interactive login / keygen                   |
+| `type`         | string | `firewall` | `firewall` or `panorama`                                  |
+| `insecure`     | bool   | `false`    | Skip TLS certificate verification                         |
+| `ca_cert_path` | string | —          | Path to a PEM CA bundle; used instead of system roots     |
 
-1. **CLI flags** (`--host`, `--api-key`, `--insecure`)
-2. **Environment variables** (`PYRE_HOST`, `PYRE_API_KEY`)
-3. **Configuration file** (~/.pyre.yaml)
-4. **Default values**
+`insecure: true` and `ca_cert_path` are mutually exclusive — if both are
+set, `insecure` wins. Prefer `ca_cert_path` in production; use
+`insecure` only for lab gear with self-signed certs. If `ca_cert_path`
+is set but the file can't be read or parsed, pyre exits with an error
+rather than silently falling back to system roots.
 
-This means CLI flags override everything, and environment variables override config file values.
+## Global settings
 
-## Environment Variables
+| Option              | Type   | Default     | Description                          |
+|---------------------|--------|-------------|--------------------------------------|
+| `session_page_size` | int    | 50          | Sessions per page                    |
+| `theme`             | string | `dark`      | Color theme (see below)              |
+| `default_view`      | string | `dashboard` | Initial view after connect           |
 
-| Variable | Description |
-|----------|-------------|
-| `PYRE_HOST` | Firewall hostname or IP |
-| `PYRE_API_KEY` | API key for authentication |
-| `PYRE_INSECURE` | Skip TLS verification (true/false) |
+`default_view` accepts: `dashboard`, `policies`, `sessions`, `logs`,
+`interfaces`.
 
-## CLI Flags
+Themes: `dark`, `light`, `nord`, `dracula`, `solarized`, `gruvbox`,
+`tokyonight`, `catppuccin`, `onedark`, `monokai`.
 
-| Flag | Description |
-|------|-------------|
-| `--host` | Firewall hostname or IP |
-| `--user` | Username for login |
-| `--api-key` | API key for authentication |
-| `--insecure` | Skip TLS verification |
-| `--config` | Path to config file |
-| `-c` | Connect to a saved connection by host |
+## Credentials
 
-## Examples
+pyre resolves an API key for a host in this order (first hit wins):
 
-### Minimal Configuration
+1. `--api-key` CLI flag
+2. `PYRE_API_KEY` env var (global)
+3. `PYRE_<HOST>_API_KEY` env var (host-scoped; `<HOST>` is the host
+   uppercased with `.` and `-` replaced by `_`)
+4. Interactive login — pyre prompts for username + password, runs
+   keygen against the firewall, and uses the returned key for the
+   current session. The key is **not** saved.
 
-Connect to a single firewall:
+pyre never writes credentials to disk, no keychain, no token cache.
+If you want credentials to survive reboots, use env vars (in your
+shell profile, direnv, a password manager, etc.) — that's the user's
+responsibility, not pyre's. Credentials are zeroed in memory on
+disconnect. The fields that could hold them (`APIKey`, `Password`) are
+marked `yaml:"-"` so they cannot leak into `~/.pyre.yaml` via `Save`.
 
-```yaml
-connections:
-  192.168.1.1:
-    insecure: true
-```
+`~/.pyre.yaml` is expected to be `0600`. Permissive modes trigger a
+startup warning.
 
-Then connect with:
+## Environment variables
 
-```bash
-export PYRE_API_KEY=YOUR_API_KEY
-pyre -c 192.168.1.1
-```
+| Variable                | Purpose                                           |
+|-------------------------|---------------------------------------------------|
+| `PYRE_HOST`             | Default host when no `--host` / `-c` is given     |
+| `PYRE_API_KEY`          | API key (applies to any host)                     |
+| `PYRE_<HOST>_API_KEY`   | Host-scoped API key                               |
+| `PYRE_INSECURE`         | `true` to skip TLS verification                   |
+| `PYRE_DEBUG`            | `1` or `true` to enable per-request API logging   |
 
-### Multiple Connections
+`PYRE_DEBUG` is off by default because traces include xpath, op-command
+bodies, and response previews that are useful for debugging but noisy
+in normal use.
 
-Manage several firewalls:
+## CLI flags
 
-```yaml
-default: 10.1.0.1
+| Flag         | Purpose                                         |
+|--------------|-------------------------------------------------|
+| `--host`     | Firewall hostname or IP                         |
+| `--user`     | Username for interactive login                  |
+| `--api-key`  | API key                                         |
+| `--insecure` | Skip TLS verification                           |
+| `--config`   | Path to config file (default `~/.pyre.yaml`)    |
+| `-c`         | Connect to a saved connection by host/IP        |
 
-connections:
-  10.1.0.1:
-    username: admin
-    insecure: true
+## Precedence
 
-  10.2.0.1:
-    username: admin
-    insecure: true
+Highest to lowest:
 
-  192.168.100.1:
-    username: labadmin
-    insecure: true
-```
-
-### Panorama
-
-Connect to Panorama and target managed firewalls:
-
-```yaml
-default: panorama.example.com
-
-connections:
-  panorama.example.com:
-    type: panorama
-    insecure: true
-```
-
-Use `D` in pyre to select a managed firewall to target.
+1. CLI flags
+2. Environment variables (including host-scoped `PYRE_<HOST>_*`)
+3. `~/.pyre.yaml`
+4. Built-in defaults
 
 ## Connection Hub
 
-When you run `pyre` without flags and have connections configured, you'll see the Connection Hub. This lets you:
+Run `pyre` with a config but no specific `-c`/`--host` and you get the
+Connection Hub: saved connections, last-connected time, last user.
 
-- View all saved connections
-- See last connected time and user
-- Connect to any saved connection
-- Add new connections
-- Delete connections
+- `j`/`k` to move
+- `Enter` to connect
+- `n` to add a new connection
+- `e` to edit
+- `d` to delete
+- `Esc` to exit
 
-Press `n` to add a new connection or `Enter` to connect to the selected one.
+## State file
 
-## State File
-
-pyre stores connection state (last connected time, user) in `~/.pyre/state.json`. This file is managed automatically and doesn't need to be edited.
+pyre writes `~/.pyre/state.json` with last-connected time and user.
+Managed automatically; editing it isn't supported.

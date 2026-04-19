@@ -21,9 +21,10 @@ type Config struct {
 // Note: The host/IP is used as the map key in Config.Connections, not stored here.
 //
 // Credential fields (APIKey, Password) are tagged `yaml:"-"` so they are
-// NEVER round-tripped to ~/.pyre.yaml. At runtime they are hydrated from
-// the OS keychain (see keyring.go) or environment variables; at disconnect
-// they are zeroed (see internal/auth).
+// NEVER round-tripped to ~/.pyre.yaml. pyre does not persist credentials.
+// At runtime they come from CLI flags, environment variables, or the
+// interactive login flow (session-only); at disconnect they are zeroed
+// (see internal/auth).
 type ConnectionConfig struct {
 	Username   string `yaml:"username,omitempty"`     // Username for API authentication
 	Type       string `yaml:"type,omitempty"`         // "firewall" (default) or "panorama"

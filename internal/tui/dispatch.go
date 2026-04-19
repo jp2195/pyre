@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"log"
-
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/auth"
@@ -80,14 +78,10 @@ func (m Model) handleAuthMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		// Persist the API key to the OS keychain so subsequent launches
-		// skip the password prompt. Best-effort: a keychain failure must
-		// not block the user from completing login.
-		if host != "" && msg.APIKey != "" {
-			if err := config.SetAPIKey(host, msg.APIKey); err != nil {
-				log.Printf("warning: failed to persist API key to keychain for %s: %v", host, err)
-			}
-		}
+		// API keys are never persisted. The key lives in memory for the
+		// session only; next launch will re-run the login flow unless
+		// the user supplies an API key via --api-key, PYRE_API_KEY, or
+		// PYRE_<HOST>_API_KEY.
 
 		m.currentView = ViewDashboard
 

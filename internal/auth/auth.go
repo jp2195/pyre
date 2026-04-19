@@ -186,14 +186,13 @@ func ResolveCredentials(cfg *config.Config, flags config.CLIFlags) *Credentials 
 
 	// Host-based API key resolution order (documented in CLAUDE.md):
 	//   1. PYRE_<HOST>_API_KEY environment variable.
-	//   2. OS keychain via config.GetAPIKey.
-	//   3. Fall through to PromptForPassword=true so the TUI prompts.
+	//   2. Fall through to PromptForPassword=true so the TUI prompts.
+	// pyre does not persist credentials. Users manage them via env vars,
+	// CLI flags, or the interactive login flow (session-only).
 	if creds.Host != "" && creds.APIKey == "" {
 		envName := strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(creds.Host, "-", "_"), ".", "_"))
 		if envKey := os.Getenv("PYRE_" + envName + "_API_KEY"); envKey != "" {
 			creds.APIKey = envKey
-		} else if k, err := config.GetAPIKey(creds.Host); err == nil {
-			creds.APIKey = k
 		}
 	}
 

@@ -1,183 +1,102 @@
-# Contributing to pyre
+# Contributing
 
-Thank you for your interest in contributing to pyre! This document provides guidelines for development and contribution.
+## Prerequisites
 
-## Development Setup
+- Go 1.26 or later
+- macOS 13+, modern Linux, or Windows 10+
 
-### Prerequisites
-
-- Go 1.25 or later
-- macOS 12 Monterey+ (if on macOS)
-
-### Clone and Build
+## Setup
 
 ```bash
 git clone https://github.com/jp2195/pyre.git
 cd pyre
-go mod download
-go build -o pyre ./cmd/pyre
+make build       # builds ./pyre
+make test-race   # runs the race-enabled test suite
 ```
 
-### Run Tests
+The `Makefile` wraps the common Go commands: `build`, `test`, `test-race`,
+`vet`, `lint` (golangci-lint), `fix` (go fix + tidy), `tidy`, `smoke`, `clean`.
+
+## Layout
+
+- `cmd/pyre/` — entry point
+- `internal/api/` — PAN-OS XML API client. All responses go through
+  `decodeXML` (`xmlsafe.go`) which rejects DOCTYPE / entity declarations.
+- `internal/auth/` — session, connection, credential resolution, keygen
+- `internal/config/` — `~/.pyre.yaml`, CLI flags, env-var resolution
+- `internal/tui/` — Bubble Tea v2 application
+  - `app.go` — top-level `Model` and Update dispatcher
+  - `handlers.go` — key handlers
+  - `navigation.go` — table-driven nav (`navTargets` + `viewToNavbar`)
+  - `commands.go` — `tea.Cmd` factories
+  - `render.go` — header/footer
+  - `views/` — individual view models
+  - `theme/` — color palette
+- `internal/troubleshoot/` — pattern-matching engine + embedded runbooks
+- `internal/models/` — data structures
+
+## Key patterns
+
+- **Value receivers** on Bubble Tea models (immutable Update). **Pointer
+  receivers** for mutation + `tea.Cmd` return.
+- Only the top-level `Model.View()` returns `tea.View`. Sub-view models
+  return `string`; the top composes them and sets program options
+  (`AltScreen`, `MouseMode`) on the returned `tea.View`.
+- Key handlers type-switch on `tea.KeyPressMsg` (v2), not `tea.KeyMsg`.
+- `saveConfig()` / `saveState()` return `tea.Cmd` to avoid goroutine races.
+- Navigation lookups use `navTargets` (key → view) and `viewToNavbar`
+  (view → key). Keep both sides in sync; `navigation_test.go` asserts the
+  bijection.
+
+## Adding a new view
+
+1. Create `internal/tui/views/<name>.go` with a `Model` that has
+   `SetSize`, `Update(msg tea.Msg) (Model, tea.Cmd)`, and `View() string`.
+2. Wire it into `internal/tui/app.go`: add a field, a `ViewState`
+   constant, init in `NewModel`, dispatch cases in Update and the render
+   composition in the top-level `View()`.
+3. Add an entry to `navTargets` and `viewToNavbar` in
+   `internal/tui/navigation.go`. The bijection test will flag omissions.
+4. If the view needs a dedicated keybinding, add it to
+   `internal/tui/keys.go`.
+5. Document in `docs/views/<name>.md`.
+
+## Testing
 
 ```bash
-go test -v ./...
+make test-race           # race-enabled test suite
+make lint                # golangci-lint (v2, 5-minute timeout)
+go test -cover ./...     # package-level coverage
 ```
 
-## Project Architecture
+Tests use `httptest.NewTLSServer` (see `internal/api/client_internal_test.go`)
+for anything touching the API client. Credential tests use `t.Setenv`
+to drive the resolution order — see `internal/auth/credentials_test.go`.
 
-```
-pyre/
-├── cmd/
-│   ├── pyre/              # Main application entry point
-│   └── pyre-demo/         # Mock server for development
-├── internal/
-│   ├── api/               # PAN-OS XML API client
-│   │   ├── client.go      # Base HTTP client
-│   │   ├── firewall.go    # Firewall API methods
-│   │   └── panorama.go    # Panorama API methods
-│   ├── auth/              # Authentication and session management
-│   │   ├── auth.go        # Session state, connection handling
-│   │   └── keygen.go      # API key generation
-│   ├── config/            # Configuration loading
-│   │   └── config.go      # YAML config, defaults, CLI overrides
-│   ├── models/            # Data structures
-│   │   ├── device.go      # SystemInfo, Resources, HAStatus
-│   │   ├── policy.go      # SecurityRule
-│   │   ├── nat.go         # NATRule
-│   │   ├── session.go     # Session, SessionInfo
-│   │   └── logs.go        # LogEntry types
-│   └── tui/               # Bubbletea TUI
-│       ├── app.go         # Main model, view switching
-│       ├── keys.go        # Keybindings
-│       ├── styles.go      # Lipgloss styles
-│       └── views/         # Individual view components
-│           ├── dashboard.go
-│           ├── dashboard_config.go
-│           ├── dashboard_network.go
-│           ├── dashboard_security.go
-│           ├── dashboard_vpn.go
-│           ├── device_picker.go
-│           ├── interfaces.go
-│           ├── login.go
-│           ├── logs.go
-│           ├── nat_policies.go
-│           ├── navbar.go
-│           ├── picker.go
-│           ├── policies.go
-│           └── sessions.go
-├── docs/                  # Documentation
-│   ├── getting-started.md
-│   ├── navigation.md
-│   ├── keybindings.md
-│   ├── configuration.md
-│   ├── panorama.md
-│   └── views/             # Per-view documentation
-```
+## Style
 
-## Running with pyre-demo
+- Conventional Commits (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`,
+  `test:`, `perf:`, `ci:`, `build:`). Scope optional.
+- Tabs for Go indentation.
+- Prefer Go 1.26 idioms: `for range N`, `min`/`max` builtins,
+  `wg.Go(func(){...})`, `slices.SortFunc`.
+- Handle errors explicitly. Use `context.Context` for cancellation.
 
-The `pyre-demo` command starts a mock API server for development without a real firewall:
+## Pull requests
 
-```bash
-# Build and run the demo server
-go build -o pyre-demo ./cmd/pyre-demo
-./pyre-demo
+1. Branch from `main`.
+2. Keep PRs focused on one logical change.
+3. Run `make test-race lint vet` before opening.
+4. Describe what the change does and why.
 
-# In another terminal, connect pyre to the mock server
-./pyre --host localhost:8443 --api-key demo-key --insecure
-```
+## Reporting issues
 
-The demo server provides:
-- Mock PAN-OS XML API responses
-- Simulated system info, policies, sessions, logs
+Include:
 
-## Adding New Views
-
-1. Create a new file in `internal/tui/views/` (e.g., `myview.go`)
-2. Define the model struct with required fields:
-
-```go
-type MyViewModel struct {
-    data    []MyDataType
-    err     error
-    cursor  int
-    width   int
-    height  int
-}
-
-func NewMyViewModel() MyViewModel {
-    return MyViewModel{}
-}
-
-func (m MyViewModel) SetSize(width, height int) MyViewModel {
-    m.width = width
-    m.height = height
-    return m
-}
-
-func (m MyViewModel) Update(msg tea.Msg) (MyViewModel, tea.Cmd) {
-    // Handle key events
-    return m, nil
-}
-
-func (m MyViewModel) View() string {
-    // Render the view
-    return ""
-}
-```
-
-3. Add the view to `internal/tui/app.go`:
-   - Add field to `Model` struct
-   - Add `ViewState` constant
-   - Initialize in `NewModel`
-   - Add case in `Update` for view switching
-   - Add case in `View` for rendering
-
-4. Add to navigation in `internal/tui/views/navbar.go`:
-   - Add `NavItem` to appropriate group
-
-5. Add keybinding in `internal/tui/keys.go` if needed
-
-6. Document the view in `docs/views/`
-
-## Code Style
-
-- Follow standard Go conventions
-- Use `go fmt` before committing
-- Keep functions focused and small
-- Add comments for exported types and functions
-- Handle errors explicitly, don't panic
-- Use context propagation for cancellation
-
-## Pull Request Process
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/my-feature`)
-3. Make your changes
-4. Run tests (`go test ./...`)
-5. Run linting (`go vet ./...`)
-6. Commit with descriptive messages
-7. Push to your fork
-8. Open a Pull Request
-
-### PR Guidelines
-
-- Keep PRs focused on a single change
-- Include tests for new functionality
-- Update documentation if needed
-- Describe what the PR does and why
-
-## Reporting Issues
-
-When reporting bugs, please include:
-- pyre version (`pyre --version`)
-- Go version (`go version`)
+- `pyre --version`
+- `go version`
 - OS and version
 - Steps to reproduce
 - Expected vs actual behavior
-- Relevant log output (sanitized of sensitive data)
-
-## Questions?
-
-Open an issue with the `question` label or start a discussion.
+- Relevant output with `PYRE_DEBUG=1` if you can reproduce a failure
+  (scrub credentials and hostnames before sharing)

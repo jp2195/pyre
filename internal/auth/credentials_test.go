@@ -3,8 +3,6 @@ package auth_test
 import (
 	"testing"
 
-	"github.com/zalando/go-keyring"
-
 	"github.com/jp2195/pyre/internal/auth"
 	"github.com/jp2195/pyre/internal/config"
 )
@@ -21,60 +19,57 @@ func newConfigWithHost(host string) *config.Config {
 	}
 }
 
-// TestResolveCredentials_HostEnvVarWins exercises priority rule 3 in the
-// documented resolution order: the PYRE_<HOST>_API_KEY environment variable
-// is consulted after the CLI flag and PYRE_API_KEY but before the keychain.
-// With no CLI flag and no global env var, the per-host env var must win.
-func TestResolveCredentials_HostEnvVarWins(t *testing.T) {
-	keyring.MockInit()
-	host := "fw1.example.com"
+// TestResolveCredentials_CLIFlagWins asserts that an explicit --api-key flag
+// beats every other source.
+func TestResolveCredentials_CLIFlagWins(t *testing.T) {
+	host := "fw.example.com"
+	t.Setenv("PYRE_API_KEY", "env-key")
+	t.Setenv("PYRE_FW_EXAMPLE_COM_API_KEY", "host-env-key")
 
-	t.Setenv("PYRE_API_KEY", "")
-	t.Setenv("PYRE_FW1_EXAMPLE_COM_API_KEY", "env-key")
+	creds := auth.ResolveCredentials(newConfigWithHost(host), config.CLIFlags{APIKey: "flag-key"})
+	if creds.APIKey != "flag-key" {
+		t.Fatalf("APIKey = %q, want flag-key", creds.APIKey)
+	}
+	if creds.PromptForPassword {
+		t.Error("PromptForPassword must be false when a key was resolved")
+	}
+}
+
+// TestResolveCredentials_GlobalEnvVar asserts that PYRE_API_KEY wins over
+// the per-host env var fallback when no CLI flag is present.
+func TestResolveCredentials_GlobalEnvVar(t *testing.T) {
+	host := "fw.example.com"
+	t.Setenv("PYRE_API_KEY", "global-env-key")
+	t.Setenv("PYRE_FW_EXAMPLE_COM_API_KEY", "host-env-key")
 
 	creds := auth.ResolveCredentials(newConfigWithHost(host), config.CLIFlags{})
-	if creds.APIKey != "env-key" {
-		t.Fatalf("APIKey = %q, want %q", creds.APIKey, "env-key")
+	if creds.APIKey != "global-env-key" {
+		t.Fatalf("APIKey = %q, want global-env-key", creds.APIKey)
+	}
+}
+
+// TestResolveCredentials_HostEnvVarFallback asserts the per-host env var is
+// consulted when neither a CLI flag nor PYRE_API_KEY is set.
+func TestResolveCredentials_HostEnvVarFallback(t *testing.T) {
+	host := "fw1.example.com"
+	t.Setenv("PYRE_API_KEY", "")
+	t.Setenv("PYRE_FW1_EXAMPLE_COM_API_KEY", "host-env-key")
+
+	creds := auth.ResolveCredentials(newConfigWithHost(host), config.CLIFlags{})
+	if creds.APIKey != "host-env-key" {
+		t.Fatalf("APIKey = %q, want host-env-key", creds.APIKey)
 	}
 	if creds.PromptForPassword {
 		t.Error("PromptForPassword must be false when an API key was resolved")
 	}
 }
 
-// TestResolveCredentials_KeychainFallback asserts that when no env var is
-// set, the keychain entry (priority 4) is used.
-func TestResolveCredentials_KeychainFallback(t *testing.T) {
-	keyring.MockInit()
-	host := "fw2.example.com"
-
-	// No per-host env var, no global env var.
-	t.Setenv("PYRE_API_KEY", "")
-	t.Setenv("PYRE_FW2_EXAMPLE_COM_API_KEY", "")
-
-	if err := config.SetAPIKey(host, "keychain-key"); err != nil {
-		t.Fatalf("seeding keychain: %v", err)
-	}
-
-	creds := auth.ResolveCredentials(newConfigWithHost(host), config.CLIFlags{})
-	if creds.APIKey != "keychain-key" {
-		t.Fatalf("APIKey = %q, want %q", creds.APIKey, "keychain-key")
-	}
-	if creds.PromptForPassword {
-		t.Error("PromptForPassword must be false when keychain supplies a key")
-	}
-}
-
-// TestResolveCredentials_NoKeyPromptsForPassword asserts that when neither
-// env var nor keychain supplies a key, ResolveCredentials signals the TUI
-// prompt flow via PromptForPassword=true (priority 5).
+// TestResolveCredentials_NoKeyPromptsForPassword asserts that when no source
+// supplies a key, ResolveCredentials signals the TUI prompt flow.
 func TestResolveCredentials_NoKeyPromptsForPassword(t *testing.T) {
-	keyring.MockInit()
 	host := "fw3.example.com"
-
 	t.Setenv("PYRE_API_KEY", "")
 	t.Setenv("PYRE_FW3_EXAMPLE_COM_API_KEY", "")
-	// MockInit starts with an empty store, so GetAPIKey will return
-	// ErrCredentialNotFound for this host.
 
 	creds := auth.ResolveCredentials(newConfigWithHost(host), config.CLIFlags{})
 	if creds.APIKey != "" {
@@ -88,31 +83,10 @@ func TestResolveCredentials_NoKeyPromptsForPassword(t *testing.T) {
 	}
 }
 
-// TestResolveCredentials_EnvVarBeatsKeychain enforces the ordering: when
-// both a per-host env var and a keychain entry exist, the env var wins.
-func TestResolveCredentials_EnvVarBeatsKeychain(t *testing.T) {
-	keyring.MockInit()
-	host := "fw4.example.com"
-
-	t.Setenv("PYRE_API_KEY", "")
-	t.Setenv("PYRE_FW4_EXAMPLE_COM_API_KEY", "env-wins")
-	if err := config.SetAPIKey(host, "keychain-loses"); err != nil {
-		t.Fatalf("seeding keychain: %v", err)
-	}
-
-	creds := auth.ResolveCredentials(newConfigWithHost(host), config.CLIFlags{})
-	if creds.APIKey != "env-wins" {
-		t.Fatalf("APIKey = %q, want %q (env var must beat keychain)", creds.APIKey, "env-wins")
-	}
-}
-
 // TestConnection_ClearsCredentialsOnRemove verifies that RemoveConnection
-// zeros the APIKey / Password fields on the previously-added *Connection so
-// any surviving reference in caller code stops pointing at the secret. The
-// keychain (which holds the persistent copy) is not touched here.
+// zeroes the APIKey / Password fields on the previously-added *Connection so
+// any surviving reference in caller code stops pointing at the secret.
 func TestConnection_ClearsCredentialsOnRemove(t *testing.T) {
-	keyring.MockInit()
-
 	cfg := &config.Config{}
 	session := auth.NewSession(cfg)
 
@@ -145,8 +119,6 @@ func TestConnection_ClearsCredentialsOnRemove(t *testing.T) {
 		}
 	}
 
-	// Session state bookkeeping: no active connection should remain when
-	// the only connection is removed.
 	if got := session.GetActiveConnection(); got != nil {
 		t.Errorf("GetActiveConnection after RemoveConnection = %+v, want nil", got)
 	}

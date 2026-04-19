@@ -151,7 +151,7 @@ func (m NavbarModel) GetItemID() string {
 }
 
 // RenderTabs renders the navigation tabs for the header
-// Returns: "1:Monitor  2:Analyze  3:Tools  4:Conn" with active group highlighted
+// Returns: "1:Monitor  2:Analyze  3:Tools" with active group highlighted
 func (m NavbarModel) RenderTabs() string {
 	// Styles
 	tabInactive := StatusMutedStyle.Padding(0, 1)

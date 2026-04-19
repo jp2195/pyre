@@ -1,78 +1,97 @@
 # Security Policy
 
-## Supported Versions
+## Supported versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
+Only the most recent minor release is supported with security fixes.
+See [Releases](https://github.com/jp2195/pyre/releases) for the current
+version.
 
-## Reporting a Vulnerability
+## Reporting a vulnerability
 
-If you discover a security vulnerability in pyre, please report it responsibly:
+1. **Do not** open a public issue.
+2. Email the repository owner via GitHub private message with steps to
+   reproduce and potential impact.
+3. You'll get a response within 72 hours.
 
-1. **Do not** open a public issue
-2. Email details to the repository owner via GitHub private message
-3. Include steps to reproduce and potential impact
+## How pyre handles credentials
 
-We will respond within 72 hours and work with you to address the issue.
+**pyre does not persist credentials.** No keychain, no token cache, no
+on-disk storage of any kind. API keys and passwords live in memory for
+the duration of a session and are zeroed on disconnect.
 
-## Security Best Practices
+Credential management is the user's responsibility. Supply keys through
+whichever mechanism fits your environment — shell env vars, direnv, a
+secrets manager that exports to env, a CI/CD secret store, etc.
 
-### API Key Management
+### Resolution order
 
-pyre handles sensitive Palo Alto firewall API keys. Follow these practices:
+When pyre needs an API key for a host, it checks in this order:
 
-**Recommended:**
-- Use environment variables for API keys (`PYRE_API_KEY`)
-- Use the `--api-key` flag for one-off connections
-- Use separate API keys per firewall with minimal required permissions
-- Rotate API keys periodically
+1. `--api-key` CLI flag
+2. `PYRE_API_KEY` environment variable
+3. `PYRE_<HOST>_API_KEY` — host-specific, where `<HOST>` is the connection
+   host uppercased with `.` and `-` replaced by `_`
+4. Interactive login — pyre prompts for username + password and runs
+   keygen. The returned key is used for the session only; on the next
+   launch pyre will prompt again unless you supplied a key upfront.
 
-**Avoid:**
-- Storing API keys in configuration files (not supported)
-- Committing credentials to version control
-- Sharing API keys between users
+### What guards against accidental persistence
 
-### Configuration Example
+- Credential fields on `config.ConnectionConfig` (`APIKey`, `Password`)
+  carry `yaml:"-"` tags, so `config.Save` cannot write them to disk
+  even if they are set in memory. A regression test
+  (`TestConfig_DoesNotPersistCredentials`) guards this invariant.
+- On `RemoveConnection`, credential fields are zeroed before the
+  connection struct is discarded to shorten in-memory lifetime.
+- `~/.pyre.yaml` with world- or group-readable permissions triggers a
+  startup warning. The file is expected to be `0600`.
 
-```yaml
-connections:
-  10.0.0.1:
-    insecure: false  # Verify TLS certificates
-```
+## TLS
 
-Then provide the API key via environment:
+- Every HTTP client sets `MinVersion: tls.VersionTLS12`.
+- Each client owns its own `*http.Transport` (no sharing of
+  `http.DefaultTransport`).
+- For firewalls using a private CA, set `ca_cert_path:
+  /path/to/ca.pem` in the connection config. CA load failures surface
+  as startup errors rather than silently falling back to system roots
+  — this prevents "I thought my private CA was trusted but actually
+  every request is validating against system roots" bugs.
+- `insecure: true` should be reserved for lab environments. In
+  production, add the firewall CA to the connection config instead.
 
-```bash
-export PYRE_API_KEY=YOUR_API_KEY
-pyre -c 10.0.0.1
-```
+## XML parsing
 
-### TLS Certificate Verification
+All PAN-OS responses go through a hardened `decodeXML` helper that
+rejects `xml.Directive` tokens (DOCTYPE, entity declarations). This
+prevents billion-laughs-style entity expansion attacks from a
+compromised firewall or a man-in-the-middle (especially relevant when
+`--insecure` is in use).
 
-- Keep `insecure: false` (default) for production firewalls
-- Only use `insecure: true` for development/lab environments with self-signed certificates
-- Consider importing firewall certificates to your trust store instead of disabling verification
+## Request/response logging
 
-### Network Security
-
-- pyre communicates with firewalls over HTTPS (port 443)
-- Ensure network policies allow only authorized hosts to connect to firewall management interfaces
-- Consider using jump hosts or VPNs for remote management
+Per-request trace logging is **off by default**. Enable it with
+`PYRE_DEBUG=1` (or `PYRE_DEBUG=true`). Error-path logs always fire.
+When debug is on, traces include xpath, target serial, op-command
+bodies, and response-body previews — useful for troubleshooting, noisy
+in production. Server-supplied error strings are sanitized
+(`api.SanitizeForDisplay`) before display, stripping ANSI CSI / OSC /
+DCS sequences and C0 / DEL control chars.
 
 ## Dependencies
 
-pyre uses these third-party libraries:
+Direct:
+- `charm.land/bubbletea/v2` — TUI framework
+- `charm.land/bubbles/v2` — TUI components
+- `charm.land/lipgloss/v2` — styling
+- `go.yaml.in/yaml/v4` — YAML parsing (pinned to rc.4 pending stable v4)
 
-- `charm.land/bubbletea/v2` - TUI framework
-- `charm.land/bubbles/v2` - TUI components
-- `charm.land/lipgloss/v2` - Styling
-- `go.yaml.in/yaml/v4` - YAML parsing
+CI runs `govulncheck ./...` on every push and weekly. Dependency pins
+are managed by Renovate.
 
-We monitor dependencies for vulnerabilities and update promptly when issues are disclosed.
+## Network notes
 
-## Audit Logging
-
-pyre does not maintain its own audit logs. Firewall API calls are logged by PAN-OS according to your firewall's logging configuration. Review firewall logs to audit pyre usage.
-
-
+- pyre talks to firewalls over HTTPS only, typically port 443.
+- The same permissions a user needs in PAN-OS also apply here — pyre
+  doesn't elevate.
+- Firewall API calls are logged by PAN-OS; review those logs for audit.
+  pyre itself does not keep a local audit log.
