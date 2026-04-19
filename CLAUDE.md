@@ -46,6 +46,36 @@ go fix ./...                  # Apply modernizers (safe, behavior-preserving)
 - Use `max()`/`min()` builtins instead of manual if/else clamping
 - Use `wg.Go(func() { ... })` instead of `wg.Add(1); go func() { defer wg.Done(); ... }()`
 
+## Credential Resolution
+
+API keys are resolved in the following order (see `auth.ResolveCredentials`):
+
+1. CLI flag `--api-key` (or `flags.APIKey`).
+2. Environment variable `PYRE_API_KEY`.
+3. Host-specific environment variable `PYRE_<HOST>_API_KEY`, where `<HOST>`
+   is the connection host uppercased with `.` and `-` replaced by `_`.
+4. OS keychain via `config.GetAPIKey(host)` (backed by `go-keyring`, service
+   name `pyre`, key `apikey:<host>`).
+5. Fall through to `Credentials.PromptForPassword = true` so the TUI prompts
+   the user for username/password and runs keygen. On successful login the
+   resulting API key is written to the keychain via `config.SetAPIKey`.
+
+Credential fields (`APIKey`, `Password`) on `config.ConnectionConfig` carry
+`yaml:"-"` tags, so they NEVER round-trip to `~/.pyre.yaml`. Connections
+are zeroed in `Session.RemoveConnection` to shorten the in-memory lifetime
+of secrets.
+
+## Debugging
+
+Set `PYRE_DEBUG=1` (or `PYRE_DEBUG=true`) to enable per-request API trace
+logging in `internal/api/client.go`. The trace lines include request type,
+action, xpath, target serial, op command bodies, response status/timing, and
+a preview of the response body. It is off by default because these fields
+may contain PAN-OS config paths and command bodies that are useful to a
+debugger but noisy (and potentially sensitive) in production sessions.
+Error-path `log.Printf` calls always fire regardless of `PYRE_DEBUG` so
+unexpected failures are never swallowed.
+
 ## Dependencies
 
 - YAML: `go.yaml.in/yaml/v4` (not gopkg.in/yaml.v3)

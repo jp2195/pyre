@@ -63,11 +63,19 @@ func (s *Session) SetActiveFirewall(name string) bool {
 }
 
 // AddConnection creates a new PAN-OS XML API connection for the given host.
-func (s *Session) AddConnection(host string, connConfig *config.ConnectionConfig, apiKey string) *Connection {
+// It returns an error if the underlying API client cannot be constructed
+// (for example, a user-supplied CA bundle that cannot be loaded).
+func (s *Session) AddConnection(host string, connConfig *config.ConnectionConfig, apiKey string) (*Connection, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	client := api.NewClient(host, apiKey, api.WithInsecure(connConfig.Insecure))
+	client, err := api.NewClient(host, apiKey, api.ClientOptions{
+		Insecure:   connConfig.Insecure,
+		CACertPath: connConfig.CACertPath,
+	})
+	if err != nil {
+		return nil, err
+	}
 	conn := &Connection{
 		Host:      host,
 		Config:    connConfig,
@@ -81,12 +89,25 @@ func (s *Session) AddConnection(host string, connConfig *config.ConnectionConfig
 		s.ActiveFirewall = host
 	}
 
-	return conn
+	return conn, nil
 }
 
 func (s *Session) RemoveConnection(host string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// Zero credential fields before dropping the reference so the secret
+	// stops being reachable from any surviving *Connection pointer a
+	// caller might still hold. The keychain keeps the persistent copy.
+	if conn, ok := s.Connections[host]; ok {
+		conn.APIKey = ""
+		if conn.Config != nil {
+			conn.Config.APIKey = ""
+			conn.Config.Password = ""
+		}
+		if conn.Client != nil {
+			_ = conn.Client.Close()
+		}
+	}
 	delete(s.Connections, host)
 	if s.ActiveFirewall == host {
 		s.ActiveFirewall = ""
@@ -160,13 +181,19 @@ func ResolveCredentials(cfg *config.Config, flags config.CLIFlags) *Credentials 
 			if !creds.Insecure && conn.Insecure {
 				creds.Insecure = true
 			}
+		}
+	}
 
-			// Try host-based env var for API key (normalize host to valid env var name)
-			envName := strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(host, "-", "_"), ".", "_"))
-			envKey := os.Getenv("PYRE_" + envName + "_API_KEY")
-			if envKey != "" && creds.APIKey == "" {
-				creds.APIKey = envKey
-			}
+	// Host-based API key resolution order (documented in CLAUDE.md):
+	//   1. PYRE_<HOST>_API_KEY environment variable.
+	//   2. OS keychain via config.GetAPIKey.
+	//   3. Fall through to PromptForPassword=true so the TUI prompts.
+	if creds.Host != "" && creds.APIKey == "" {
+		envName := strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(creds.Host, "-", "_"), ".", "_"))
+		if envKey := os.Getenv("PYRE_" + envName + "_API_KEY"); envKey != "" {
+			creds.APIKey = envKey
+		} else if k, err := config.GetAPIKey(creds.Host); err == nil {
+			creds.APIKey = k
 		}
 	}
 
@@ -204,10 +231,14 @@ func validateSerial(serial string) error {
 // SetTarget sets the current target device for Panorama.
 // Pass nil to target Panorama itself.
 // Returns an error if the device serial is invalid.
+//
+// The target serial is stored on the Connection and is passed explicitly to
+// each API call that needs it (see Target()). The underlying *api.Client
+// holds no target state, which eliminates races when concurrent fetches
+// use different targets.
 func (c *Connection) SetTarget(device *models.ManagedDevice) error {
 	if device == nil {
 		c.TargetSerial = ""
-		c.Client.ClearTarget()
 		return nil
 	}
 
@@ -217,8 +248,14 @@ func (c *Connection) SetTarget(device *models.ManagedDevice) error {
 	}
 
 	c.TargetSerial = device.Serial
-	c.Client.SetTarget(device.Serial)
 	return nil
+}
+
+// Target returns the current Panorama target serial, or "" for Panorama
+// itself / standalone firewalls. Safe for concurrent callers because it
+// only reads (callers that set the target serialize via the TUI event loop).
+func (c *Connection) Target() string {
+	return c.TargetSerial
 }
 
 // GetTargetDevice returns the currently targeted managed device, or nil if targeting Panorama.
@@ -240,11 +277,9 @@ func (c *Connection) RefreshManagedDevices(ctx context.Context) error {
 		return nil
 	}
 
-	// Temporarily clear target to query Panorama directly
-	savedTarget := c.Client.GetTarget()
-	c.Client.ClearTarget()
-	defer c.Client.SetTarget(savedTarget)
-
+	// GetManagedDevices intentionally targets Panorama itself regardless of
+	// the connection's current TargetSerial, so no save/restore dance is
+	// required with the stateless client.
 	devices, err := c.Client.GetManagedDevices(ctx)
 	if err != nil {
 		return err

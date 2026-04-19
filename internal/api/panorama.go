@@ -2,7 +2,7 @@ package api
 
 import (
 	"context"
-	"encoding/xml"
+	"bytes"
 	"fmt"
 	"strings"
 
@@ -11,7 +11,9 @@ import (
 
 // GetManagedDevices fetches all devices managed by Panorama.
 func (c *Client) GetManagedDevices(ctx context.Context) ([]models.ManagedDevice, error) {
-	resp, err := c.Op(ctx, "<show><devices><all></all></devices></show>")
+	// GetManagedDevices intentionally always queries Panorama itself (target="")
+	// because this call enumerates the devices Panorama manages.
+	resp, err := c.Op(ctx, "<show><devices><all></all></devices></show>", "")
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +36,7 @@ func (c *Client) GetManagedDevices(ctx context.Context) ([]models.ManagedDevice,
 			} `xml:"entry"`
 		} `xml:"devices"`
 	}
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
 		return nil, fmt.Errorf("parsing managed devices: %w", err)
 	}
 

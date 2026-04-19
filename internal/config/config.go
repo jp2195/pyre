@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -17,11 +18,23 @@ type Config struct {
 
 // ConnectionConfig describes a single PAN-OS endpoint.
 // SSH is intentionally unsupported; access is XML API only.
-// Note: The host/IP is used as the map key in Config.Connections, not stored here
+// Note: The host/IP is used as the map key in Config.Connections, not stored here.
+//
+// Credential fields (APIKey, Password) are tagged `yaml:"-"` so they are
+// NEVER round-tripped to ~/.pyre.yaml. At runtime they are hydrated from
+// the OS keychain (see keyring.go) or environment variables; at disconnect
+// they are zeroed (see internal/auth).
 type ConnectionConfig struct {
-	Username string `yaml:"username,omitempty"` // Username for API authentication
-	Type     string `yaml:"type,omitempty"`     // "firewall" (default) or "panorama"
-	Insecure bool   `yaml:"insecure,omitempty"`
+	Username   string `yaml:"username,omitempty"`     // Username for API authentication
+	Type       string `yaml:"type,omitempty"`         // "firewall" (default) or "panorama"
+	Insecure   bool   `yaml:"insecure,omitempty"`     // Skip TLS verification (self-signed certs)
+	CACertPath string `yaml:"ca_cert_path,omitempty"` // Optional PEM-encoded CA bundle for TLS verification
+
+	// APIKey is the per-host PAN-OS API key. Never persisted to disk.
+	APIKey string `yaml:"-"`
+	// Password is the cleartext password used for initial keygen. Never
+	// persisted to disk; only present in memory during the login flow.
+	Password string `yaml:"-"`
 }
 
 type Settings struct {
@@ -56,6 +69,16 @@ func Load() (*Config, error) {
 	configPath, err := ConfigPath()
 	if err != nil {
 		return cfg, nil
+	}
+
+	// Warn if the config file is readable by group/other. Plan A removed
+	// the Warnings slice in favour of direct log.Printf at startup, which
+	// prints before the TUI initialises and is therefore user-visible.
+	if info, statErr := os.Stat(configPath); statErr == nil {
+		if info.Mode().Perm()&0o077 != 0 {
+			log.Printf("warning: %s has permissive mode %#o; run `chmod 600 %s`",
+				configPath, info.Mode().Perm(), configPath)
+		}
 	}
 
 	data, err := os.ReadFile(configPath) // #nosec G304 -- Path is constructed from user's home directory

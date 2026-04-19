@@ -35,7 +35,10 @@ func TestSession_AddConnection(t *testing.T) {
 		Insecure: true,
 	}
 
-	conn := session.AddConnection("10.0.0.1", fwConfig, "test-api-key")
+	conn, err := session.AddConnection("10.0.0.1", fwConfig, "test-api-key")
+	if err != nil {
+		t.Fatalf("AddConnection returned error: %v", err)
+	}
 
 	if conn == nil {
 		t.Fatal("expected non-nil connection")
@@ -66,7 +69,7 @@ func TestSession_GetActiveConnection(t *testing.T) {
 
 	// Add a connection
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "api-key")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "api-key")
 
 	conn = session.GetActiveConnection()
 	if conn == nil {
@@ -82,8 +85,8 @@ func TestSession_SetActiveFirewall(t *testing.T) {
 	session := NewSession(cfg)
 
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
-	session.AddConnection("10.0.0.2", fwConfig, "key2")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.2", fwConfig, "key2")
 
 	// Set active to second host
 	ok := session.SetActiveFirewall("10.0.0.2")
@@ -110,8 +113,8 @@ func TestSession_RemoveConnection(t *testing.T) {
 	session := NewSession(cfg)
 
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
-	session.AddConnection("10.0.0.2", fwConfig, "key2")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.2", fwConfig, "key2")
 
 	// Remove active connection
 	session.RemoveConnection("10.0.0.1")
@@ -143,8 +146,8 @@ func TestSession_ListConnections(t *testing.T) {
 
 	// Add connections
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
-	session.AddConnection("10.0.0.2", fwConfig, "key2")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.2", fwConfig, "key2")
 
 	conns = session.ListConnections()
 	if len(conns) != 2 {
@@ -163,7 +166,7 @@ func TestSession_IsConnected(t *testing.T) {
 
 	// Add connection
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
 
 	if !session.IsConnected("10.0.0.1") {
 		t.Error("expected IsConnected to be true")

@@ -2,7 +2,7 @@ package api
 
 import (
 	"context"
-	"encoding/xml"
+	"bytes"
 	"strconv"
 	"strings"
 	"time"
@@ -10,9 +10,9 @@ import (
 	"github.com/jp2195/pyre/internal/models"
 )
 
-func (c *Client) GetThreatSummary(ctx context.Context) (*models.ThreatSummary, error) {
+func (c *Client) GetThreatSummary(ctx context.Context, target string) (*models.ThreatSummary, error) {
 	// Query threat logs for the last hour to get a summary
-	resp, err := c.Op(ctx, "<show><counter><global><name>flow_threat_*</name></global></counter></show>")
+	resp, err := c.Op(ctx, "<show><counter><global><name>flow_threat_*</name></global></counter></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +32,7 @@ func (c *Client) GetThreatSummary(ctx context.Context) (*models.ThreatSummary, e
 			Severity string `xml:"severity"`
 		} `xml:"global>counters>entry"`
 	}
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
 		// Fallback: try to parse simple counter format
 		// Return empty summary if parsing fails (device may not have threat prevention)
 		return summary, nil
@@ -62,8 +62,8 @@ func (c *Client) GetThreatSummary(ctx context.Context) (*models.ThreatSummary, e
 	return summary, nil
 }
 
-func (c *Client) GetGlobalProtectInfo(ctx context.Context) (*models.GlobalProtectInfo, error) {
-	resp, err := c.Op(ctx, "<show><global-protect-gateway><current-user></current-user></global-protect-gateway></show>")
+func (c *Client) GetGlobalProtectInfo(ctx context.Context, target string) (*models.GlobalProtectInfo, error) {
+	resp, err := c.Op(ctx, "<show><global-protect-gateway><current-user></current-user></global-protect-gateway></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (c *Client) GetGlobalProtectInfo(ctx context.Context) (*models.GlobalProtec
 			LoginTime string `xml:"login-time"`
 		} `xml:"entry"`
 	}
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
 		return info, nil
 	}
 
@@ -125,8 +125,8 @@ func parseJobTimestamp(s string) time.Time {
 	return time.Time{}
 }
 
-func (c *Client) GetJobs(ctx context.Context) ([]models.Job, error) {
-	resp, err := c.Op(ctx, "<show><jobs><all></all></jobs></show>")
+func (c *Client) GetJobs(ctx context.Context, target string) ([]models.Job, error) {
+	resp, err := c.Op(ctx, "<show><jobs><all></all></jobs></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +144,7 @@ func (c *Client) GetJobs(ctx context.Context) ([]models.Job, error) {
 	var jobResult struct {
 		Entry []jobEntry `xml:"job"`
 	}
-	if xml.Unmarshal(WrapInner(resp.Result.Inner), &jobResult) == nil && len(jobResult.Entry) > 0 {
+	if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &jobResult) == nil && len(jobResult.Entry) > 0 {
 		entries = jobResult.Entry
 	}
 
@@ -153,7 +153,7 @@ func (c *Client) GetJobs(ctx context.Context) ([]models.Job, error) {
 		var entryResult struct {
 			Entry []jobEntry `xml:"entry"`
 		}
-		if xml.Unmarshal(WrapInner(resp.Result.Inner), &entryResult) == nil {
+		if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &entryResult) == nil {
 			entries = entryResult.Entry
 		}
 	}
@@ -192,8 +192,8 @@ func (c *Client) GetJobs(ctx context.Context) ([]models.Job, error) {
 }
 
 // GetDiskUsage retrieves disk usage information
-func (c *Client) GetDiskUsage(ctx context.Context) ([]models.DiskUsage, error) {
-	resp, err := c.Op(ctx, "<show><system><disk-space></disk-space></system></show>")
+func (c *Client) GetDiskUsage(ctx context.Context, target string) ([]models.DiskUsage, error) {
+	resp, err := c.Op(ctx, "<show><system><disk-space></disk-space></system></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -235,8 +235,8 @@ func (c *Client) GetDiskUsage(ctx context.Context) ([]models.DiskUsage, error) {
 // GetEnvironmentals retrieves hardware environmental sensor data
 //
 //nolint:misspell // "environmentals" is the PAN-OS XML API tag name
-func (c *Client) GetEnvironmentals(ctx context.Context) ([]models.Environmental, error) {
-	resp, err := c.Op(ctx, "<show><system><environmentals></environmentals></system></show>")
+func (c *Client) GetEnvironmentals(ctx context.Context, target string) ([]models.Environmental, error) {
+	resp, err := c.Op(ctx, "<show><system><environmentals></environmentals></system></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -272,7 +272,7 @@ func (c *Client) GetEnvironmentals(ctx context.Context) ([]models.Environmental,
 	var powerResult struct {
 		Power powerSection `xml:"power"`
 	}
-	if xml.Unmarshal(WrapInner(resp.Result.Inner), &powerResult) == nil {
+	if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &powerResult) == nil {
 		for _, slot := range powerResult.Power.Slots {
 			for _, e := range slot.Entry {
 				alarm := strings.ToLower(e.Alarm) == "true"
@@ -297,7 +297,7 @@ func (c *Client) GetEnvironmentals(ctx context.Context) ([]models.Environmental,
 	var thermalResult struct {
 		Thermal thermalSection `xml:"thermal"`
 	}
-	if xml.Unmarshal(WrapInner(resp.Result.Inner), &thermalResult) == nil {
+	if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &thermalResult) == nil {
 		for _, slot := range thermalResult.Thermal.Slots {
 			for _, e := range slot.Entry {
 				alarm := strings.ToLower(e.Alarm) == "true"
@@ -329,7 +329,7 @@ func (c *Client) GetEnvironmentals(ctx context.Context) ([]models.Environmental,
 	var fanResult struct {
 		Fan fanSection `xml:"fan"`
 	}
-	if xml.Unmarshal(WrapInner(resp.Result.Inner), &fanResult) == nil {
+	if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &fanResult) == nil {
 		for _, slot := range fanResult.Fan.Slots {
 			for _, e := range slot.Entry {
 				alarm := strings.ToLower(e.Alarm) == "true"
@@ -358,8 +358,8 @@ func (c *Client) GetEnvironmentals(ctx context.Context) ([]models.Environmental,
 }
 
 // GetCertificates retrieves certificate information
-func (c *Client) GetCertificates(ctx context.Context) ([]models.Certificate, error) {
-	resp, err := c.Op(ctx, "<show><sslmgr-store><certificate><all></all></certificate></sslmgr-store></show>")
+func (c *Client) GetCertificates(ctx context.Context, target string) ([]models.Certificate, error) {
+	resp, err := c.Op(ctx, "<show><sslmgr-store><certificate><all></all></certificate></sslmgr-store></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -383,7 +383,7 @@ func (c *Client) GetCertificates(ctx context.Context) ([]models.Certificate, err
 		} `xml:"certificate>entry"`
 	}
 
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
 		// Try alternate structure
 		var alt struct {
 			Entry []struct {
@@ -396,7 +396,7 @@ func (c *Client) GetCertificates(ctx context.Context) ([]models.Certificate, err
 				Algorithm      string `xml:"algorithm"`
 			} `xml:"entry"`
 		}
-		if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &alt); err != nil {
+		if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &alt); err != nil {
 			return []models.Certificate{}, nil
 		}
 		result.Entry = alt.Entry

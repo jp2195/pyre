@@ -12,9 +12,9 @@ func TestGetSystemInfo(t *testing.T) {
 	mock := testutil.NewMockPANOS()
 	defer mock.Close()
 
-	client := api.NewClient(mock.Host(), "test-api-key", api.WithInsecure(true))
+	client, _ := api.NewClient(mock.Host(), "test-api-key", api.ClientOptions{Insecure: true})
 
-	info, err := client.GetSystemInfo(context.Background())
+	info, err := client.GetSystemInfo(context.Background(), "")
 	if err != nil {
 		t.Fatalf("GetSystemInfo failed: %v", err)
 	}
@@ -40,9 +40,9 @@ func TestGetSystemResources(t *testing.T) {
 	mock := testutil.NewMockPANOS()
 	defer mock.Close()
 
-	client := api.NewClient(mock.Host(), "test-api-key", api.WithInsecure(true))
+	client, _ := api.NewClient(mock.Host(), "test-api-key", api.ClientOptions{Insecure: true})
 
-	res, err := client.GetSystemResources(context.Background())
+	res, err := client.GetSystemResources(context.Background(), "")
 	if err != nil {
 		t.Fatalf("GetSystemResources failed: %v", err)
 	}
@@ -59,9 +59,9 @@ func TestGetSessionInfo(t *testing.T) {
 	mock := testutil.NewMockPANOS()
 	defer mock.Close()
 
-	client := api.NewClient(mock.Host(), "test-api-key", api.WithInsecure(true))
+	client, _ := api.NewClient(mock.Host(), "test-api-key", api.ClientOptions{Insecure: true})
 
-	info, err := client.GetSessionInfo(context.Background())
+	info, err := client.GetSessionInfo(context.Background(), "")
 	if err != nil {
 		t.Fatalf("GetSessionInfo failed: %v", err)
 	}
@@ -81,9 +81,9 @@ func TestGetSessions(t *testing.T) {
 	mock := testutil.NewMockPANOS()
 	defer mock.Close()
 
-	client := api.NewClient(mock.Host(), "test-api-key", api.WithInsecure(true))
+	client, _ := api.NewClient(mock.Host(), "test-api-key", api.ClientOptions{Insecure: true})
 
-	sessions, err := client.GetSessions(context.Background(), "")
+	sessions, err := client.GetSessions(context.Background(), "", "")
 	if err != nil {
 		t.Fatalf("GetSessions failed: %v", err)
 	}
@@ -111,9 +111,9 @@ func TestGetSecurityPolicies(t *testing.T) {
 	mock := testutil.NewMockPANOS()
 	defer mock.Close()
 
-	client := api.NewClient(mock.Host(), "test-api-key", api.WithInsecure(true))
+	client, _ := api.NewClient(mock.Host(), "test-api-key", api.ClientOptions{Insecure: true})
 
-	policies, err := client.GetSecurityPolicies(context.Background())
+	policies, err := client.GetSecurityPolicies(context.Background(), "")
 	if err != nil {
 		t.Fatalf("GetSecurityPolicies failed: %v", err)
 	}
@@ -146,9 +146,9 @@ func TestGetHAStatus(t *testing.T) {
 	mock := testutil.NewMockPANOS()
 	defer mock.Close()
 
-	client := api.NewClient(mock.Host(), "test-api-key", api.WithInsecure(true))
+	client, _ := api.NewClient(mock.Host(), "test-api-key", api.ClientOptions{Insecure: true})
 
-	status, err := client.GetHAStatus(context.Background())
+	status, err := client.GetHAStatus(context.Background(), "")
 	if err != nil {
 		t.Fatalf("GetHAStatus failed: %v", err)
 	}
@@ -171,9 +171,9 @@ func TestGetInterfaces(t *testing.T) {
 	mock := testutil.NewMockPANOS()
 	defer mock.Close()
 
-	client := api.NewClient(mock.Host(), "test-api-key", api.WithInsecure(true))
+	client, _ := api.NewClient(mock.Host(), "test-api-key", api.ClientOptions{Insecure: true})
 
-	interfaces, err := client.GetInterfaces(context.Background())
+	interfaces, err := client.GetInterfaces(context.Background(), "")
 	if err != nil {
 		t.Fatalf("GetInterfaces failed: %v", err)
 	}

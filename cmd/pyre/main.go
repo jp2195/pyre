@@ -135,7 +135,11 @@ func main() {
 		creds.PromptForPassword = true
 	}
 
-	model := tui.NewModel(cfg, state, creds, startView)
+	model, err := tui.NewModel(cfg, state, creds, startView)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 
 	p := tea.NewProgram(
 		model,

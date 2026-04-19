@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -485,6 +486,68 @@ func TestConfig_HasConnections(t *testing.T) {
 
 	if !cfg.HasConnections() {
 		t.Error("expected HasConnections to be true")
+	}
+}
+
+// TestConfig_DoesNotPersistCredentials is a regression guard for the
+// contract documented on ConnectionConfig: APIKey and Password carry
+// `yaml:"-"` tags and must never round-trip to ~/.pyre.yaml. If someone
+// later removes those tags (or adds a new credential field without one),
+// this test fires.
+func TestConfig_DoesNotPersistCredentials(t *testing.T) {
+	const (
+		secretKey = "SECRET-KEY-ABCD1234"
+		secretPwd = "hunter2"
+	)
+
+	// Redirect HOME so Save() writes into a test-scoped directory. Save()
+	// resolves the destination via os.UserHomeDir() → ~/.pyre.yaml.
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	// macOS honours $HOME for UserHomeDir(); set USERPROFILE too so the
+	// same test works on Windows if the suite is ever cross-run.
+	t.Setenv("USERPROFILE", tmpDir)
+
+	cfg := DefaultConfig()
+	cfg.Default = "10.0.0.1"
+	cfg.Connections["10.0.0.1"] = ConnectionConfig{
+		Username: "admin",
+		APIKey:   secretKey,
+		Password: secretPwd,
+	}
+
+	if err := cfg.Save(); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	configPath := filepath.Join(tmpDir, ".pyre.yaml")
+	data, err := os.ReadFile(configPath) // #nosec G304 -- test-controlled path
+	if err != nil {
+		t.Fatalf("reading saved config: %v", err)
+	}
+
+	if bytes.Contains(data, []byte(secretKey)) {
+		t.Errorf("API key leaked to disk; file contents:\n%s", data)
+	}
+	if bytes.Contains(data, []byte(secretPwd)) {
+		t.Errorf("password leaked to disk; file contents:\n%s", data)
+	}
+
+	// Load the file back and confirm credentials are empty on the
+	// round-tripped struct.
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	conn, ok := loaded.GetConnection("10.0.0.1")
+	if !ok {
+		t.Fatalf("expected 10.0.0.1 connection after reload")
+	}
+	if conn.APIKey != "" {
+		t.Errorf("APIKey round-tripped from disk: %q", conn.APIKey)
+	}
+	if conn.Password != "" {
+		t.Errorf("Password round-tripped from disk: %q", conn.Password)
 	}
 }
 

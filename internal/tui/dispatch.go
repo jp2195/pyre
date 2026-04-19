@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"log"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/jp2195/pyre/internal/auth"
@@ -70,7 +72,23 @@ func (m Model) handleAuthMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		conn := m.session.AddConnection(host, connConfig, msg.APIKey)
+		conn, err := m.session.AddConnection(host, connConfig, msg.APIKey)
+		if err != nil {
+			m.login = m.login.SetError(err)
+			m.selectedConnection = ""
+			m.selectedConnectionConfig = config.ConnectionConfig{}
+			return m, nil
+		}
+
+		// Persist the API key to the OS keychain so subsequent launches
+		// skip the password prompt. Best-effort: a keychain failure must
+		// not block the user from completing login.
+		if host != "" && msg.APIKey != "" {
+			if err := config.SetAPIKey(host, msg.APIKey); err != nil {
+				log.Printf("warning: failed to persist API key to keychain for %s: %v", host, err)
+			}
+		}
+
 		m.currentView = ViewDashboard
 
 		if m.state != nil && host != "" {

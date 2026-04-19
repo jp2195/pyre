@@ -2,7 +2,7 @@ package api
 
 import (
 	"context"
-	"encoding/xml"
+	"bytes"
 	"fmt"
 	"log"
 	"regexp"
@@ -29,8 +29,8 @@ var (
 	cpuSyPattern = regexp.MustCompile(`([\d.]+)\s*%?\s*sy`)
 )
 
-func (c *Client) GetSystemInfo(ctx context.Context) (*models.SystemInfo, error) {
-	resp, err := c.Op(ctx, "<show><system><info></info></system></show>")
+func (c *Client) GetSystemInfo(ctx context.Context, target string) (*models.SystemInfo, error) {
+	resp, err := c.Op(ctx, "<show><system><info></info></system></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -78,11 +78,11 @@ func (c *Client) GetSystemInfo(ctx context.Context) (*models.SystemInfo, error) 
 	var result struct {
 		System sysInfo `xml:"system"`
 	}
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err == nil && result.System.Hostname != "" {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err == nil && result.System.Hostname != "" {
 		si = result.System
 	} else {
 		// Try without wrapper
-		if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &si); err != nil || si.Hostname == "" {
+		if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &si); err != nil || si.Hostname == "" {
 			return &models.SystemInfo{}, nil
 		}
 	}
@@ -137,8 +137,8 @@ func (c *Client) GetSystemInfo(ctx context.Context) (*models.SystemInfo, error) 
 }
 
 // GetLoggedInAdmins returns the list of currently logged in administrators
-func (c *Client) GetLoggedInAdmins(ctx context.Context) ([]models.LoggedInAdmin, error) {
-	resp, err := c.Op(ctx, "<show><admins></admins></show>")
+func (c *Client) GetLoggedInAdmins(ctx context.Context, target string) ([]models.LoggedInAdmin, error) {
+	resp, err := c.Op(ctx, "<show><admins></admins></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +161,7 @@ func (c *Client) GetLoggedInAdmins(ctx context.Context) ([]models.LoggedInAdmin,
 	}
 
 	// Try multiple parsing approaches
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil || len(result.Entry) == 0 {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil || len(result.Entry) == 0 {
 		// Try alternate structure
 		var alt struct {
 			Entry []struct {
@@ -172,7 +172,7 @@ func (c *Client) GetLoggedInAdmins(ctx context.Context) ([]models.LoggedInAdmin,
 				IdleTime string `xml:"idle-for"`
 			} `xml:"entry"`
 		}
-		if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &alt); err == nil {
+		if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &alt); err == nil {
 			result.Entry = alt.Entry
 		}
 	}
@@ -205,8 +205,8 @@ func (c *Client) GetLoggedInAdmins(ctx context.Context) ([]models.LoggedInAdmin,
 	return admins, nil
 }
 
-func (c *Client) GetSystemResources(ctx context.Context) (*models.Resources, error) {
-	resp, err := c.Op(ctx, "<show><system><resources></resources></system></show>")
+func (c *Client) GetSystemResources(ctx context.Context, target string) (*models.Resources, error) {
+	resp, err := c.Op(ctx, "<show><system><resources></resources></system></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -303,8 +303,8 @@ func (c *Client) GetSystemResources(ctx context.Context) (*models.Resources, err
 }
 
 // GetDataPlaneResources fetches dataplane CPU utilization from the resource monitor
-func (c *Client) GetDataPlaneResources(ctx context.Context) (float64, error) {
-	resp, err := c.Op(ctx, "<show><running><resource-monitor><hour><last>1</last></hour></resource-monitor></running></show>")
+func (c *Client) GetDataPlaneResources(ctx context.Context, target string) (float64, error) {
+	resp, err := c.Op(ctx, "<show><running><resource-monitor><hour><last>1</last></hour></resource-monitor></running></show>", target)
 	if err != nil {
 		return 0, err
 	}
@@ -336,7 +336,7 @@ func (c *Client) GetDataPlaneResources(ctx context.Context) (float64, error) {
 		ResourceMonitor resourceMonitor `xml:"resource-monitor"`
 	}
 
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
 		return 0, fmt.Errorf("failed to parse resource monitor: %w", err)
 	}
 
@@ -367,8 +367,8 @@ func (c *Client) GetDataPlaneResources(ctx context.Context) (float64, error) {
 	return totalCPU / float64(coreCount), nil
 }
 
-func (c *Client) GetLicenseInfo(ctx context.Context) ([]models.LicenseInfo, error) {
-	resp, err := c.Op(ctx, "<request><license><info></info></license></request>")
+func (c *Client) GetLicenseInfo(ctx context.Context, target string) ([]models.LicenseInfo, error) {
+	resp, err := c.Op(ctx, "<request><license><info></info></license></request>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +384,7 @@ func (c *Client) GetLicenseInfo(ctx context.Context) ([]models.LicenseInfo, erro
 			Expired     string `xml:"expired"`
 		} `xml:"licenses>entry"`
 	}
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
 		return nil, fmt.Errorf("parsing license info: %w", err)
 	}
 

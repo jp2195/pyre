@@ -2,7 +2,7 @@ package api
 
 import (
 	"context"
-	"encoding/xml"
+	"bytes"
 	"log"
 	"strconv"
 	"strings"
@@ -85,14 +85,14 @@ func parseSecurityRuleEntries(inner []byte) []securityRuleEntry {
 	var withWrapper struct {
 		Entry []securityRuleEntry `xml:"rules>entry"`
 	}
-	if unmarshalErr := xml.Unmarshal(WrapInner(inner), &withWrapper); unmarshalErr == nil && len(withWrapper.Entry) > 0 {
+	if unmarshalErr := decodeXML(bytes.NewReader(WrapInner(inner)), &withWrapper); unmarshalErr == nil && len(withWrapper.Entry) > 0 {
 		entries = withWrapper.Entry
 	} else {
 		// Try parsing without wrapper (entries directly in result)
 		var withoutWrapper struct {
 			Entry []securityRuleEntry `xml:"entry"`
 		}
-		if xml.Unmarshal(WrapInner(inner), &withoutWrapper) == nil {
+		if decodeXML(bytes.NewReader(WrapInner(inner)), &withoutWrapper) == nil {
 			entries = withoutWrapper.Entry
 		}
 	}
@@ -207,7 +207,7 @@ func parseRuleHitCounts(inner []byte) map[string]hitStats {
 			LastReset string `xml:"last-reset-timestamp"`
 		} `xml:"rule-hit-count>vsys>entry>rule-base>entry>rules>entry"`
 	}
-	if xml.Unmarshal(inner, &hitResult) != nil {
+	if decodeXML(bytes.NewReader(inner), &hitResult) != nil {
 		return nil
 	}
 
@@ -224,16 +224,16 @@ func parseRuleHitCounts(inner []byte) map[string]hitStats {
 }
 
 // fetchRulesFromPaths tries to fetch rules from multiple XPaths, using the provided parse function.
-func fetchRulesFromPaths[T any](c *Client, ctx context.Context, xpaths []string, parse func([]byte) []T) []T {
+func fetchRulesFromPaths[T any](c *Client, ctx context.Context, xpaths []string, target string, parse func([]byte) []T) []T {
 	for _, xpath := range xpaths {
-		resp, err := c.Show(ctx, xpath)
+		resp, err := c.Show(ctx, xpath, target)
 		if err == nil && resp.IsSuccess() && len(resp.Result.Inner) > 0 {
 			if entries := parse(resp.Result.Inner); len(entries) > 0 {
 				return entries
 			}
 		}
 		// Try Get if Show didn't work
-		resp, err = c.Get(ctx, xpath)
+		resp, err = c.Get(ctx, xpath, target)
 		if err == nil && resp.IsSuccess() && len(resp.Result.Inner) > 0 {
 			if entries := parse(resp.Result.Inner); len(entries) > 0 {
 				return entries
@@ -243,7 +243,7 @@ func fetchRulesFromPaths[T any](c *Client, ctx context.Context, xpaths []string,
 	return nil
 }
 
-func (c *Client) GetSecurityPolicies(ctx context.Context) ([]models.SecurityRule, error) {
+func (c *Client) GetSecurityPolicies(ctx context.Context, target string) ([]models.SecurityRule, error) {
 	// Pre-rulebase paths (Panorama-pushed rules evaluated first)
 	// Includes paths for both standalone firewalls and Panorama-managed firewalls
 	preRulebasePaths := []string{
@@ -272,9 +272,9 @@ func (c *Client) GetSecurityPolicies(ctx context.Context) ([]models.SecurityRule
 	}
 
 	// Fetch from all three rulebase locations
-	preEntries := fetchRulesFromPaths(c, ctx, preRulebasePaths, parseSecurityRuleEntries)
-	localEntries := fetchRulesFromPaths(c, ctx, localRulebasePaths, parseSecurityRuleEntries)
-	postEntries := fetchRulesFromPaths(c, ctx, postRulebasePaths, parseSecurityRuleEntries)
+	preEntries := fetchRulesFromPaths(c, ctx, preRulebasePaths, target, parseSecurityRuleEntries)
+	localEntries := fetchRulesFromPaths(c, ctx, localRulebasePaths, target, parseSecurityRuleEntries)
+	postEntries := fetchRulesFromPaths(c, ctx, postRulebasePaths, target, parseSecurityRuleEntries)
 
 	// Combine in evaluation order: pre -> local -> post
 	totalEntries := len(preEntries) + len(localEntries) + len(postEntries)
@@ -299,7 +299,7 @@ func (c *Client) GetSecurityPolicies(ctx context.Context) ([]models.SecurityRule
 	}
 
 	// Fetch and apply rule hit counts
-	hitCountResp, err := c.Op(ctx, "<show><rule-hit-count><vsys><vsys-name><entry name='vsys1'><rule-base><entry name='security'><rules><all/></rules></entry></rule-base></entry></vsys-name></vsys></rule-hit-count></show>")
+	hitCountResp, err := c.Op(ctx, "<show><rule-hit-count><vsys><vsys-name><entry name='vsys1'><rule-base><entry name='security'><rules><all/></rules></entry></rule-base></entry></vsys-name></vsys></rule-hit-count></show>", target)
 	if err != nil {
 		log.Printf("[API Warning] failed to fetch security rule hit counts: %v", err)
 	} else if !hitCountResp.IsSuccess() {
@@ -385,14 +385,14 @@ func parseNATRuleEntries(inner []byte) []natRuleEntry {
 	var withWrapper struct {
 		Entry []natRuleEntry `xml:"rules>entry"`
 	}
-	if unmarshalErr := xml.Unmarshal(WrapInner(inner), &withWrapper); unmarshalErr == nil && len(withWrapper.Entry) > 0 {
+	if unmarshalErr := decodeXML(bytes.NewReader(WrapInner(inner)), &withWrapper); unmarshalErr == nil && len(withWrapper.Entry) > 0 {
 		entries = withWrapper.Entry
 	} else {
 		// Try parsing without wrapper
 		var withoutWrapper struct {
 			Entry []natRuleEntry `xml:"entry"`
 		}
-		if xml.Unmarshal(WrapInner(inner), &withoutWrapper) == nil {
+		if decodeXML(bytes.NewReader(WrapInner(inner)), &withoutWrapper) == nil {
 			entries = withoutWrapper.Entry
 		}
 	}
@@ -449,7 +449,7 @@ func convertNATRuleEntry(e natRuleEntry, position int, ruleBase models.RuleBase)
 }
 
 // GetNATRules retrieves NAT policy rules from the firewall
-func (c *Client) GetNATRules(ctx context.Context) ([]models.NATRule, error) {
+func (c *Client) GetNATRules(ctx context.Context, target string) ([]models.NATRule, error) {
 	// Pre-rulebase paths (Panorama-pushed rules evaluated first)
 	// Includes paths for both standalone firewalls and Panorama-managed firewalls
 	preRulebasePaths := []string{
@@ -478,9 +478,9 @@ func (c *Client) GetNATRules(ctx context.Context) ([]models.NATRule, error) {
 	}
 
 	// Fetch from all three rulebase locations
-	preEntries := fetchRulesFromPaths(c, ctx, preRulebasePaths, parseNATRuleEntries)
-	localEntries := fetchRulesFromPaths(c, ctx, localRulebasePaths, parseNATRuleEntries)
-	postEntries := fetchRulesFromPaths(c, ctx, postRulebasePaths, parseNATRuleEntries)
+	preEntries := fetchRulesFromPaths(c, ctx, preRulebasePaths, target, parseNATRuleEntries)
+	localEntries := fetchRulesFromPaths(c, ctx, localRulebasePaths, target, parseNATRuleEntries)
+	postEntries := fetchRulesFromPaths(c, ctx, postRulebasePaths, target, parseNATRuleEntries)
 
 	// Combine in evaluation order: pre -> local -> post
 	totalEntries := len(preEntries) + len(localEntries) + len(postEntries)
@@ -505,7 +505,7 @@ func (c *Client) GetNATRules(ctx context.Context) ([]models.NATRule, error) {
 	}
 
 	// Fetch and apply NAT rule hit counts
-	hitCountResp, err := c.Op(ctx, "<show><rule-hit-count><vsys><vsys-name><entry name='vsys1'><rule-base><entry name='nat'><rules><all/></rules></entry></rule-base></entry></vsys-name></vsys></rule-hit-count></show>")
+	hitCountResp, err := c.Op(ctx, "<show><rule-hit-count><vsys><vsys-name><entry name='vsys1'><rule-base><entry name='nat'><rules><all/></rules></entry></rule-base></entry></vsys-name></vsys></rule-hit-count></show>", target)
 	if err != nil {
 		log.Printf("[API Warning] failed to fetch NAT rule hit counts: %v", err)
 	} else if !hitCountResp.IsSuccess() {

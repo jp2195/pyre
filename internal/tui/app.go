@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -84,7 +85,7 @@ type Model struct {
 	selectedConnectionConfig config.ConnectionConfig
 }
 
-func NewModel(cfg *config.Config, state *config.State, creds *auth.Credentials, startView ViewState) Model {
+func NewModel(cfg *config.Config, state *config.State, creds *auth.Credentials, startView ViewState) (Model, error) {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = SpinnerStyle
@@ -116,7 +117,10 @@ func NewModel(cfg *config.Config, state *config.State, creds *auth.Credentials, 
 				Insecure: creds.Insecure,
 			}
 		}
-		session.AddConnection(creds.Host, connConfig, creds.APIKey)
+		if _, err := session.AddConnection(creds.Host, connConfig, creds.APIKey); err != nil {
+			cancel()
+			return Model{}, fmt.Errorf("initializing connection to %s: %w", creds.Host, err)
+		}
 		m.currentView = ViewDashboard
 	}
 
@@ -142,7 +146,7 @@ func NewModel(cfg *config.Config, state *config.State, creds *auth.Credentials, 
 	m.devicePicker = views.NewDevicePickerModel()
 	m.commandPalette = views.NewCommandPaletteModel()
 
-	return m
+	return m, nil
 }
 
 // setError sets an error on the model and returns a command to auto-dismiss it.

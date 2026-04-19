@@ -1,10 +1,11 @@
 package api
 
 import (
+	"bytes"
 	"context"
-	"encoding/xml"
 	"fmt"
 	"log"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -12,8 +13,25 @@ import (
 	"github.com/jp2195/pyre/internal/models"
 )
 
-func (c *Client) GetSessionInfo(ctx context.Context) (*models.SessionInfo, error) {
-	resp, err := c.Op(ctx, "<show><session><info></info></session></show>")
+// sessionFilterPattern restricts session filter tags to lowercase alphanumeric
+// identifiers. The filter is interpolated directly into an XML element name
+// (e.g. <source/> in <filter><source/></filter>), so anything outside this
+// pattern could inject arbitrary XML into the op command.
+var sessionFilterPattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+
+// buildSessionFilterCmd constructs the op command used to query sessions
+// with a specific filter tag (e.g. "source", "destination"). Rejecting
+// anything outside the safelist prevents XML injection via crafted filter
+// strings.
+func buildSessionFilterCmd(filter string) (string, error) {
+	if !sessionFilterPattern.MatchString(filter) {
+		return "", fmt.Errorf("invalid session filter %q: must match %s", filter, sessionFilterPattern)
+	}
+	return fmt.Sprintf("<show><session><all><filter><%s/></filter></all></session></show>", filter), nil
+}
+
+func (c *Client) GetSessionInfo(ctx context.Context, target string) (*models.SessionInfo, error) {
+	resp, err := c.Op(ctx, "<show><session><info></info></session></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +53,7 @@ func (c *Client) GetSessionInfo(ctx context.Context) (*models.SessionInfo, error
 		NumUDP     int   `xml:"num-udp"`
 		NumICMP    int   `xml:"num-icmp"`
 	}
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
 		log.Printf("[API Warning] failed to parse session info XML: %v", err)
 		return &models.SessionInfo{}, nil
 	}
@@ -51,13 +69,17 @@ func (c *Client) GetSessionInfo(ctx context.Context) (*models.SessionInfo, error
 	}, nil
 }
 
-func (c *Client) GetSessions(ctx context.Context, filter string) ([]models.Session, error) {
+func (c *Client) GetSessions(ctx context.Context, filter, target string) ([]models.Session, error) {
 	cmd := "<show><session><all></all></session></show>"
 	if filter != "" {
-		cmd = fmt.Sprintf("<show><session><all><filter><%s/></filter></all></session></show>", filter)
+		built, err := buildSessionFilterCmd(filter)
+		if err != nil {
+			return nil, err
+		}
+		cmd = built
 	}
 
-	resp, err := c.Op(ctx, cmd)
+	resp, err := c.Op(ctx, cmd, target)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +113,7 @@ func (c *Client) GetSessions(ctx context.Context, filter string) ([]models.Sessi
 			BytesIn     int64  `xml:"total-byte-count"`
 		} `xml:"entry"`
 	}
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
 		log.Printf("[API Warning] failed to parse sessions list XML: %v", err)
 		return []models.Session{}, nil
 	}
@@ -128,10 +150,10 @@ func (c *Client) GetSessions(ctx context.Context, filter string) ([]models.Sessi
 }
 
 // GetSessionByID retrieves detailed information for a specific session.
-func (c *Client) GetSessionByID(ctx context.Context, id int64) (*models.SessionDetail, error) {
+func (c *Client) GetSessionByID(ctx context.Context, id int64, target string) (*models.SessionDetail, error) {
 	cmd := fmt.Sprintf("<show><session><id>%d</id></session></show>", id)
 
-	resp, err := c.Op(ctx, cmd)
+	resp, err := c.Op(ctx, cmd, target)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +216,7 @@ func (c *Client) GetSessionByID(ctx context.Context, id int64) (*models.SessionD
 		L7Processing  string `xml:"layer7-processing"`
 	}
 
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
 		return nil, fmt.Errorf("failed to parse session detail: %w", err)
 	}
 

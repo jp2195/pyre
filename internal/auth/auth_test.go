@@ -18,9 +18,9 @@ func TestConcurrentSetActiveFirewall(t *testing.T) {
 
 		// Add some test connections (host is now the key)
 		fwConfig := &config.ConnectionConfig{}
-		session.AddConnection("10.0.0.1", fwConfig, "key1")
-		session.AddConnection("10.0.0.2", fwConfig, "key2")
-		session.AddConnection("10.0.0.3", fwConfig, "key3")
+		_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
+		_, _ = session.AddConnection("10.0.0.2", fwConfig, "key2")
+		_, _ = session.AddConnection("10.0.0.3", fwConfig, "key3")
 
 		var wg sync.WaitGroup
 		firewalls := []string{"10.0.0.1", "10.0.0.2", "10.0.0.3"}
@@ -61,7 +61,7 @@ func TestConcurrentGetActiveConnection(t *testing.T) {
 
 		// Add a test connection
 		fwConfig := &config.ConnectionConfig{}
-		session.AddConnection("10.0.0.1", fwConfig, "key1")
+		_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
 		session.SetActiveFirewall("10.0.0.1")
 
 		var wg sync.WaitGroup
@@ -96,7 +96,7 @@ func TestConcurrentAddRemoveConnection(t *testing.T) {
 			go func(idx int) {
 				defer wg.Done()
 				host := "10.0.0." + string(rune('a'+idx%26))
-				session.AddConnection(host, fwConfig, "key")
+				_, _ = session.AddConnection(host, fwConfig, "key")
 			}(i)
 		}
 
@@ -118,7 +118,7 @@ func TestConcurrentMixedOperations(t *testing.T) {
 		session := auth.NewSession(cfg)
 
 		fwConfig := &config.ConnectionConfig{}
-		session.AddConnection("10.0.0.1", fwConfig, "key1")
+		_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
 
 		var wg sync.WaitGroup
 
@@ -131,7 +131,7 @@ func TestConcurrentMixedOperations(t *testing.T) {
 					session.SetActiveFirewall("10.0.0.1")
 				} else {
 					host := "10.1.0." + string(rune('a'+idx%26))
-					session.AddConnection(host, fwConfig, "key")
+					_, _ = session.AddConnection(host, fwConfig, "key")
 				}
 			}(i)
 		}

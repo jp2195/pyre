@@ -25,8 +25,8 @@ func TestPickerModel_WithConnections(t *testing.T) {
 	session := auth.NewSession(cfg)
 
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
-	session.AddConnection("10.0.0.2", fwConfig, "key2")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.2", fwConfig, "key2")
 
 	m := NewPickerModel(session)
 
@@ -43,12 +43,12 @@ func TestPickerModel_UpdateConnections(t *testing.T) {
 	session := auth.NewSession(cfg)
 
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
 
 	m := NewPickerModel(session)
 
 	// Add another connection
-	session.AddConnection("10.0.0.2", fwConfig, "key2")
+	_, _ = session.AddConnection("10.0.0.2", fwConfig, "key2")
 	m = m.UpdateConnections(session)
 
 	if len(m.connections) != 2 {
@@ -83,8 +83,8 @@ func TestPickerModel_Selected(t *testing.T) {
 
 	// With connections
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
-	session.AddConnection("10.0.0.2", fwConfig, "key2")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.2", fwConfig, "key2")
 
 	m = NewPickerModel(session)
 	if m.Selected() == "" {
@@ -97,9 +97,9 @@ func TestPickerModel_Update_Navigation(t *testing.T) {
 	session := auth.NewSession(cfg)
 
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
-	session.AddConnection("10.0.0.2", fwConfig, "key2")
-	session.AddConnection("10.0.0.3", fwConfig, "key3")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.2", fwConfig, "key2")
+	_, _ = session.AddConnection("10.0.0.3", fwConfig, "key3")
 
 	m := NewPickerModel(session)
 	initialCursor := m.cursor
@@ -160,7 +160,7 @@ func TestPickerModel_View_WithConnections(t *testing.T) {
 	session := auth.NewSession(cfg)
 
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
 
 	m := NewPickerModel(session)
 	m = m.SetSize(100, 50)
@@ -187,9 +187,9 @@ func TestPickerModel_CursorOnActive(t *testing.T) {
 	session := auth.NewSession(cfg)
 
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
-	session.AddConnection("10.0.0.2", fwConfig, "key2")
-	session.AddConnection("10.0.0.3", fwConfig, "key3")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.2", fwConfig, "key2")
+	_, _ = session.AddConnection("10.0.0.3", fwConfig, "key3")
 
 	// Set 10.0.0.2 as active
 	session.SetActiveFirewall("10.0.0.2")

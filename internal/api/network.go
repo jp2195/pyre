@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"encoding/xml"
+	"bytes"
 	"strconv"
 	"strings"
 
@@ -11,9 +11,9 @@ import (
 )
 
 // GetARPTable retrieves the ARP table
-func (c *Client) GetARPTable(ctx context.Context) ([]models.ARPEntry, error) {
+func (c *Client) GetARPTable(ctx context.Context, target string) ([]models.ARPEntry, error) {
 	// Try the standard command format
-	resp, err := c.Op(ctx, "<show><arp><entry name = 'all'/></arp></show>")
+	resp, err := c.Op(ctx, "<show><arp><entry name = 'all'/></arp></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (c *Client) GetARPTable(ctx context.Context) ([]models.ARPEntry, error) {
 	var result1 struct {
 		Entry []arpEntry `xml:"entries>entry"`
 	}
-	if xml.Unmarshal(WrapInner(resp.Result.Inner), &result1) == nil && len(result1.Entry) > 0 {
+	if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result1) == nil && len(result1.Entry) > 0 {
 		entries = result1.Entry
 	}
 
@@ -50,7 +50,7 @@ func (c *Client) GetARPTable(ctx context.Context) ([]models.ARPEntry, error) {
 		var result2 struct {
 			Entry []arpEntry `xml:"entry"`
 		}
-		if xml.Unmarshal(WrapInner(resp.Result.Inner), &result2) == nil {
+		if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result2) == nil {
 			entries = result2.Entry
 		}
 	}
@@ -62,7 +62,7 @@ func (c *Client) GetARPTable(ctx context.Context) ([]models.ARPEntry, error) {
 				Entry []arpEntry `xml:"entry"`
 			} `xml:"max"`
 		}
-		if xml.Unmarshal(WrapInner(resp.Result.Inner), &result3) == nil {
+		if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result3) == nil {
 			entries = result3.Max.Entry
 		}
 	}
@@ -83,7 +83,7 @@ func (c *Client) GetARPTable(ctx context.Context) ([]models.ARPEntry, error) {
 }
 
 // GetRoutingTable retrieves the routing table
-func (c *Client) GetRoutingTable(ctx context.Context) ([]models.RouteEntry, error) {
+func (c *Client) GetRoutingTable(ctx context.Context, target string) ([]models.RouteEntry, error) {
 	// Try legacy command first (more widely supported), then advanced routing
 	// This order ensures faster response on devices that don't support advanced routing
 	commands := []string{
@@ -99,7 +99,7 @@ func (c *Client) GetRoutingTable(ctx context.Context) ([]models.RouteEntry, erro
 
 	for _, cmd := range commands {
 		var err error
-		resp, err = c.Op(ctx, cmd)
+		resp, err = c.Op(ctx, cmd, target)
 		if err != nil {
 			lastErr = err
 			continue
@@ -154,7 +154,7 @@ func parseAdvancedRoutingJSON(inner []byte) ([]models.RouteEntry, error) {
 	var jsonWrapper struct {
 		JSON string `xml:"json"`
 	}
-	if err := xml.Unmarshal(WrapInner(inner), &jsonWrapper); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(inner)), &jsonWrapper); err != nil {
 		return []models.RouteEntry{}, nil
 	}
 
@@ -218,8 +218,8 @@ func parseAdvancedRoutingJSON(inner []byte) ([]models.RouteEntry, error) {
 }
 
 // GetBGPNeighbors retrieves BGP neighbor information
-func (c *Client) GetBGPNeighbors(ctx context.Context) ([]models.BGPNeighbor, error) {
-	resp, err := c.Op(ctx, "<show><routing><protocol><bgp><peer></peer></bgp></protocol></routing></show>")
+func (c *Client) GetBGPNeighbors(ctx context.Context, target string) ([]models.BGPNeighbor, error) {
+	resp, err := c.Op(ctx, "<show><routing><protocol><bgp><peer></peer></bgp></protocol></routing></show>", target)
 	if err != nil {
 		// Return empty slice with error for display as "Not available"
 		return nil, err
@@ -256,7 +256,7 @@ func (c *Client) GetBGPNeighbors(ctx context.Context) ([]models.BGPNeighbor, err
 	var result1 struct {
 		Entry []bgpEntry `xml:"entry"`
 	}
-	if xml.Unmarshal(WrapInner(resp.Result.Inner), &result1) == nil && len(result1.Entry) > 0 {
+	if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result1) == nil && len(result1.Entry) > 0 {
 		entries = result1.Entry
 	}
 
@@ -267,7 +267,7 @@ func (c *Client) GetBGPNeighbors(ctx context.Context) ([]models.BGPNeighbor, err
 				Entry []bgpEntry `xml:"entry"`
 			} `xml:"peer-group"`
 		}
-		if xml.Unmarshal(WrapInner(resp.Result.Inner), &result2) == nil {
+		if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result2) == nil {
 			entries = result2.PeerGroup.Entry
 		}
 	}
@@ -296,8 +296,8 @@ func (c *Client) GetBGPNeighbors(ctx context.Context) ([]models.BGPNeighbor, err
 }
 
 // GetOSPFNeighbors retrieves OSPF neighbor information
-func (c *Client) GetOSPFNeighbors(ctx context.Context) ([]models.OSPFNeighbor, error) {
-	resp, err := c.Op(ctx, "<show><routing><protocol><ospf><neighbor></neighbor></ospf></protocol></routing></show>")
+func (c *Client) GetOSPFNeighbors(ctx context.Context, target string) ([]models.OSPFNeighbor, error) {
+	resp, err := c.Op(ctx, "<show><routing><protocol><ospf><neighbor></neighbor></ospf></protocol></routing></show>", target)
 	if err != nil {
 		// Return empty slice with error for display as "Not available"
 		return nil, err
@@ -330,7 +330,7 @@ func (c *Client) GetOSPFNeighbors(ctx context.Context) ([]models.OSPFNeighbor, e
 	var result1 struct {
 		Entry []ospfEntry `xml:"entry"`
 	}
-	if xml.Unmarshal(WrapInner(resp.Result.Inner), &result1) == nil && len(result1.Entry) > 0 {
+	if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result1) == nil && len(result1.Entry) > 0 {
 		entries = result1.Entry
 	}
 
@@ -341,7 +341,7 @@ func (c *Client) GetOSPFNeighbors(ctx context.Context) ([]models.OSPFNeighbor, e
 				Entry []ospfEntry `xml:"entry"`
 			} `xml:"area"`
 		}
-		if xml.Unmarshal(WrapInner(resp.Result.Inner), &result2) == nil {
+		if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result2) == nil {
 			entries = result2.Area.Entry
 		}
 	}
@@ -389,7 +389,7 @@ func parseLegacyRoutingXML(inner []byte) ([]models.RouteEntry, error) {
 			var r struct {
 				Entry []routeEntry `xml:"entry"`
 			}
-			if xml.Unmarshal(WrapInner(inner), &r) == nil {
+			if decodeXML(bytes.NewReader(WrapInner(inner)), &r) == nil {
 				return r.Entry
 			}
 			return nil
@@ -399,7 +399,7 @@ func parseLegacyRoutingXML(inner []byte) ([]models.RouteEntry, error) {
 			var r struct {
 				Entry []routeEntry `xml:"route-table>entry"`
 			}
-			if xml.Unmarshal(WrapInner(inner), &r) == nil {
+			if decodeXML(bytes.NewReader(WrapInner(inner)), &r) == nil {
 				return r.Entry
 			}
 			return nil
@@ -411,7 +411,7 @@ func parseLegacyRoutingXML(inner []byte) ([]models.RouteEntry, error) {
 					Entry []routeEntry `xml:"entry"`
 				} `xml:"dp"`
 			}
-			if xml.Unmarshal(WrapInner(inner), &r) == nil {
+			if decodeXML(bytes.NewReader(WrapInner(inner)), &r) == nil {
 				return r.DP.Entry
 			}
 			return nil

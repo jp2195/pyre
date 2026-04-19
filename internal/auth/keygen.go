@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/jp2195/pyre/internal/api"
 )
 
 type KeygenResult struct {
@@ -34,7 +36,10 @@ func GenerateAPIKey(ctx context.Context, host, username, password string, insecu
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			// #nosec G402 -- InsecureSkipVerify required for self-signed firewall certificates when user enables --insecure
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure}, //nolint:gosec
+			TLSClientConfig: &tls.Config{
+				MinVersion:         tls.VersionTLS12,
+				InsecureSkipVerify: insecure, //nolint:gosec
+			},
 		},
 	}
 
@@ -68,7 +73,10 @@ func GenerateAPIKey(ctx context.Context, host, username, password string, insecu
 	}
 
 	if xmlResp.Status != "success" {
-		errMsg := xmlResp.Msg.Line
+		// Sanitize before surfacing: PAN-OS (or a MITM) could embed ANSI
+		// escapes or control bytes in <msg><line>, which would otherwise
+		// flow unchanged into the TUI login error pane.
+		errMsg := api.SanitizeForDisplay(xmlResp.Msg.Line)
 		if errMsg == "" {
 			errMsg = "authentication failed"
 		}

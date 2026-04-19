@@ -136,7 +136,7 @@ func (e *Engine) executeAPIStep(ctx context.Context, step Step) (string, error) 
 	// Map API calls to actual client methods
 	switch step.APICall {
 	case "system_info":
-		info, err := e.apiClient.GetSystemInfo(ctx)
+		info, err := e.apiClient.GetSystemInfo(ctx, "")
 		if err != nil {
 			return "", err
 		}
@@ -144,7 +144,7 @@ func (e *Engine) executeAPIStep(ctx context.Context, step Step) (string, error) 
 			info.Hostname, info.Model, info.Version, info.Uptime), nil
 
 	case "system_resources":
-		res, err := e.apiClient.GetSystemResources(ctx)
+		res, err := e.apiClient.GetSystemResources(ctx, "")
 		if err != nil {
 			return "", err
 		}
@@ -152,7 +152,7 @@ func (e *Engine) executeAPIStep(ctx context.Context, step Step) (string, error) 
 			res.CPUPercent, res.MemoryPercent, res.Load1, res.Load5, res.Load15), nil
 
 	case "ha_status":
-		status, err := e.apiClient.GetHAStatus(ctx)
+		status, err := e.apiClient.GetHAStatus(ctx, "")
 		if err != nil {
 			return "", err
 		}
@@ -163,7 +163,7 @@ func (e *Engine) executeAPIStep(ctx context.Context, step Step) (string, error) 
 			status.State, status.PeerState, status.SyncState), nil
 
 	case "session_info":
-		info, err := e.apiClient.GetSessionInfo(ctx)
+		info, err := e.apiClient.GetSessionInfo(ctx, "")
 		if err != nil {
 			return "", err
 		}
