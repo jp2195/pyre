@@ -156,26 +156,28 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 	}
 	tmpPath := f.Name()
 
-	// Clean up temp file on any error
+	// Clean up temp file on any error. Best-effort: if Remove fails here
+	// there's nothing useful we can do (the primary error is already on
+	// its way to the caller).
 	success := false
 	defer func() {
 		if !success {
-			os.Remove(tmpPath)
+			_ = os.Remove(tmpPath)
 		}
 	}()
 
 	if err := f.Chmod(perm); err != nil {
-		f.Close()
+		_ = f.Close()
 		return fmt.Errorf("setting permissions: %w", err)
 	}
 
 	if _, err := f.Write(data); err != nil {
-		f.Close()
+		_ = f.Close()
 		return fmt.Errorf("writing data: %w", err)
 	}
 
 	if err := f.Sync(); err != nil {
-		f.Close()
+		_ = f.Close()
 		return fmt.Errorf("syncing file: %w", err)
 	}
 
