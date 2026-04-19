@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/troubleshoot"
 )
@@ -261,61 +261,61 @@ func TestTroubleshootModel_Update_Navigation(t *testing.T) {
 	m = m.SetRunbooks(runbooks)
 
 	// Move down with j
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if m.selected != 1 {
 		t.Errorf("expected selected=1 after j, got %d", m.selected)
 	}
 
 	// Move down with down arrow
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.selected != 2 {
 		t.Errorf("expected selected=2 after down, got %d", m.selected)
 	}
 
 	// At end, shouldn't go further
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if m.selected != 2 {
 		t.Errorf("expected selected to stay at 2, got %d", m.selected)
 	}
 
 	// Move up with k
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if m.selected != 1 {
 		t.Errorf("expected selected=1 after k, got %d", m.selected)
 	}
 
 	// Move up with up arrow
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.selected != 0 {
 		t.Errorf("expected selected=0 after up, got %d", m.selected)
 	}
 
 	// At start, shouldn't go negative
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if m.selected != 0 {
 		t.Errorf("expected selected to stay at 0, got %d", m.selected)
 	}
 
 	// Go to end with G
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("G")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	if m.selected != 2 {
 		t.Errorf("expected selected=2 after G, got %d", m.selected)
 	}
 
 	// Go to start with g
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	if m.selected != 0 {
 		t.Errorf("expected selected=0 after g, got %d", m.selected)
 	}
 
 	// End key
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnd})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnd})
 	if m.selected != 2 {
 		t.Errorf("expected selected=2 after End, got %d", m.selected)
 	}
 
 	// Home key
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyHome})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyHome})
 	if m.selected != 0 {
 		t.Errorf("expected selected=0 after Home, got %d", m.selected)
 	}
@@ -328,7 +328,7 @@ func TestTroubleshootModel_Update_ResultMode(t *testing.T) {
 	m.result = &troubleshoot.RunbookResult{}
 
 	// Esc should clear result
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	if m.mode != TroubleshootModeList {
 		t.Errorf("expected mode=TroubleshootModeList after Esc, got %d", m.mode)
 	}
@@ -337,7 +337,7 @@ func TestTroubleshootModel_Update_ResultMode(t *testing.T) {
 	m.mode = TroubleshootModeResult
 	m.result = &troubleshoot.RunbookResult{}
 
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
 	if m.mode != TroubleshootModeList {
 		t.Errorf("expected mode=TroubleshootModeList after q, got %d", m.mode)
 	}

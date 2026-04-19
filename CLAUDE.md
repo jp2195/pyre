@@ -36,6 +36,9 @@ go fix ./...                  # Apply modernizers (safe, behavior-preserving)
 - `setError()` is a pointer receiver that sets `m.err` and returns auto-dismiss tick Cmd
 - Navigation uses table-driven `navTargets` map and `viewToNavbar` for reverse lookup
 - Format helpers shared in `views/format_helpers.go`
+- **Bubble Tea v2 View composition**: only the top-level `tui.Model.View()` returns `tea.View`; every sub-view model returns `string`. The top-level composes sub-view strings and sets program options (alt-screen, mouse mode, window title, cursor) on the returned `tea.View` rather than on `tea.NewProgram`.
+- Use `tea.KeyPressMsg` in key handler type switches (not `tea.KeyMsg`, which in v2 is the union interface of press and release). Construct test messages as `tea.KeyPressMsg{Code: tea.KeyDown}` or `tea.KeyPressMsg{Code: 'j', Text: "j"}` — `Runes`/`Type` from v1 no longer exist.
+- Theme palette fields are `image/color.Color`, not a string alias. Construct concrete values via `lipgloss.Color("#RRGGBB")`.
 
 ## Code Style
 
@@ -78,6 +81,7 @@ unexpected failures are never swallowed.
 
 ## Dependencies
 
+- TUI: Bubble Tea v2 (`charm.land/bubbletea/v2`), lipgloss v2 (`charm.land/lipgloss/v2`), bubbles v2 (`charm.land/bubbles/v2`). Migrated from `github.com/charmbracelet/{bubbletea,lipgloss,bubbles}` on 2026-04-18.
 - YAML: `go.yaml.in/yaml/v4` (not gopkg.in/yaml.v3)
 - `maxResponseSize = 50MB` const in `client.go`, used with `io.LimitReader`
 - Log polling: `logPollMaxAttempts=30`, `logPollInterval=500ms` in `api/logs.go`

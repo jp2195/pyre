@@ -1,14 +1,14 @@
 package tui
 
 import (
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/auth"
 	"github.com/jp2195/pyre/internal/tui/views"
 )
 
-func (m Model) handleLoginKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLoginKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch {
@@ -41,7 +41,7 @@ func (m Model) handleLoginKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) handlePickerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handlePickerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	pickerKeys := DefaultPickerKeyMap()
 
 	switch {
@@ -74,7 +74,7 @@ func (m Model) handlePickerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) handleDevicePickerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleDevicePickerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	devicePickerKeys := DefaultDevicePickerKeyMap()
 
 	switch {
@@ -107,7 +107,7 @@ func (m Model) handleDevicePickerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) handleCommandPaletteKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleCommandPaletteKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.currentView = m.previousView
@@ -270,7 +270,7 @@ func (m Model) buildCommandRegistry() []views.Command {
 	return commands
 }
 
-func (m Model) handleConnectionHubKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleConnectionHubKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	hubKeys := DefaultConnectionHubKeyMap()
 
 	// Handle delete confirmation
@@ -342,7 +342,7 @@ func (m Model) handleConnectionHubKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) handleConnectionFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleConnectionFormKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	formKeys := DefaultConnectionFormKeyMap()
 
 	switch {
@@ -394,7 +394,7 @@ func (m Model) handleConnectionFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) handleViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch m.currentView {

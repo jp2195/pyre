@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func TestNewTableBase(t *testing.T) {
@@ -184,18 +184,19 @@ func TestTableBase_HandleNavigation(t *testing.T) {
 			tb := NewTableBase("")
 			tb.Cursor = tt.cursor
 
-			var msg tea.KeyMsg
+			var msg tea.KeyPressMsg
 			switch tt.key {
 			case "down":
-				msg = tea.KeyMsg{Type: tea.KeyDown}
+				msg = tea.KeyPressMsg{Code: tea.KeyDown}
 			case "up":
-				msg = tea.KeyMsg{Type: tea.KeyUp}
+				msg = tea.KeyPressMsg{Code: tea.KeyUp}
 			case "home":
-				msg = tea.KeyMsg{Type: tea.KeyHome}
+				msg = tea.KeyPressMsg{Code: tea.KeyHome}
 			case "end":
-				msg = tea.KeyMsg{Type: tea.KeyEnd}
+				msg = tea.KeyPressMsg{Code: tea.KeyEnd}
 			default:
-				msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(tt.key)}
+				runes := []rune(tt.key)
+				msg = tea.KeyPressMsg{Code: runes[0], Text: tt.key}
 			}
 
 			result, handled, _ := tb.HandleNavigation(msg, tt.itemCount, tt.visibleRows)
@@ -213,7 +214,7 @@ func TestTableBase_HandleNavigation(t *testing.T) {
 func TestTableBase_HandleNavigation_FilterMode(t *testing.T) {
 	tb := NewTableBase("")
 
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")}
+	msg := tea.KeyPressMsg{Code: '/', Text: "/"}
 	result, handled, cmd := tb.HandleNavigation(msg, 10, 5)
 
 	if !handled {
@@ -231,7 +232,7 @@ func TestTableBase_HandleNavigation_ToggleExpanded(t *testing.T) {
 	tb := NewTableBase("")
 	tb.Expanded = false
 
-	msg := tea.KeyMsg{Type: tea.KeyEnter}
+	msg := tea.KeyPressMsg{Code: tea.KeyEnter}
 	result, handled, _ := tb.HandleNavigation(msg, 10, 5)
 
 	if !handled {

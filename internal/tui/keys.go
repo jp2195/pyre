@@ -1,6 +1,6 @@
 package tui
 
-import "github.com/charmbracelet/bubbles/key"
+import "charm.land/bubbles/v2/key"
 
 type KeyMap struct {
 	// Global
@@ -306,7 +306,7 @@ func DefaultConnectionFormKeyMap() ConnectionFormKeyMap {
 			key.WithHelp("shift+tab", "prev field"),
 		),
 		Space: key.NewBinding(
-			key.WithKeys(" "),
+			key.WithKeys(" ", "space"),
 			key.WithHelp("space", "toggle"),
 		),
 		Quit: key.NewBinding(

@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // RuleListConfig defines the type-specific behavior for a RuleListModel.
@@ -158,7 +158,7 @@ func (m RuleListModel[T]) Update(msg tea.Msg) (RuleListModel[T], tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "esc":
 			if m.HandleCollapseIfExpanded() {

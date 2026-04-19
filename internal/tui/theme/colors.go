@@ -1,37 +1,42 @@
 package theme
 
-import "github.com/charmbracelet/lipgloss"
+import "image/color"
 
 // ColorPalette contains all semantic colors used throughout the application.
 // Each theme defines its own palette with colors appropriate for that theme.
+//
+// In lipgloss v2, colors are represented by the standard library
+// image/color.Color interface. Construct concrete values via lipgloss.Color
+// ("#RRGGBB" or ANSI index strings); this type intentionally uses the
+// interface so themes remain profile-agnostic.
 type ColorPalette struct {
 	// UI colors
-	Primary lipgloss.Color // Main brand/accent color
-	Accent  lipgloss.Color // Secondary accent color
-	Success lipgloss.Color // Success states, allow actions, up status
-	Error   lipgloss.Color // Error states, deny actions, down status
-	Warning lipgloss.Color // Warning states, caution
-	Info    lipgloss.Color // Informational, low severity
+	Primary color.Color // Main brand/accent color
+	Accent  color.Color // Secondary accent color
+	Success color.Color // Success states, allow actions, up status
+	Error   color.Color // Error states, deny actions, down status
+	Warning color.Color // Warning states, caution
+	Info    color.Color // Informational, low severity
 
 	// Severity colors (for threats, logs)
-	Critical lipgloss.Color
-	High     lipgloss.Color
-	Medium   lipgloss.Color
-	Low      lipgloss.Color
+	Critical color.Color
+	High     color.Color
+	Medium   color.Color
+	Low      color.Color
 
 	// Text colors
-	Text      lipgloss.Color // Normal text
-	TextMuted lipgloss.Color // Muted/disabled text
-	TextLight lipgloss.Color // Emphasized/light text
-	TextLabel lipgloss.Color // Labels
+	Text      color.Color // Normal text
+	TextMuted color.Color // Muted/disabled text
+	TextLight color.Color // Emphasized/light text
+	TextLabel color.Color // Labels
 
 	// Background colors
-	Background    lipgloss.Color // Main background
-	BackgroundAlt lipgloss.Color // Selected/highlighted background
-	Border        lipgloss.Color // Border color
-	Overlay       lipgloss.Color // Modal overlay color
+	Background    color.Color // Main background
+	BackgroundAlt color.Color // Selected/highlighted background
+	Border        color.Color // Border color
+	Overlay       color.Color // Modal overlay color
 
 	// Special colors
-	White lipgloss.Color
-	Black lipgloss.Color
+	White color.Color
+	Black color.Color
 }

@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/troubleshoot"
 )
@@ -126,7 +126,7 @@ func (m TroubleshootModel) Mode() TroubleshootMode {
 // Update handles input events.
 func (m TroubleshootModel) Update(msg tea.Msg) (TroubleshootModel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch m.mode {
 		case TroubleshootModeList:
 			switch msg.String() {

@@ -64,9 +64,9 @@ pyre -c 10.0.0.1
 
 pyre uses these third-party libraries:
 
-- `github.com/charmbracelet/bubbletea` - TUI framework
-- `github.com/charmbracelet/bubbles` - TUI components
-- `github.com/charmbracelet/lipgloss` - Styling
+- `charm.land/bubbletea/v2` - TUI framework
+- `charm.land/bubbles/v2` - TUI components
+- `charm.land/lipgloss/v2` - Styling
 - `go.yaml.in/yaml/v4` - YAML parsing
 
 We monitor dependencies for vulnerabilities and update promptly when issues are disclosed.

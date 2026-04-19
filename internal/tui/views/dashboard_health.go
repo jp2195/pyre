@@ -75,11 +75,11 @@ func (m DashboardModel) renderResourcesCompact(width int) string {
 
 	// Management CPU (from load average, treated as percentage)
 	mgmtCPU := m.resources.ManagementCPU
-	mgmtColor := string(c.Success)
+	mgmtColor := c.Success
 	if mgmtCPU > 80 {
-		mgmtColor = string(c.Error)
+		mgmtColor = c.Error
 	} else if mgmtCPU > 60 {
-		mgmtColor = string(c.Warning)
+		mgmtColor = c.Warning
 	}
 	b.WriteString(labelStyle().Render("Mgmt"))
 	b.WriteString(renderBar(mgmtCPU, barWidth, mgmtColor))
@@ -87,11 +87,11 @@ func (m DashboardModel) renderResourcesCompact(width int) string {
 
 	// Dataplane CPU (percentage from resource monitor)
 	dpCPU := m.resources.DataPlaneCPU
-	dpColor := string(c.Success)
+	dpColor := c.Success
 	if dpCPU > 80 {
-		dpColor = string(c.Error)
+		dpColor = c.Error
 	} else if dpCPU > 60 {
-		dpColor = string(c.Warning)
+		dpColor = c.Warning
 	}
 	b.WriteString(labelStyle().Render("DP  "))
 	b.WriteString(renderBar(dpCPU, barWidth, dpColor))
@@ -99,11 +99,11 @@ func (m DashboardModel) renderResourcesCompact(width int) string {
 
 	// Memory
 	memPct := m.resources.MemoryPercent
-	memColor := string(c.Success)
+	memColor := c.Success
 	if memPct > 85 {
-		memColor = string(c.Error)
+		memColor = c.Error
 	} else if memPct > 70 {
-		memColor = string(c.Warning)
+		memColor = c.Warning
 	}
 	b.WriteString(labelStyle().Render("Mem "))
 	b.WriteString(renderBar(memPct, barWidth, memColor))
@@ -132,11 +132,11 @@ func (m DashboardModel) renderSessionsCompact(width int) string {
 	if si.MaxCount > 0 {
 		c := theme.Colors()
 		sessPct := float64(si.ActiveCount) / float64(si.MaxCount) * 100
-		sessColor := string(c.Success)
+		sessColor := c.Success
 		if sessPct > 80 {
-			sessColor = string(c.Error)
+			sessColor = c.Error
 		} else if sessPct > 60 {
-			sessColor = string(c.Warning)
+			sessColor = c.Warning
 		}
 		barWidth := max(width-22, 8)
 		b.WriteString(renderBar(sessPct, barWidth, sessColor))
@@ -238,11 +238,11 @@ func (m DashboardModel) renderDiskUsage(width int) string {
 		}
 
 		// Determine color based on usage
-		color := string(c.Success)
+		color := c.Success
 		if disk.Percent > 90 {
-			color = string(c.Error)
+			color = c.Error
 		} else if disk.Percent > 80 {
-			color = string(c.Warning)
+			color = c.Warning
 		}
 
 		mountPoint := disk.MountPoint

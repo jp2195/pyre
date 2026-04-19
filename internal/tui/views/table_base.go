@@ -1,8 +1,8 @@
 package views
 
 import (
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 )
 
 // TableBase provides common state and navigation handling for table-style views.
@@ -26,7 +26,7 @@ func NewTableBase(placeholder string) TableBase {
 	f := textinput.New()
 	f.Placeholder = placeholder
 	f.CharLimit = 100
-	f.Width = 40
+	f.SetWidth(40)
 
 	return TableBase{
 		Filter: f,
@@ -97,7 +97,7 @@ func (t *TableBase) EnsureCursorValid(itemCount int) {
 // Returns the updated TableBase, whether the key was handled, and any command.
 // itemCount is the total number of items in the current (filtered) list.
 // visibleRows is the number of visible rows for page up/down calculations.
-func (t TableBase) HandleNavigation(msg tea.KeyMsg, itemCount, visibleRows int) (TableBase, bool, tea.Cmd) {
+func (t TableBase) HandleNavigation(msg tea.KeyPressMsg, itemCount, visibleRows int) (TableBase, bool, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
 		if t.Cursor < itemCount-1 {
@@ -163,7 +163,7 @@ func (t TableBase) HandleNavigation(msg tea.KeyMsg, itemCount, visibleRows int) 
 // Returns the updated TableBase, whether filter mode was exited, and any command.
 func (t TableBase) HandleFilterMode(msg tea.Msg) (TableBase, bool, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "enter", "esc":
 			t.FilterMode = false

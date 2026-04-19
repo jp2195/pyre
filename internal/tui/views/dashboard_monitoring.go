@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 	"github.com/jp2195/pyre/internal/tui/theme"
@@ -472,15 +472,15 @@ func (m DashboardModel) renderNATPoolUtilization(width int) string {
 		}
 
 		// Color based on utilization
-		color := string(c.Success)
+		poolColor := c.Success
 		if pool.Percent > 80 {
-			color = string(c.Error)
+			poolColor = c.Error
 		} else if pool.Percent > 60 {
-			color = string(c.Warning)
+			poolColor = c.Warning
 		}
 
 		b.WriteString(labelStyle().Render(fmt.Sprintf("%-15s ", name)))
-		b.WriteString(renderBar(pool.Percent, barWidth, color))
+		b.WriteString(renderBar(pool.Percent, barWidth, poolColor))
 		b.WriteString(fmt.Sprintf(" %3.0f%%", pool.Percent))
 
 		if i < len(m.natPools)-1 && i < maxShow-1 {

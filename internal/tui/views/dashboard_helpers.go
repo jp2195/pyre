@@ -2,10 +2,11 @@ package views
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 // DashboardBase provides shared layout fields and helpers for all dashboard models.
@@ -58,7 +59,7 @@ func warningStyle() lipgloss.Style   { return StatusWarningStyle }
 func errorStyle() lipgloss.Style     { return ErrorMsgStyle }
 func accentStyle() lipgloss.Style    { return TagStyle }
 
-func renderBar(percent float64, width int, color string) string {
+func renderBar(percent float64, width int, c color.Color) string {
 	if percent < 0 {
 		percent = 0
 	}
@@ -68,7 +69,7 @@ func renderBar(percent float64, width int, color string) string {
 
 	filled := min(int(percent/100*float64(width)), width)
 
-	filledStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(color))
+	filledStyle := lipgloss.NewStyle().Foreground(c)
 	emptyStyle := StatusMutedStyle
 
 	bar := strings.Builder{}

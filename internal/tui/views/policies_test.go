@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 )
@@ -164,13 +164,13 @@ func TestPoliciesModel_Update_Navigation(t *testing.T) {
 	m = m.SetPolicies(policies, nil)
 
 	// Move down
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if m.list.Cursor != 1 {
 		t.Errorf("expected Cursor=1 after j, got %d", m.list.Cursor)
 	}
 
 	// Move up
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if m.list.Cursor != 0 {
 		t.Errorf("expected Cursor=0 after k, got %d", m.list.Cursor)
 	}

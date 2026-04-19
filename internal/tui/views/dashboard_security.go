@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 	"github.com/jp2195/pyre/internal/tui/theme"
@@ -141,7 +141,7 @@ func (m SecurityDashboardModel) renderThreatBreakdown(width int) string {
 	if ts.BlockedCount > 0 {
 		blockedPct := float64(ts.BlockedCount) / float64(ts.TotalThreats) * 100
 		b.WriteString(labelStyle().Render("Blocked  "))
-		b.WriteString(renderBar(blockedPct, barWidth, string(c.Success)))
+		b.WriteString(renderBar(blockedPct, barWidth, c.Success))
 		b.WriteString(highlightStyle().Render(fmt.Sprintf(" %d", ts.BlockedCount)))
 		b.WriteString("\n")
 	}
@@ -150,7 +150,7 @@ func (m SecurityDashboardModel) renderThreatBreakdown(width int) string {
 	if ts.AlertedCount > 0 {
 		alertedPct := float64(ts.AlertedCount) / float64(ts.TotalThreats) * 100
 		b.WriteString(labelStyle().Render("Alerted  "))
-		b.WriteString(renderBar(alertedPct, barWidth, string(c.Warning)))
+		b.WriteString(renderBar(alertedPct, barWidth, c.Warning))
 		b.WriteString(warningStyle().Render(fmt.Sprintf(" %d", ts.AlertedCount)))
 	}
 
@@ -186,7 +186,7 @@ func (m SecurityDashboardModel) renderThreatSeverity(width int) string {
 	if ts.CriticalCount > 0 {
 		pct := float64(ts.CriticalCount) / float64(ts.TotalThreats) * 100
 		b.WriteString(criticalStyle.Render("Critical "))
-		b.WriteString(renderBar(pct, barWidth, string(c.Critical)))
+		b.WriteString(renderBar(pct, barWidth, c.Critical))
 		b.WriteString(criticalStyle.Render(fmt.Sprintf(" %d", ts.CriticalCount)))
 		b.WriteString("\n")
 	}
@@ -195,7 +195,7 @@ func (m SecurityDashboardModel) renderThreatSeverity(width int) string {
 	if ts.HighCount > 0 {
 		pct := float64(ts.HighCount) / float64(ts.TotalThreats) * 100
 		b.WriteString(highStyle.Render("High     "))
-		b.WriteString(renderBar(pct, barWidth, string(c.High)))
+		b.WriteString(renderBar(pct, barWidth, c.High))
 		b.WriteString(highStyle.Render(fmt.Sprintf(" %d", ts.HighCount)))
 		b.WriteString("\n")
 	}
@@ -204,7 +204,7 @@ func (m SecurityDashboardModel) renderThreatSeverity(width int) string {
 	if ts.MediumCount > 0 {
 		pct := float64(ts.MediumCount) / float64(ts.TotalThreats) * 100
 		b.WriteString(mediumStyle.Render("Medium   "))
-		b.WriteString(renderBar(pct, barWidth, string(c.Medium)))
+		b.WriteString(renderBar(pct, barWidth, c.Medium))
 		b.WriteString(mediumStyle.Render(fmt.Sprintf(" %d", ts.MediumCount)))
 		b.WriteString("\n")
 	}
@@ -213,7 +213,7 @@ func (m SecurityDashboardModel) renderThreatSeverity(width int) string {
 	if ts.LowCount > 0 {
 		pct := float64(ts.LowCount) / float64(ts.TotalThreats) * 100
 		b.WriteString(lowStyle.Render("Low      "))
-		b.WriteString(renderBar(pct, barWidth, string(c.Low)))
+		b.WriteString(renderBar(pct, barWidth, c.Low))
 		b.WriteString(lowStyle.Render(fmt.Sprintf(" %d", ts.LowCount)))
 	}
 

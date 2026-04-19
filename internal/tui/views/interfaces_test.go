@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 )
@@ -133,13 +133,13 @@ func TestInterfacesModel_Update_Navigation(t *testing.T) {
 	m = m.SetInterfaces(interfaces, nil)
 
 	// Move down
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.Cursor != 1 {
 		t.Errorf("expected Cursor=1 after down, got %d", m.Cursor)
 	}
 
 	// Move up
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.Cursor != 0 {
 		t.Errorf("expected Cursor=0 after up, got %d", m.Cursor)
 	}
@@ -208,7 +208,7 @@ func TestInterfacesModel_SetSize_ClampsCursor(t *testing.T) {
 
 	// Move cursor to end using table navigation
 	for range 4 {
-		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	}
 	if m.Cursor != 4 {
 		t.Errorf("expected cursor at 4, got %d", m.Cursor)

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 )
@@ -154,7 +154,7 @@ func (m VPNDashboardModel) renderIPSecSummary(width int) string {
 		b.WriteString("\n")
 		barWidth := max(width-8, 10)
 		upPct := float64(upCount) / float64(len(m.tunnels)) * 100
-		b.WriteString(renderBar(upPct, barWidth, "#10B981"))
+		b.WriteString(renderBar(upPct, barWidth, lipgloss.Color("#10B981")))
 	}
 
 	return panelStyle().Width(width).Render(b.String())

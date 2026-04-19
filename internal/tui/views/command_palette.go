@@ -3,9 +3,9 @@ package views
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/tui/theme"
 )
@@ -40,7 +40,7 @@ func NewCommandPaletteModel() CommandPaletteModel {
 	ti.Placeholder = "Type to search..."
 	ti.Prompt = "> "
 	ti.CharLimit = 64
-	ti.Width = 50
+	ti.SetWidth(50)
 
 	return CommandPaletteModel{
 		textInput: ti,
@@ -150,7 +150,7 @@ func (m *CommandPaletteModel) filterCommands() {
 // Update handles events for the command palette
 func (m CommandPaletteModel) Update(msg tea.Msg) (CommandPaletteModel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "up", "ctrl+p":
 			if m.cursor > 0 {
@@ -217,7 +217,7 @@ func (m CommandPaletteModel) View() string {
 	var b strings.Builder
 
 	// Input field
-	m.textInput.Width = modalWidth - 4
+	m.textInput.SetWidth(modalWidth - 4)
 	b.WriteString(ModalInputStyle.Render(m.textInput.View()))
 	b.WriteString("\n")
 
@@ -236,7 +236,7 @@ func (m CommandPaletteModel) View() string {
 		lipgloss.Center, lipgloss.Center,
 		modal,
 		lipgloss.WithWhitespaceChars(" "),
-		lipgloss.WithWhitespaceForeground(c.Overlay),
+		lipgloss.WithWhitespaceStyle(lipgloss.NewStyle().Foreground(c.Overlay)),
 	)
 }
 

@@ -3,7 +3,7 @@ package views
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/auth"
 	"github.com/jp2195/pyre/internal/config"
@@ -105,7 +105,7 @@ func TestPickerModel_Update_Navigation(t *testing.T) {
 	initialCursor := m.cursor
 
 	// Move down with j
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	expectedAfterJ := initialCursor + 1
 	if initialCursor >= 2 {
 		expectedAfterJ = 2 // Can't go past end
@@ -116,7 +116,7 @@ func TestPickerModel_Update_Navigation(t *testing.T) {
 
 	// Move up with k
 	prevCursor := m.cursor
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	expectedAfterK := prevCursor - 1
 	if prevCursor == 0 {
 		expectedAfterK = 0 // Can't go below 0
@@ -128,7 +128,7 @@ func TestPickerModel_Update_Navigation(t *testing.T) {
 	// Go to start
 	m.cursor = 0
 	// At start, shouldn't go negative
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if m.cursor != 0 {
 		t.Errorf("expected cursor to stay at 0, got %d", m.cursor)
 	}
@@ -136,7 +136,7 @@ func TestPickerModel_Update_Navigation(t *testing.T) {
 	// Go to end
 	m.cursor = 2
 	// At end, shouldn't go further
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if m.cursor != 2 {
 		t.Errorf("expected cursor to stay at 2, got %d", m.cursor)
 	}

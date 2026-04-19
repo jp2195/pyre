@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/config"
 )
@@ -154,7 +154,7 @@ func (m ConnectionHubModel) HasConnections() bool {
 // Update handles keyboard input for navigation
 func (m ConnectionHubModel) Update(msg tea.Msg) (ConnectionHubModel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if m.showConfirm {
 			// In confirmation mode, only handle y/n/esc
 			return m, nil
