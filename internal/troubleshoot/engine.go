@@ -6,13 +6,11 @@ import (
 	"time"
 
 	"github.com/jp2195/pyre/internal/api"
-	"github.com/jp2195/pyre/internal/ssh"
 )
 
 // Engine executes troubleshooting runbooks.
 type Engine struct {
 	apiClient      *api.Client
-	sshClient      *ssh.Client
 	registry       *Registry
 	patternMatcher *PatternMatcher
 	stepCallback   StepCallback
@@ -22,10 +20,9 @@ type Engine struct {
 type StepCallback func(stepIndex int, step Step, status StepStatus, output string)
 
 // NewEngine creates a new troubleshooting engine.
-func NewEngine(apiClient *api.Client, sshClient *ssh.Client, registry *Registry) *Engine {
+func NewEngine(apiClient *api.Client, registry *Registry) *Engine {
 	return &Engine{
 		apiClient:      apiClient,
-		sshClient:      sshClient,
 		registry:       registry,
 		patternMatcher: NewPatternMatcher(),
 	}
@@ -49,13 +46,6 @@ func (e *Engine) Run(ctx context.Context, runbookID string) (*RunbookResult, err
 // RunRunbook executes a runbook directly.
 func (e *Engine) RunRunbook(ctx context.Context, runbook *Runbook) (*RunbookResult, error) {
 	result := NewRunbookResult(runbook)
-
-	// Check SSH requirement
-	if runbook.RequiresSSH && (e.sshClient == nil || !e.sshClient.IsConnected()) {
-		result.Error = fmt.Errorf("runbook requires SSH but SSH is not connected")
-		result.Finalize()
-		return result, nil
-	}
 
 	// Execute each step
 	for i, step := range runbook.Steps {
@@ -97,11 +87,17 @@ func (e *Engine) executeStep(ctx context.Context, index int, step Step) StepResu
 	var output string
 	var err error
 
+	// Apply per-step timeout so a hung API call cannot stall the whole runbook.
+	// This context scopes both the step-type dispatch below AND the subsequent
+	// MatchAll pass: `defer cancel()` fires at function return, so any work
+	// that consults stepCtx before we return (including pattern matching)
+	// inherits the same deadline.
+	stepCtx, cancel := context.WithTimeout(ctx, step.effectiveTimeout())
+	defer cancel()
+
 	switch step.Type {
-	case StepTypeSSH:
-		output, err = e.executeSSHStep(ctx, step)
 	case StepTypeAPI:
-		output, err = e.executeAPIStep(ctx, step)
+		output, err = e.executeAPIStep(stepCtx, step)
 	default:
 		err = fmt.Errorf("unknown step type: %s", step.Type)
 	}
@@ -139,28 +135,6 @@ func (e *Engine) executeStep(ctx context.Context, index int, step Step) StepResu
 	return result
 }
 
-// executeSSHStep executes an SSH command step.
-func (e *Engine) executeSSHStep(ctx context.Context, step Step) (string, error) {
-	if e.sshClient == nil {
-		return "", fmt.Errorf("SSH client not available")
-	}
-
-	if !e.sshClient.IsConnected() {
-		return "", fmt.Errorf("SSH not connected")
-	}
-
-	cmdResult, err := e.sshClient.Execute(ctx, step.Command)
-	if err != nil {
-		return "", err
-	}
-
-	if cmdResult.Error != nil {
-		return cmdResult.Stdout + cmdResult.Stderr, cmdResult.Error
-	}
-
-	return cmdResult.Stdout + cmdResult.Stderr, nil
-}
-
 // executeAPIStep executes an API call step.
 func (e *Engine) executeAPIStep(ctx context.Context, step Step) (string, error) {
 	if e.apiClient == nil {
@@ -170,7 +144,7 @@ func (e *Engine) executeAPIStep(ctx context.Context, step Step) (string, error) 
 	// Map API calls to actual client methods
 	switch step.APICall {
 	case "system_info":
-		info, err := e.apiClient.GetSystemInfo(ctx)
+		info, err := e.apiClient.GetSystemInfo(ctx, "")
 		if err != nil {
 			return "", err
 		}
@@ -178,7 +152,7 @@ func (e *Engine) executeAPIStep(ctx context.Context, step Step) (string, error) 
 			info.Hostname, info.Model, info.Version, info.Uptime), nil
 
 	case "system_resources":
-		res, err := e.apiClient.GetSystemResources(ctx)
+		res, err := e.apiClient.GetSystemResources(ctx, "")
 		if err != nil {
 			return "", err
 		}
@@ -186,7 +160,7 @@ func (e *Engine) executeAPIStep(ctx context.Context, step Step) (string, error) 
 			res.CPUPercent, res.MemoryPercent, res.Load1, res.Load5, res.Load15), nil
 
 	case "ha_status":
-		status, err := e.apiClient.GetHAStatus(ctx)
+		status, err := e.apiClient.GetHAStatus(ctx, "")
 		if err != nil {
 			return "", err
 		}
@@ -197,7 +171,7 @@ func (e *Engine) executeAPIStep(ctx context.Context, step Step) (string, error) 
 			status.State, status.PeerState, status.SyncState), nil
 
 	case "session_info":
-		info, err := e.apiClient.GetSessionInfo(ctx)
+		info, err := e.apiClient.GetSessionInfo(ctx, "")
 		if err != nil {
 			return "", err
 		}
@@ -214,25 +188,10 @@ func (e *Engine) CanRun(runbook *Runbook) (bool, string) {
 	if e.apiClient == nil {
 		return false, "API client not available"
 	}
-
-	if runbook.RequiresSSH {
-		if e.sshClient == nil {
-			return false, "SSH not configured"
-		}
-		if !e.sshClient.IsConnected() {
-			return false, "SSH not connected"
-		}
-	}
-
 	return true, ""
 }
 
 // GetRegistry returns the runbook registry.
 func (e *Engine) GetRegistry() *Registry {
 	return e.registry
-}
-
-// HasSSH returns true if SSH is available.
-func (e *Engine) HasSSH() bool {
-	return e.sshClient != nil && e.sshClient.IsConnected()
 }

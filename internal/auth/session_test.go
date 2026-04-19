@@ -35,7 +35,10 @@ func TestSession_AddConnection(t *testing.T) {
 		Insecure: true,
 	}
 
-	conn := session.AddConnection("10.0.0.1", fwConfig, "test-api-key")
+	conn, err := session.AddConnection("10.0.0.1", fwConfig, "test-api-key")
+	if err != nil {
+		t.Fatalf("AddConnection returned error: %v", err)
+	}
 
 	if conn == nil {
 		t.Fatal("expected non-nil connection")
@@ -54,26 +57,6 @@ func TestSession_AddConnection(t *testing.T) {
 	}
 }
 
-func TestSession_AddConnectionWithSSH(t *testing.T) {
-	cfg := config.DefaultConfig()
-	session := NewSession(cfg)
-
-	fwConfig := &config.ConnectionConfig{
-		Insecure: true,
-	}
-
-	// Note: SSH client is passed directly (established during login)
-	// Password is no longer stored - SSH must be established while credentials are in memory
-	conn := session.AddConnectionWithSSH("10.0.0.1", fwConfig, "test-api-key", "admin", nil)
-
-	if conn == nil {
-		t.Fatal("expected non-nil connection")
-	}
-	if conn.SSHUsername != "admin" {
-		t.Errorf("expected SSH username 'admin', got %q", conn.SSHUsername)
-	}
-}
-
 func TestSession_GetActiveConnection(t *testing.T) {
 	cfg := config.DefaultConfig()
 	session := NewSession(cfg)
@@ -86,7 +69,7 @@ func TestSession_GetActiveConnection(t *testing.T) {
 
 	// Add a connection
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "api-key")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "api-key")
 
 	conn = session.GetActiveConnection()
 	if conn == nil {
@@ -102,8 +85,8 @@ func TestSession_SetActiveFirewall(t *testing.T) {
 	session := NewSession(cfg)
 
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
-	session.AddConnection("10.0.0.2", fwConfig, "key2")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.2", fwConfig, "key2")
 
 	// Set active to second host
 	ok := session.SetActiveFirewall("10.0.0.2")
@@ -130,8 +113,8 @@ func TestSession_RemoveConnection(t *testing.T) {
 	session := NewSession(cfg)
 
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
-	session.AddConnection("10.0.0.2", fwConfig, "key2")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.2", fwConfig, "key2")
 
 	// Remove active connection
 	session.RemoveConnection("10.0.0.1")
@@ -163,8 +146,8 @@ func TestSession_ListConnections(t *testing.T) {
 
 	// Add connections
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
-	session.AddConnection("10.0.0.2", fwConfig, "key2")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.2", fwConfig, "key2")
 
 	conns = session.ListConnections()
 	if len(conns) != 2 {
@@ -183,7 +166,7 @@ func TestSession_IsConnected(t *testing.T) {
 
 	// Add connection
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
 
 	if !session.IsConnected("10.0.0.1") {
 		t.Error("expected IsConnected to be true")
@@ -359,150 +342,6 @@ func TestConnection_ConnectedDeviceCount(t *testing.T) {
 	count := conn.ConnectedDeviceCount()
 	if count != 2 {
 		t.Errorf("expected 2 connected devices, got %d", count)
-	}
-}
-
-func TestConnection_HasSSH(t *testing.T) {
-	// No SSH config
-	conn := &Connection{
-		Host:   "10.0.0.1",
-		Config: &config.ConnectionConfig{},
-	}
-
-	if conn.HasSSH() {
-		t.Error("expected HasSSH to be false with no username")
-	}
-
-	// With SSH username in config
-	conn.Config = &config.ConnectionConfig{
-		SSH: config.SSHConfig{
-			Username: "admin",
-		},
-	}
-
-	if !conn.HasSSH() {
-		t.Error("expected HasSSH to be true with username")
-	}
-
-	// With SSH username from login credentials
-	conn.Config = &config.ConnectionConfig{}
-	conn.SSHUsername = "admin"
-
-	if !conn.HasSSH() {
-		t.Error("expected HasSSH to be true with login username")
-	}
-}
-
-func TestResolveSSHCredentials(t *testing.T) {
-	// Set environment variables
-	os.Setenv("PYRE_SSH_USERNAME", "env-user")
-	os.Setenv("PYRE_SSH_PASSWORD", "env-pass")
-	os.Setenv("PYRE_SSH_KEY_PATH", "/env/key/path")
-	defer func() {
-		os.Unsetenv("PYRE_SSH_USERNAME")
-		os.Unsetenv("PYRE_SSH_PASSWORD")
-		os.Unsetenv("PYRE_SSH_KEY_PATH")
-	}()
-
-	cfg := config.SSHConfig{}
-	result := resolveSSHCredentials(cfg)
-
-	if result.Username != "env-user" {
-		t.Errorf("expected Username 'env-user', got %q", result.Username)
-	}
-	if result.Password != "env-pass" {
-		t.Errorf("expected Password 'env-pass', got %q", result.Password)
-	}
-	if result.PrivateKeyPath != "/env/key/path" {
-		t.Errorf("expected PrivateKeyPath '/env/key/path', got %q", result.PrivateKeyPath)
-	}
-}
-
-func TestResolveSSHCredentials_ConfigTakesPrecedence(t *testing.T) {
-	// Set environment variables
-	os.Setenv("PYRE_SSH_USERNAME", "env-user")
-	defer os.Unsetenv("PYRE_SSH_USERNAME")
-
-	// Config with username already set
-	cfg := config.SSHConfig{
-		Username: "config-user",
-	}
-	result := resolveSSHCredentials(cfg)
-
-	// Config should be preserved, env should not override
-	if result.Username != "config-user" {
-		t.Errorf("expected Username 'config-user', got %q", result.Username)
-	}
-}
-
-func TestConnection_getSSHConfig(t *testing.T) {
-	conn := &Connection{
-		Host: "10.0.0.1",
-		Config: &config.ConnectionConfig{
-			SSH: config.SSHConfig{
-				Port:     2222,
-				Username: "config-admin",
-				Timeout:  60,
-			},
-		},
-		SSHUsername: "login-admin",
-	}
-
-	cfg := conn.getSSHConfig()
-
-	// Config values should be preserved
-	if cfg.Port != 2222 {
-		t.Errorf("expected Port 2222, got %d", cfg.Port)
-	}
-	if cfg.Timeout != 60 {
-		t.Errorf("expected Timeout 60, got %d", cfg.Timeout)
-	}
-	// Config username takes precedence
-	if cfg.Username != "config-admin" {
-		t.Errorf("expected Username 'config-admin', got %q", cfg.Username)
-	}
-}
-
-func TestConnection_getSSHConfig_LoginFallback(t *testing.T) {
-	// Set SSH password env var for this test
-	os.Setenv("PYRE_SSH_PASSWORD", "env-pass")
-	defer os.Unsetenv("PYRE_SSH_PASSWORD")
-
-	conn := &Connection{
-		Host: "10.0.0.1",
-		Config: &config.ConnectionConfig{
-			SSH: config.SSHConfig{
-				Port: 22,
-				// No username
-			},
-		},
-		SSHUsername: "login-admin",
-	}
-
-	cfg := conn.getSSHConfig()
-
-	// Should fall back to login username
-	if cfg.Username != "login-admin" {
-		t.Errorf("expected Username 'login-admin', got %q", cfg.Username)
-	}
-	// Password should come from env var
-	if cfg.Password != "env-pass" {
-		t.Errorf("expected Password 'env-pass', got %q", cfg.Password)
-	}
-}
-
-func TestConnection_getSSHConfig_NilConfig(t *testing.T) {
-	conn := &Connection{
-		Host:        "10.0.0.1",
-		Config:      nil,
-		SSHUsername: "login-admin",
-	}
-
-	cfg := conn.getSSHConfig()
-
-	// Should use login username
-	if cfg.Username != "login-admin" {
-		t.Errorf("expected Username 'login-admin', got %q", cfg.Username)
 	}
 }
 

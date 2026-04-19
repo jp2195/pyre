@@ -1,112 +1,43 @@
 # Dashboard
 
-The Dashboard provides at-a-glance monitoring of your firewall. It's divided into four sub-views that you access through the Monitor group (press `1`).
+At-a-glance firewall monitoring. Four sub-views reachable via the Monitor
+group (`1`). Press `1` again or `Tab` to cycle; `Ctrl+P` jumps directly.
 
-## Overview (Default)
+## Overview
 
-The main dashboard shows system health and resource utilization.
+System health + resource utilization.
 
-### System Information
-- Hostname and model
-- Serial number
-- PAN-OS version
-- Uptime
-
-### Resources
-- CPU utilization (data plane and management plane)
-- Memory usage
-- Session count (current/max)
-- Disk usage
-
-### HA Status
-- HA mode (active-passive, active-active, standalone)
-- State (active, passive, initial, etc.)
-- Peer information and sync status
-- Last state change
-
-### Session Summary
-- Active sessions
-- Sessions per second
-- TCP/UDP/ICMP breakdown
-
-### Additional Information
-- Logged-in administrators
-- Active licenses and expiration
-- Recent jobs
-- Environmental sensors (temperature, fans)
-- Certificate expiration warnings
-- NAT pool utilization
+- **System** — hostname, model, serial, PAN-OS version, uptime.
+- **Resources** — CPU (data plane + management plane), memory, session
+  count (current / max), disk.
+- **HA** — mode (active-passive / active-active / standalone), state,
+  peer info, sync status, last state change.
+- **Sessions summary** — active, sessions/sec, TCP/UDP/ICMP breakdown.
+- **Extras** — logged-in admins, active licenses + expiration, recent
+  jobs, environmental sensors, cert-expiration warnings, NAT pool use.
 
 ## Network
 
-The Network sub-view focuses on network connectivity.
-
-### Top Interfaces
-- Interfaces sorted by traffic volume
-- Shows bytes in/out and packets
-- State indicators (up/down)
-
-### Interface Errors
-- Interfaces with errors or drops
-- Error counts and types
-
-### ARP Table
-- Recent ARP entries
-- IP to MAC mappings
-- Interface and status
-
-### Routing Summary
-- Route count by type
-- Default route information
-- Static vs dynamic routes
+- **Top interfaces** — by traffic volume, bytes/packets in/out, state.
+- **Interface errors** — interfaces with errors or drops.
+- **ARP table** — recent entries, IP→MAC, interface, status.
+- **Routing summary** — counts by type, default route, static vs
+  dynamic.
 
 ## Security
 
-The Security sub-view shows threat activity and policy effectiveness.
-
-### Threat Summary
-- Threats blocked (last 24h)
-- Threats by severity (critical, high, medium, low)
-- Threats by type (virus, spyware, vulnerability)
-
-### Rule Analysis
-- Zero-hit rules (candidates for cleanup)
-- Most-hit rules (highest traffic)
-- Disabled rules count
-
-### Top Applications
-- Most frequently matched applications
-- Session counts per application
+- **Threat summary** — blocked in last 24h, by severity (critical /
+  high / medium / low), by type (virus / spyware / vulnerability).
+- **Rule analysis** — zero-hit rules (cleanup candidates), most-hit
+  rules, disabled rule count.
+- **Top applications** — most-matched, session counts per app.
 
 ## VPN
 
-The VPN sub-view monitors VPN connectivity.
+- **IPSec tunnels** — status, peer gateway, crypto, counters.
+- **GlobalProtect** — active users, users by gateway, recent connects.
 
-### IPSec Tunnels
-- Tunnel status (up/down)
-- Peer gateway
-- Encryption/authentication
-- Traffic counters
+## Keys
 
-### GlobalProtect
-- Active user count
-- Users by gateway
-- Recent connections
-
-## Keybindings
-
-| Key | Action |
-|-----|--------|
-| `1` | Cycle to next Monitor sub-view |
-| `Tab` | Cycle to next Monitor sub-view |
-| `r` | Refresh dashboard data |
-| `?` | Help overlay |
-
-## Navigation
-
-The Dashboard sub-views are part of the Monitor group:
-
-- Press `1` once to go to Monitor group (Overview by default)
-- Press `1` again to cycle: Overview -> Network -> Security -> VPN -> Overview
-- Or use `Tab` to cycle through sub-views
-- Or use the command palette (`Ctrl+P`) to jump directly to any sub-view
+Standard navigation applies — see [keybindings.md](../keybindings.md).
+View-specific: none beyond cycling sub-views with `1` / `Tab`.

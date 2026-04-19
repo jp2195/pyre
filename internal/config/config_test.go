@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -260,52 +261,6 @@ connections:
 	}
 }
 
-func TestSSHConfig(t *testing.T) {
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "ssh-test.yaml")
-
-	configContent := `
-connections:
-  10.0.0.1:
-    ssh:
-      port: 2222
-      username: admin
-      password: secret
-      private_key_path: /path/to/key
-      timeout: 60
-`
-	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
-		t.Fatalf("failed to write test config: %v", err)
-	}
-
-	flags := CLIFlags{Config: configPath}
-	cfg, err := LoadWithFlags(flags)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	conn, ok := cfg.GetConnection("10.0.0.1")
-	if !ok {
-		t.Fatal("expected to find 10.0.0.1")
-	}
-
-	if conn.SSH.Port != 2222 {
-		t.Errorf("expected SSH port 2222, got %d", conn.SSH.Port)
-	}
-	if conn.SSH.Username != "admin" {
-		t.Errorf("expected SSH username 'admin', got %q", conn.SSH.Username)
-	}
-	if conn.SSH.Password != "secret" {
-		t.Errorf("expected SSH password 'secret', got %q", conn.SSH.Password)
-	}
-	if conn.SSH.PrivateKeyPath != "/path/to/key" {
-		t.Errorf("expected SSH key path '/path/to/key', got %q", conn.SSH.PrivateKeyPath)
-	}
-	if conn.SSH.Timeout != 60 {
-		t.Errorf("expected SSH timeout 60, got %d", conn.SSH.Timeout)
-	}
-}
-
 func TestConnectionType(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "type-test.yaml")
@@ -433,60 +388,6 @@ func TestSettings_AllFields(t *testing.T) {
 	}
 }
 
-func TestSSHConfig_AllFields(t *testing.T) {
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "ssh-all-fields.yaml")
-
-	configContent := `
-connections:
-  10.0.0.1:
-    insecure: true
-    type: firewall
-    ssh:
-      port: 2222
-      username: admin
-      password: secret123
-      private_key_path: /path/to/key
-      timeout: 120
-`
-	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
-		t.Fatalf("failed to write test config: %v", err)
-	}
-
-	flags := CLIFlags{Config: configPath}
-	cfg, err := LoadWithFlags(flags)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	conn, ok := cfg.GetConnection("10.0.0.1")
-	if !ok {
-		t.Fatal("expected to find 10.0.0.1")
-	}
-
-	if !conn.Insecure {
-		t.Error("expected Insecure to be true")
-	}
-	if conn.Type != "firewall" {
-		t.Errorf("expected Type 'firewall', got %q", conn.Type)
-	}
-	if conn.SSH.Port != 2222 {
-		t.Errorf("expected SSH Port 2222, got %d", conn.SSH.Port)
-	}
-	if conn.SSH.Username != "admin" {
-		t.Errorf("expected SSH Username 'admin', got %q", conn.SSH.Username)
-	}
-	if conn.SSH.Password != "secret123" {
-		t.Errorf("expected SSH Password 'secret123', got %q", conn.SSH.Password)
-	}
-	if conn.SSH.PrivateKeyPath != "/path/to/key" {
-		t.Errorf("expected SSH PrivateKeyPath '/path/to/key', got %q", conn.SSH.PrivateKeyPath)
-	}
-	if conn.SSH.Timeout != 120 {
-		t.Errorf("expected SSH Timeout 120, got %d", conn.SSH.Timeout)
-	}
-}
-
 func TestConfig_ApplyFlags_NoHost(t *testing.T) {
 	cfg := DefaultConfig()
 
@@ -585,6 +486,68 @@ func TestConfig_HasConnections(t *testing.T) {
 
 	if !cfg.HasConnections() {
 		t.Error("expected HasConnections to be true")
+	}
+}
+
+// TestConfig_DoesNotPersistCredentials is a regression guard for the
+// contract documented on ConnectionConfig: APIKey and Password carry
+// `yaml:"-"` tags and must never round-trip to ~/.pyre.yaml. If someone
+// later removes those tags (or adds a new credential field without one),
+// this test fires.
+func TestConfig_DoesNotPersistCredentials(t *testing.T) {
+	const (
+		secretKey = "SECRET-KEY-ABCD1234"
+		secretPwd = "hunter2"
+	)
+
+	// Redirect HOME so Save() writes into a test-scoped directory. Save()
+	// resolves the destination via os.UserHomeDir() → ~/.pyre.yaml.
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	// macOS honours $HOME for UserHomeDir(); set USERPROFILE too so the
+	// same test works on Windows if the suite is ever cross-run.
+	t.Setenv("USERPROFILE", tmpDir)
+
+	cfg := DefaultConfig()
+	cfg.Default = "10.0.0.1"
+	cfg.Connections["10.0.0.1"] = ConnectionConfig{
+		Username: "admin",
+		APIKey:   secretKey,
+		Password: secretPwd,
+	}
+
+	if err := cfg.Save(); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	configPath := filepath.Join(tmpDir, ".pyre.yaml")
+	data, err := os.ReadFile(configPath) // #nosec G304 -- test-controlled path
+	if err != nil {
+		t.Fatalf("reading saved config: %v", err)
+	}
+
+	if bytes.Contains(data, []byte(secretKey)) {
+		t.Errorf("API key leaked to disk; file contents:\n%s", data)
+	}
+	if bytes.Contains(data, []byte(secretPwd)) {
+		t.Errorf("password leaked to disk; file contents:\n%s", data)
+	}
+
+	// Load the file back and confirm credentials are empty on the
+	// round-tripped struct.
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	conn, ok := loaded.GetConnection("10.0.0.1")
+	if !ok {
+		t.Fatalf("expected 10.0.0.1 connection after reload")
+	}
+	if conn.APIKey != "" {
+		t.Errorf("APIKey round-tripped from disk: %q", conn.APIKey)
+	}
+	if conn.Password != "" {
+		t.Errorf("Password round-tripped from disk: %q", conn.Password)
 	}
 }
 

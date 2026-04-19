@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"regexp"
 	"strings"
@@ -12,7 +11,6 @@ import (
 	"github.com/jp2195/pyre/internal/api"
 	"github.com/jp2195/pyre/internal/config"
 	"github.com/jp2195/pyre/internal/models"
-	"github.com/jp2195/pyre/internal/ssh"
 )
 
 // serialPattern validates Palo Alto device serial numbers (alphanumeric, typically 12-15 chars)
@@ -26,22 +24,16 @@ type Session struct {
 }
 
 type Connection struct {
-	Host       string // Host/IP is the primary identifier
-	Config     *config.ConnectionConfig
-	APIKey     string
-	Client     *api.Client
-	SSHClient  *ssh.Client
-	Connected  bool
-	SSHEnabled bool
-
-	// SSH username from login (password must come from env var for security)
-	SSHUsername string
+	Host      string // Host/IP is the primary identifier
+	Config    *config.ConnectionConfig
+	APIKey    string
+	Client    *api.Client
+	Connected bool
 
 	// Panorama fields
 	IsPanorama     bool
 	ManagedDevices []models.ManagedDevice
 	TargetSerial   string // Current target device serial (empty = Panorama itself)
-	TargetIP       string // Current target device mgmt IP (for SSH)
 }
 
 func NewSession(cfg *config.Config) *Session {
@@ -70,27 +62,26 @@ func (s *Session) SetActiveFirewall(name string) bool {
 	return false
 }
 
-func (s *Session) AddConnection(host string, connConfig *config.ConnectionConfig, apiKey string) *Connection {
-	return s.AddConnectionWithSSH(host, connConfig, apiKey, "", nil)
-}
-
-// AddConnectionWithSSH creates a new connection with SSH username and optional pre-established SSH client.
-// If sshClient is provided, it will be used directly. Otherwise, SSH can be established later
-// using credentials from environment variables.
-func (s *Session) AddConnectionWithSSH(host string, connConfig *config.ConnectionConfig, apiKey, sshUsername string, sshClient *ssh.Client) *Connection {
+// AddConnection creates a new PAN-OS XML API connection for the given host.
+// It returns an error if the underlying API client cannot be constructed
+// (for example, a user-supplied CA bundle that cannot be loaded).
+func (s *Session) AddConnection(host string, connConfig *config.ConnectionConfig, apiKey string) (*Connection, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	client := api.NewClient(host, apiKey, api.WithInsecure(connConfig.Insecure))
+	client, err := api.NewClient(host, apiKey, api.ClientOptions{
+		Insecure:   connConfig.Insecure,
+		CACertPath: connConfig.CACertPath,
+	})
+	if err != nil {
+		return nil, err
+	}
 	conn := &Connection{
-		Host:        host,
-		Config:      connConfig,
-		APIKey:      apiKey,
-		Client:      client,
-		Connected:   true,
-		SSHUsername: sshUsername,
-		SSHClient:   sshClient,
-		SSHEnabled:  sshClient != nil,
+		Host:      host,
+		Config:    connConfig,
+		APIKey:    apiKey,
+		Client:    client,
+		Connected: true,
 	}
 	s.Connections[host] = conn
 
@@ -98,12 +89,25 @@ func (s *Session) AddConnectionWithSSH(host string, connConfig *config.Connectio
 		s.ActiveFirewall = host
 	}
 
-	return conn
+	return conn, nil
 }
 
 func (s *Session) RemoveConnection(host string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// Zero credential fields before dropping the reference so the secret
+	// stops being reachable from any surviving *Connection pointer a
+	// caller might still hold. The keychain keeps the persistent copy.
+	if conn, ok := s.Connections[host]; ok {
+		conn.APIKey = ""
+		if conn.Config != nil {
+			conn.Config.APIKey = ""
+			conn.Config.Password = ""
+		}
+		if conn.Client != nil {
+			_ = conn.Client.Close()
+		}
+	}
 	delete(s.Connections, host)
 	if s.ActiveFirewall == host {
 		s.ActiveFirewall = ""
@@ -177,13 +181,18 @@ func ResolveCredentials(cfg *config.Config, flags config.CLIFlags) *Credentials 
 			if !creds.Insecure && conn.Insecure {
 				creds.Insecure = true
 			}
+		}
+	}
 
-			// Try host-based env var for API key (normalize host to valid env var name)
-			envName := strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(host, "-", "_"), ".", "_"))
-			envKey := os.Getenv("PYRE_" + envName + "_API_KEY")
-			if envKey != "" && creds.APIKey == "" {
-				creds.APIKey = envKey
-			}
+	// Host-based API key resolution order (documented in CLAUDE.md):
+	//   1. PYRE_<HOST>_API_KEY environment variable.
+	//   2. Fall through to PromptForPassword=true so the TUI prompts.
+	// pyre does not persist credentials. Users manage them via env vars,
+	// CLI flags, or the interactive login flow (session-only).
+	if creds.Host != "" && creds.APIKey == "" {
+		envName := strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(creds.Host, "-", "_"), ".", "_"))
+		if envKey := os.Getenv("PYRE_" + envName + "_API_KEY"); envKey != "" {
+			creds.APIKey = envKey
 		}
 	}
 
@@ -218,25 +227,17 @@ func validateSerial(serial string) error {
 	return nil
 }
 
-// validateIP checks if the IP address is valid.
-func validateIP(ip string) error {
-	if ip == "" {
-		return nil
-	}
-	if net.ParseIP(ip) == nil {
-		return fmt.Errorf("invalid IP address: %s", ip)
-	}
-	return nil
-}
-
 // SetTarget sets the current target device for Panorama.
 // Pass nil to target Panorama itself.
-// Returns an error if the device serial or IP is invalid.
+// Returns an error if the device serial is invalid.
+//
+// The target serial is stored on the Connection and is passed explicitly to
+// each API call that needs it (see Target()). The underlying *api.Client
+// holds no target state, which eliminates races when concurrent fetches
+// use different targets.
 func (c *Connection) SetTarget(device *models.ManagedDevice) error {
 	if device == nil {
 		c.TargetSerial = ""
-		c.TargetIP = ""
-		c.Client.ClearTarget()
 		return nil
 	}
 
@@ -245,15 +246,15 @@ func (c *Connection) SetTarget(device *models.ManagedDevice) error {
 		return err
 	}
 
-	// Validate IP address format
-	if err := validateIP(device.IPAddress); err != nil {
-		return err
-	}
-
 	c.TargetSerial = device.Serial
-	c.TargetIP = device.IPAddress
-	c.Client.SetTarget(device.Serial)
 	return nil
+}
+
+// Target returns the current Panorama target serial, or "" for Panorama
+// itself / standalone firewalls. Safe for concurrent callers because it
+// only reads (callers that set the target serialize via the TUI event loop).
+func (c *Connection) Target() string {
+	return c.TargetSerial
 }
 
 // GetTargetDevice returns the currently targeted managed device, or nil if targeting Panorama.
@@ -275,11 +276,9 @@ func (c *Connection) RefreshManagedDevices(ctx context.Context) error {
 		return nil
 	}
 
-	// Temporarily clear target to query Panorama directly
-	savedTarget := c.Client.GetTarget()
-	c.Client.ClearTarget()
-	defer c.Client.SetTarget(savedTarget)
-
+	// GetManagedDevices intentionally targets Panorama itself regardless of
+	// the connection's current TargetSerial, so no save/restore dance is
+	// required with the stateless client.
 	devices, err := c.Client.GetManagedDevices(ctx)
 	if err != nil {
 		return err
@@ -297,92 +296,4 @@ func (c *Connection) ConnectedDeviceCount() int {
 		}
 	}
 	return count
-}
-
-// ConnectSSH establishes an SSH connection for the given firewall connection.
-func (c *Connection) ConnectSSH(ctx context.Context) error {
-	sshCfg := c.getSSHConfig()
-
-	// If no SSH username is configured, skip SSH connection
-	if sshCfg.Username == "" {
-		return nil
-	}
-
-	// For Panorama with a target device, connect to the target's IP
-	host := c.Host
-	if c.IsPanorama && c.TargetIP != "" {
-		// Validate target IP before using it
-		if err := validateIP(c.TargetIP); err != nil {
-			return fmt.Errorf("invalid target IP for SSH: %w", err)
-		}
-		host = c.TargetIP
-	}
-
-	client, err := ssh.NewClient(host, sshCfg)
-	if err != nil {
-		return err
-	}
-
-	if err := client.Connect(ctx); err != nil {
-		return err
-	}
-
-	c.SSHClient = client
-	c.SSHEnabled = true
-	return nil
-}
-
-// DisconnectSSH closes the SSH connection.
-func (c *Connection) DisconnectSSH() error {
-	if c.SSHClient != nil {
-		err := c.SSHClient.Close()
-		c.SSHClient = nil
-		c.SSHEnabled = false
-		return err
-	}
-	return nil
-}
-
-// HasSSH returns true if SSH is configured for this connection.
-func (c *Connection) HasSSH() bool {
-	sshCfg := c.getSSHConfig()
-	return sshCfg.Username != ""
-}
-
-// getSSHConfig returns the SSH configuration, combining config file, env vars, and login credentials.
-// Note: SSH passwords must come from environment variables (PYRE_SSH_PASSWORD) for security.
-func (c *Connection) getSSHConfig() config.SSHConfig {
-	var sshCfg config.SSHConfig
-	if c.Config != nil {
-		sshCfg = c.Config.SSH
-	}
-
-	// Apply environment variable overrides
-	sshCfg = resolveSSHCredentials(sshCfg)
-
-	// Use login username if no username configured yet
-	if sshCfg.Username == "" && c.SSHUsername != "" {
-		sshCfg.Username = c.SSHUsername
-	}
-
-	return sshCfg
-}
-
-// resolveSSHCredentials applies environment variable overrides to SSH config.
-func resolveSSHCredentials(cfg config.SSHConfig) config.SSHConfig {
-	// Global SSH env vars
-	if envUser := os.Getenv("PYRE_SSH_USERNAME"); envUser != "" && cfg.Username == "" {
-		cfg.Username = envUser
-	}
-	if envPass := os.Getenv("PYRE_SSH_PASSWORD"); envPass != "" && cfg.Password == "" {
-		cfg.Password = envPass
-	}
-	if envKey := os.Getenv("PYRE_SSH_KEY_PATH"); envKey != "" && cfg.PrivateKeyPath == "" {
-		cfg.PrivateKeyPath = envKey
-	}
-	if os.Getenv("PYRE_SSH_INSECURE") == "true" {
-		cfg.Insecure = true
-	}
-
-	return cfg
 }

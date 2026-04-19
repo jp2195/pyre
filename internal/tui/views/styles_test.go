@@ -1,6 +1,7 @@
 package views
 
 import (
+	"image/color"
 	"testing"
 
 	"github.com/jp2195/pyre/internal/tui/theme"
@@ -159,38 +160,40 @@ func TestThemeColors(t *testing.T) {
 
 	colors := []struct {
 		name  string
-		color string
+		color color.Color
 	}{
-		{"Primary", string(c.Primary)},
-		{"Accent", string(c.Accent)},
-		{"Success", string(c.Success)},
-		{"Error", string(c.Error)},
-		{"Warning", string(c.Warning)},
-		{"Info", string(c.Info)},
-		{"Critical", string(c.Critical)},
-		{"High", string(c.High)},
-		{"Medium", string(c.Medium)},
-		{"Low", string(c.Low)},
-		{"Text", string(c.Text)},
-		{"TextMuted", string(c.TextMuted)},
-		{"TextLight", string(c.TextLight)},
-		{"TextLabel", string(c.TextLabel)},
-		{"Background", string(c.Background)},
-		{"BackgroundAlt", string(c.BackgroundAlt)},
-		{"Border", string(c.Border)},
-		{"Overlay", string(c.Overlay)},
-		{"White", string(c.White)},
-		{"Black", string(c.Black)},
+		{"Primary", c.Primary},
+		{"Accent", c.Accent},
+		{"Success", c.Success},
+		{"Error", c.Error},
+		{"Warning", c.Warning},
+		{"Info", c.Info},
+		{"Critical", c.Critical},
+		{"High", c.High},
+		{"Medium", c.Medium},
+		{"Low", c.Low},
+		{"Text", c.Text},
+		{"TextMuted", c.TextMuted},
+		{"TextLight", c.TextLight},
+		{"TextLabel", c.TextLabel},
+		{"Background", c.Background},
+		{"BackgroundAlt", c.BackgroundAlt},
+		{"Border", c.Border},
+		{"Overlay", c.Overlay},
+		{"White", c.White},
+		{"Black", c.Black},
 	}
 
 	for _, tc := range colors {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.color == "" {
-				t.Errorf("%s is empty", tc.name)
+			if tc.color == nil {
+				t.Fatalf("%s is nil", tc.name)
 			}
-			// Check it starts with # (hex color)
-			if tc.color[0] != '#' {
-				t.Errorf("%s doesn't start with #: %s", tc.name, tc.color)
+			// Every palette entry must have a non-zero alpha so it actually
+			// renders (transparent colors would be a theme bug).
+			_, _, _, a := tc.color.RGBA()
+			if a == 0 {
+				t.Errorf("%s has zero alpha (%v)", tc.name, tc.color)
 			}
 		})
 	}
@@ -286,8 +289,8 @@ func TestThemeInit(t *testing.T) {
 
 			// Verify colors are accessible
 			c := theme.Colors()
-			if string(c.Primary) == "" {
-				t.Errorf("Primary color is empty for theme %q", themeName)
+			if c.Primary == nil {
+				t.Errorf("Primary color is nil for theme %q", themeName)
 			}
 		})
 	}

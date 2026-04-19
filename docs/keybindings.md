@@ -1,165 +1,161 @@
-# Keybindings Reference
+# Keybindings & Navigation
 
-Complete reference of keyboard shortcuts in pyre.
+## Navigation model
 
-## Global Keybindings
+Views are organized into three numbered groups. Press a number to switch
+groups; press it again (or `Tab`) to cycle through views within the
+current group.
 
-These work from any view (except when in filter mode or text input).
+| Key | Group   | Views                                         |
+|-----|---------|-----------------------------------------------|
+| `1` | Monitor | Overview · Network · Security · VPN           |
+| `2` | Analyze | Policies · NAT · Sessions · Interfaces · Logs |
+| `3` | Tools   | Config                                        |
 
-### Navigation
+The header shows the group tabs on top and the sub-tabs for the active
+group underneath.
 
-| Key | Action |
-|-----|--------|
-| `1` | Monitor group (Overview, Network, Security, VPN) |
-| `2` | Analyze group (Policies, NAT, Sessions, Interfaces, Logs) |
-| `3` | Tools group (Config) |
-| `4` | Connections group (Switch Device) |
-| `Tab` | Next view in current group |
-| `Ctrl+P` | Open command palette |
-| `:` | Open connection picker |
-| `D` | Open device picker (Panorama only) |
+## Global
 
-### Actions
+| Key         | Action                                          |
+|-------------|-------------------------------------------------|
+| `1` `2` `3` | Switch (or cycle within) navigation group       |
+| `Tab`       | Next view in the current group                  |
+| `Ctrl+P`    | Command palette — fuzzy jump anywhere           |
+| `:`         | Connection picker (switch between firewalls)    |
+| `D`         | Device picker (Panorama only)                   |
+| `r`         | Refresh current view                            |
+| `?`         | Toggle help overlay                             |
+| `q`         | Quit                                            |
+| `Ctrl+C`    | Quit                                            |
 
-| Key | Action |
-|-----|--------|
-| `r` | Refresh current view |
-| `?` | Toggle help overlay |
-| `q` | Quit application |
-| `Ctrl+C` | Quit application |
+## List navigation
 
-## List Navigation
+Works in any view that renders a scrollable list (Policies, Sessions,
+Logs, Interfaces, …).
 
-These work in views with scrollable lists (Policies, Sessions, Logs, etc.).
+| Key                 | Action           |
+|---------------------|------------------|
+| `j` / `Down`        | Move down        |
+| `k` / `Up`          | Move up          |
+| `g` / `Home`        | Jump to top      |
+| `G` / `End`         | Jump to bottom   |
+| `Ctrl+d` / `PgDn`   | Page down        |
+| `Ctrl+u` / `PgUp`   | Page up          |
 
-| Key | Action |
-|-----|--------|
-| `j` / `Down` | Move cursor down |
-| `k` / `Up` | Move cursor up |
-| `g` / `Home` | Jump to top |
-| `G` / `End` | Jump to bottom |
-| `Ctrl+d` / `PgDn` | Page down |
-| `Ctrl+u` / `PgUp` | Page up |
+## Filter
 
-## Filter Mode
+| Key     | Action                              |
+|---------|-------------------------------------|
+| `/`     | Enter filter mode                   |
+| `Enter` | Apply filter                        |
+| `Esc`   | Clear filter / exit filter mode     |
 
-| Key | Action |
-|-----|--------|
-| `/` | Enter filter mode |
-| `Enter` | Apply filter |
-| `Esc` | Clear filter / Cancel |
+Filters use partial (substring) matching.
 
-When in filter mode, type your search query. Filters support partial matching.
+## Sort
 
-## Sorting
+| Key | Action                                |
+|-----|---------------------------------------|
+| `s` | Cycle through sort fields             |
+| `S` | Toggle direction (ascending/descending) |
 
-| Key | Action |
-|-----|--------|
-| `s` | Cycle through sort fields |
-| `S` | Toggle sort direction (asc/desc) |
+## Per-view
 
-## View-Specific Keybindings
+### Dashboard (group 1)
 
-### Dashboard Views
+- `Tab` — cycle sub-views (Overview → Network → Security → VPN)
 
-| Key | Action |
-|-----|--------|
-| `Tab` | Cycle dashboard sub-views (within Monitor group) |
+### Policies (group 2)
 
-### Policies View
+- `/` filter by name, tag, zone, or application
+- `s` cycle sort: position, name, hits, last hit
+- `Enter` toggle rule detail
 
-| Key | Action |
-|-----|--------|
-| `/` | Filter by name, tag, zone, or application |
-| `s` | Cycle sort (position, name, hits, last hit) |
-| `Enter` | Toggle rule detail view |
+### NAT (group 2)
 
-### NAT Policies View
+- `/` filter by name or translation
+- `s` cycle sort: position, name, hits
+- `Enter` toggle rule detail
 
-| Key | Action |
-|-----|--------|
-| `/` | Filter by name or translation |
-| `s` | Cycle sort (position, name, hits) |
-| `Enter` | Toggle rule detail view |
+### Sessions (group 2)
 
-### Sessions View
+- `/` filter by IP, application, zone, rule, or user
+- `s` cycle sort: ID, bytes, age, application
+- `d` / `Enter` toggle session detail
 
-| Key | Action |
-|-----|--------|
-| `/` | Filter by IP, application, zone, rule, or user |
-| `s` | Cycle sort (ID, bytes, age, application) |
-| `Enter` | Toggle session detail view |
+### Interfaces (group 2)
 
-### Interfaces View
+- `/` filter by name, zone, IP, or state
+- `s` cycle sort: name, zone, state, IP
+- `Enter` toggle interface detail
 
-| Key | Action |
-|-----|--------|
-| `/` | Filter by name, zone, IP, or state |
-| `s` | Cycle sort (name, zone, state, IP) |
-| `Enter` | Toggle interface detail view |
+### Logs (group 2)
 
-### Logs View
+- `]` next log type (System → Traffic → Threat)
+- `[` previous log type
+- `/` filter
+- `s` cycle sort
+- `S` toggle direction
+- `Enter` toggle log detail
 
-| Key | Action |
-|-----|--------|
-| `]` | Next log type (System -> Traffic -> Threat) |
-| `[` | Previous log type (System -> Threat -> Traffic) |
-| `/` | Filter log entries |
-| `s` | Cycle sort field |
-| `S` | Toggle sort direction |
-| `Enter` | Toggle log detail view |
+## Modal views
 
-### Connection Hub
+### Command palette (`Ctrl+P`)
 
-| Key | Action |
-|-----|--------|
-| `j`/`k` | Navigate up/down |
-| `Enter` | Connect to selected connection |
-| `n` | Add new connection |
-| `e` | Edit selected connection |
-| `d` | Delete selected connection |
-| `Esc` | Back / Cancel |
+| Key               | Action                   |
+|-------------------|--------------------------|
+| type              | fuzzy-filter commands    |
+| `j`/`k` / arrows  | navigate results         |
+| `Enter`           | execute                  |
+| `Esc`             | close                    |
 
-### Connection Form
+### Connection picker (`:`)
 
-| Key | Action |
-|-----|--------|
-| `Tab` | Move to next field |
-| `Shift+Tab` | Move to previous field |
-| `Enter` | Submit form |
-| `Esc` | Cancel and go back |
+| Key        | Action                       |
+|------------|------------------------------|
+| `j`/`k`    | navigate                     |
+| `Enter`    | connect                      |
+| `x`        | disconnect selected          |
+| `Esc`, `:` | close                        |
 
-### Connection Picker
+### Device picker (`D`, Panorama only)
 
-| Key | Action |
-|-----|--------|
-| `j`/`k` | Navigate up/down |
-| `Enter` | Connect to selected firewall |
-| `x` | Disconnect selected |
-| `Esc` / `:` | Close picker |
+| Key        | Action                                         |
+|------------|------------------------------------------------|
+| `j`/`k`    | navigate                                       |
+| `Enter`    | select device (or Panorama to target itself)   |
+| `r`        | refresh managed-device list                    |
+| `Esc`, `D` | close                                          |
 
-### Device Picker (Panorama)
+On a standalone firewall connection, `D` falls through to the current
+view's own handlers instead of opening a picker.
 
-| Key | Action |
-|-----|--------|
-| `j`/`k` | Navigate up/down |
-| `Enter` | Select device to target |
-| `r` | Refresh device list |
-| `Esc` / `D` | Close picker |
+### Connection Hub (launch screen)
 
-### Command Palette
+| Key   | Action                              |
+|-------|-------------------------------------|
+| `j`/`k` | navigate                          |
+| `Enter` | connect                           |
+| `n`   | add new connection                  |
+| `e`   | edit selected                       |
+| `d`   | delete selected                     |
+| `Esc` | back / cancel                       |
 
-| Key | Action |
-|-----|--------|
-| Type | Filter commands |
-| `j`/`k` / `Up`/`Down` | Navigate results |
-| `Enter` | Execute selected command |
-| `Esc` | Close palette |
+### Connection form
 
-## Login Screen
+| Key         | Action                |
+|-------------|-----------------------|
+| `Tab`       | next field            |
+| `Shift+Tab` | previous field        |
+| `Enter`     | submit                |
+| `Esc`       | cancel and go back    |
 
-| Key | Action |
-|-----|--------|
-| `Tab` | Move to next field |
-| `Enter` | Submit (when all fields filled) |
-| `Ctrl+C` | Quit |
+### Login screen
+
+| Key         | Action                                                      |
+|-------------|-------------------------------------------------------------|
+| `Tab`       | next field                                                  |
+| `Enter`     | submit (all fields filled)                                  |
+| `Esc`       | return to Connection Hub; form buffers are cleared          |
+| `Ctrl+C`    | quit                                                        |

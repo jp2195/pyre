@@ -6,16 +6,24 @@ import (
 )
 
 // PatternMatcher compiles and caches regex patterns for efficient matching.
+// The common PAN-OS patterns enumerated in precompiledPatterns are compiled
+// eagerly at package init (see precompiledRegexCache) and seeded into every
+// new matcher; runtime-supplied patterns are lazily compiled via getOrCompile.
 type PatternMatcher struct {
 	mu       sync.RWMutex
 	compiled map[string]*regexp.Regexp
 }
 
-// NewPatternMatcher creates a new pattern matcher.
+// NewPatternMatcher creates a new pattern matcher seeded with the
+// precompiled common-pattern set.
 func NewPatternMatcher() *PatternMatcher {
-	return &PatternMatcher{
-		compiled: make(map[string]*regexp.Regexp),
+	pm := &PatternMatcher{
+		compiled: make(map[string]*regexp.Regexp, len(precompiledRegexCache)),
 	}
+	for src, re := range precompiledRegexCache {
+		pm.compiled[src] = re
+	}
+	return pm
 }
 
 // Match checks if the output matches the given pattern.
@@ -25,15 +33,28 @@ func (pm *PatternMatcher) Match(pattern Pattern, output string) (*MatchResult, e
 		return nil, err
 	}
 
-	match := re.FindString(output)
-	if match == "" {
+	// Single scan: FindStringSubmatchIndex gives us both the full match span
+	// and any capture-group spans in one pass. Previously Match called
+	// FindString then FindStringSubmatch, scanning twice.
+	idx := re.FindStringSubmatchIndex(output)
+	if idx == nil {
 		return nil, nil
+	}
+
+	matches := make([]string, len(idx)/2)
+	for i := range matches {
+		start, end := idx[2*i], idx[2*i+1]
+		if start < 0 || end < 0 {
+			// Non-participating capture group.
+			continue
+		}
+		matches[i] = output[start:end]
 	}
 
 	return &MatchResult{
 		Pattern:     pattern,
-		MatchedText: match,
-		Matches:     re.FindStringSubmatch(output),
+		MatchedText: matches[0],
+		Matches:     matches,
 	}, nil
 }
 
@@ -82,8 +103,18 @@ type MatchResult struct {
 	Matches     []string // Capture groups
 }
 
-// precompiledPatterns contains commonly used PAN-OS patterns.
-// These are package-private as they are only used within the troubleshoot package.
+// precompiledPatterns holds the canonical regex source strings for the
+// common PAN-OS patterns, addressable by name. precompiledRegexCache
+// (below) maps each of these source strings to its compiled form.
+//
+// TODO: reviewer suggested folding these two vars into a single
+// map[string]*regexp.Regexp. Kept separate for now because
+// patterns_test.go dereferences precompiledPatterns.<name> as a named
+// source string when checking that each canonical pattern compiles and
+// matches its sample. Collapsing into one map would force the test to
+// key by the raw regex string, losing the name-based assertion. Revisit
+// once the test is reshaped (or move the name→source map into a test
+// helper).
 var precompiledPatterns = struct {
 	sslHandshakeFailed   string
 	connectionRefused    string
@@ -116,6 +147,28 @@ var precompiledPatterns = struct {
 	highCPU:              `(?i)cpu.*([89]\d|100)%|cpu.*utilization.*high`,
 	highMemory:           `(?i)memory.*([89]\d|100)%|memory.*utilization.*high`,
 	oomKiller:            `(?i)oom.*kill|out.*of.*memory|memory.*exhausted`,
+}
+
+// precompiledRegexCache maps each common PAN-OS pattern source to its
+// compiled form. Populated via regexp.MustCompile at package init so
+// compilation happens once per process, not once per matcher instance.
+// NewPatternMatcher copies this map into its per-instance cache.
+var precompiledRegexCache = map[string]*regexp.Regexp{
+	precompiledPatterns.sslHandshakeFailed:   regexp.MustCompile(precompiledPatterns.sslHandshakeFailed),
+	precompiledPatterns.connectionRefused:    regexp.MustCompile(precompiledPatterns.connectionRefused),
+	precompiledPatterns.authenticationFailed: regexp.MustCompile(precompiledPatterns.authenticationFailed),
+	precompiledPatterns.peerUnreachable:      regexp.MustCompile(precompiledPatterns.peerUnreachable),
+	precompiledPatterns.haStateNonFunctional: regexp.MustCompile(precompiledPatterns.haStateNonFunctional),
+	precompiledPatterns.haSyncFailed:         regexp.MustCompile(precompiledPatterns.haSyncFailed),
+	precompiledPatterns.haLinkDown:           regexp.MustCompile(precompiledPatterns.haLinkDown),
+	precompiledPatterns.commitFailed:         regexp.MustCompile(precompiledPatterns.commitFailed),
+	precompiledPatterns.validationError:      regexp.MustCompile(precompiledPatterns.validationError),
+	precompiledPatterns.objectReference:      regexp.MustCompile(precompiledPatterns.objectReference),
+	precompiledPatterns.configLocked:         regexp.MustCompile(precompiledPatterns.configLocked),
+	precompiledPatterns.licenseExpired:       regexp.MustCompile(precompiledPatterns.licenseExpired),
+	precompiledPatterns.highCPU:              regexp.MustCompile(precompiledPatterns.highCPU),
+	precompiledPatterns.highMemory:           regexp.MustCompile(precompiledPatterns.highMemory),
+	precompiledPatterns.oomKiller:            regexp.MustCompile(precompiledPatterns.oomKiller),
 }
 
 // commonKBArticles contains common PAN-OS KB article URLs.

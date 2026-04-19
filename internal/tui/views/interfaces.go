@@ -3,12 +3,12 @@ package views
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/table"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 	"github.com/jp2195/pyre/internal/tui/theme"
@@ -29,7 +29,6 @@ type InterfacesModel struct {
 	filtered    []models.Interface
 	sortBy      InterfaceSortField
 	lastRefresh time.Time
-	table       table.Model
 	arpTable    []models.ARPEntry
 }
 
@@ -37,73 +36,24 @@ func NewInterfacesModel() InterfacesModel {
 	base := NewTableBase("Filter interfaces...")
 	base.SortAsc = true
 
-	// Initialize table with columns
-	columns := []table.Column{
-		{Title: "St", Width: 2},
-		{Title: "Name", Width: 16},
-		{Title: "Type", Width: 10},
-		{Title: "Zone", Width: 12},
-		{Title: "IP", Width: 18},
-		{Title: "MAC", Width: 17},
-		{Title: "VR", Width: 12},
-	}
-
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithFocused(true),
-		table.WithHeight(10),
-	)
-
-	// Apply theme-aware styles
-	s := table.DefaultStyles()
-	c := theme.Colors()
-	s.Header = s.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(c.Border).
-		BorderBottom(true).
-		Bold(true).
-		Foreground(c.TextLabel)
-	s.Selected = s.Selected.
-		Foreground(c.White).
-		Background(c.Primary).
-		Bold(false)
-	t.SetStyles(s)
-
 	return InterfacesModel{
 		TableBase: base,
-		table:     t,
 	}
 }
 
 func (m InterfacesModel) SetSize(width, height int) InterfacesModel {
 	m.TableBase = m.TableBase.SetSize(width, height)
 
-	// Update table dimensions
-	tableHeight := height - 8 // Account for header, filter, help
-	if m.Expanded {
-		tableHeight -= 14
-	}
-	if tableHeight < 3 {
-		tableHeight = 3
-	}
-	m.table.SetHeight(tableHeight)
-
-	// Update column widths proportionally
-	availWidth := width - 4
-	columns := []table.Column{
-		{Title: "St", Width: 2},
-		{Title: "Name", Width: maxInt(12, availWidth*15/100)},
-		{Title: "Type", Width: maxInt(8, availWidth*10/100)},
-		{Title: "Zone", Width: maxInt(10, availWidth*12/100)},
-		{Title: "IP", Width: maxInt(15, availWidth*18/100)},
-		{Title: "MAC", Width: 17},
-		{Title: "VR", Width: maxInt(10, availWidth*12/100)},
-	}
-	m.table.SetColumns(columns)
-
 	// Clamp cursor to valid range after resize
-	if m.table.Cursor() >= len(m.filtered) && len(m.filtered) > 0 {
-		m.table.SetCursor(len(m.filtered) - 1)
+	count := len(m.filtered)
+	if m.Cursor >= count && count > 0 {
+		m.Cursor = count - 1
+	}
+
+	// Adjust offset to keep cursor visible
+	visibleRows := m.visibleRows()
+	if visibleRows > 0 && m.Cursor >= m.Offset+visibleRows {
+		m.Offset = m.Cursor - visibleRows + 1
 	}
 
 	return m
@@ -111,6 +61,12 @@ func (m InterfacesModel) SetSize(width, height int) InterfacesModel {
 
 func (m InterfacesModel) SetLoading(loading bool) InterfacesModel {
 	m.TableBase = m.TableBase.SetLoading(loading)
+	return m
+}
+
+// SetSpinnerFrame updates the current spinner animation frame.
+func (m InterfacesModel) SetSpinnerFrame(frame string) InterfacesModel {
+	m.TableBase = m.TableBase.SetSpinnerFrame(frame)
 	return m
 }
 
@@ -124,8 +80,9 @@ func (m InterfacesModel) SetInterfaces(interfaces []models.Interface, err error)
 	m.Err = err
 	m.Loading = false
 	m.lastRefresh = time.Now()
+	m.Cursor = 0
+	m.Offset = 0
 	m.applyFilter()
-	m.updateTableRows()
 	return m
 }
 
@@ -194,30 +151,15 @@ func (m *InterfacesModel) applySort() {
 	})
 }
 
-func (m *InterfacesModel) updateTableRows() {
-	rows := make([]table.Row, len(m.filtered))
-	for i, iface := range m.filtered {
-		status := "○"
-		if iface.State == "up" {
-			status = "●"
-		}
-
-		ip := cleanValue(iface.IP)
-		if ip == "" {
-			ip = "—"
-		}
-
-		rows[i] = table.Row{
-			status,
-			cleanValue(iface.Name),
-			cleanValue(iface.Type),
-			cleanValue(iface.Zone),
-			ip,
-			cleanValue(iface.MAC),
-			cleanValue(iface.VirtualRouter),
-		}
+func (m InterfacesModel) visibleRows() int {
+	rows := m.Height - 8
+	if m.Expanded {
+		rows -= 14
 	}
-	m.table.SetRows(rows)
+	if rows < 1 {
+		rows = 1
+	}
+	return rows
 }
 
 func (m InterfacesModel) Init() tea.Cmd {
@@ -230,34 +172,28 @@ func (m InterfacesModel) Update(msg tea.Msg) (InterfacesModel, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "s":
 			m.sortBy = (m.sortBy + 1) % 4
 			m.applySort()
-			m.updateTableRows()
 			return m, nil
 		case "S":
 			m.SortAsc = !m.SortAsc
 			m.applySort()
-			m.updateTableRows()
 			return m, nil
-		case "/":
-			m.FilterMode = true
-			m.Filter.Focus()
-			return m, nil
-		case "enter":
-			m.Expanded = !m.Expanded
-			// Recalculate table height
-			m = m.SetSize(m.Width, m.Height)
-			return m, nil
+		}
+
+		// Delegate to TableBase for common navigation
+		visible := m.visibleRows()
+		base, handled, cmd := m.HandleNavigation(msg, len(m.filtered), visible)
+		if handled {
+			m.TableBase = base
+			return m, cmd
 		}
 	}
 
-	// Delegate to table for navigation
-	var cmd tea.Cmd
-	m.table, cmd = m.table.Update(msg)
-	return m, cmd
+	return m, nil
 }
 
 func (m InterfacesModel) updateFilterMode(msg tea.Msg) (InterfacesModel, tea.Cmd) {
@@ -265,22 +201,15 @@ func (m InterfacesModel) updateFilterMode(msg tea.Msg) (InterfacesModel, tea.Cmd
 	m.TableBase = base
 	if exited {
 		m.applyFilter()
-		m.updateTableRows()
 	}
 	return m, cmd
 }
 
 func (m InterfacesModel) SelectedInterface() (models.Interface, bool) {
-	idx := m.table.Cursor()
-	if idx >= 0 && idx < len(m.filtered) {
-		return m.filtered[idx], true
+	if m.Cursor >= 0 && m.Cursor < len(m.filtered) {
+		return m.filtered[m.Cursor], true
 	}
 	return models.Interface{}, false
-}
-
-// TableCursor returns the current table cursor position (for testing)
-func (m InterfacesModel) TableCursor() int {
-	return m.table.Cursor()
 }
 
 func (m InterfacesModel) View() string {
@@ -313,7 +242,7 @@ func (m InterfacesModel) View() string {
 		if len(m.filtered) == 0 {
 			sections = append(sections, EmptyMsgStyle.Padding(1, 0).Render("No interfaces found"))
 		} else {
-			sections = append(sections, m.table.View())
+			sections = append(sections, m.renderTable())
 		}
 
 		// Expanded detail panel
@@ -380,10 +309,7 @@ func (m InterfacesModel) renderHeader() string {
 		right = labelStyle.Render(fmt.Sprintf("Updated %s ago", ago))
 	}
 
-	padding := m.Width - lipgloss.Width(left) - lipgloss.Width(right) - 2
-	if padding < 1 {
-		padding = 1
-	}
+	padding := max(m.Width-lipgloss.Width(left)-lipgloss.Width(right)-2, 1)
 
 	return left + strings.Repeat(" ", padding) + right
 }
@@ -394,6 +320,99 @@ func (m InterfacesModel) renderError() string {
 
 func (m InterfacesModel) renderFilterBar() string {
 	return FilterBorderStyle.Render(m.Filter.View())
+}
+
+func (m InterfacesModel) renderTable() string {
+	headerStyle := DetailLabelStyle.Bold(true)
+	selectedStyle := TableRowSelectedStyle.Bold(true)
+	normalStyle := DetailValueStyle
+	dimStyle := DetailDimStyle
+	c := theme.Colors()
+
+	availableWidth := m.Width - 6
+
+	var b strings.Builder
+
+	// Header
+	header := m.formatHeaderRow(availableWidth)
+	b.WriteString(headerStyle.Render(header))
+	b.WriteString("\n")
+	b.WriteString(dimStyle.Render(strings.Repeat("─", min(availableWidth, len(header)+10))))
+	b.WriteString("\n")
+
+	visibleRows := m.visibleRows()
+	end := min(m.Offset+visibleRows, len(m.filtered))
+
+	upStyle := lipgloss.NewStyle().Foreground(c.Success)
+	downStyle := lipgloss.NewStyle().Foreground(c.Error)
+
+	for i := m.Offset; i < end; i++ {
+		iface := m.filtered[i]
+		isSelected := i == m.Cursor
+
+		row := m.formatInterfaceRow(iface, availableWidth)
+
+		if isSelected {
+			b.WriteString(selectedStyle.Render(row))
+		} else if iface.State == "up" {
+			// Render status indicator with color
+			b.WriteString(upStyle.Render("●") + " " + normalStyle.Render(row[2:]))
+		} else {
+			b.WriteString(downStyle.Render("○") + " " + normalStyle.Render(row[2:]))
+		}
+		b.WriteString("\n")
+	}
+
+	// Show scroll indicator if needed
+	if len(m.filtered) > visibleRows {
+		scrollInfo := fmt.Sprintf("  Showing %d-%d of %d", m.Offset+1, end, len(m.filtered))
+		b.WriteString(dimStyle.Render(scrollInfo))
+	}
+
+	return b.String()
+}
+
+func (m InterfacesModel) formatHeaderRow(width int) string {
+	if width >= 120 {
+		return fmt.Sprintf("%-2s %-16s %-10s %-12s %-18s %-17s %-12s",
+			"St", "Name", "Type", "Zone", "IP", "MAC", "VR")
+	} else if width >= 90 {
+		return fmt.Sprintf("%-2s %-14s %-8s %-10s %-16s %-12s",
+			"St", "Name", "Type", "Zone", "IP", "VR")
+	}
+	return fmt.Sprintf("%-2s %-14s %-10s %-16s",
+		"St", "Name", "Zone", "IP")
+}
+
+func (m InterfacesModel) formatInterfaceRow(iface models.Interface, width int) string {
+	status := "○"
+	if iface.State == "up" {
+		status = "●"
+	}
+
+	ip := cleanValue(iface.IP)
+	if ip == "" {
+		ip = "—"
+	}
+
+	name := cleanValue(iface.Name)
+	ifType := cleanValue(iface.Type)
+	zone := cleanValue(iface.Zone)
+	mac := cleanValue(iface.MAC)
+	vr := cleanValue(iface.VirtualRouter)
+
+	if width >= 120 {
+		return fmt.Sprintf("%-2s %-16s %-10s %-12s %-18s %-17s %-12s",
+			status, truncateStr(name, 16), truncateStr(ifType, 10),
+			truncateStr(zone, 12), truncateStr(ip, 18), truncateStr(mac, 17),
+			truncateStr(vr, 12))
+	} else if width >= 90 {
+		return fmt.Sprintf("%-2s %-14s %-8s %-10s %-16s %-12s",
+			status, truncateStr(name, 14), truncateStr(ifType, 8),
+			truncateStr(zone, 10), truncateStr(ip, 16), truncateStr(vr, 12))
+	}
+	return fmt.Sprintf("%-2s %-14s %-10s %-16s",
+		status, truncateStr(name, 14), truncateStr(zone, 10), truncateStr(ip, 16))
 }
 
 func (m InterfacesModel) renderDetailPanel(iface models.Interface) string {
@@ -437,10 +456,10 @@ func (m InterfacesModel) renderDetailPanel(iface models.Interface) string {
 	lines = append(lines, row("MAC Address", iface.MAC))
 	lines = append(lines, row("Virtual Router", iface.VirtualRouter))
 	if iface.MTU > 0 {
-		lines = append(lines, labelStyle.Render("MTU")+valueStyle.Render(fmt.Sprintf("%d", iface.MTU)))
+		lines = append(lines, labelStyle.Render("MTU")+valueStyle.Render(strconv.Itoa(iface.MTU)))
 	}
 	if iface.Tag > 0 {
-		lines = append(lines, labelStyle.Render("VLAN Tag")+valueStyle.Render(fmt.Sprintf("%d", iface.Tag)))
+		lines = append(lines, labelStyle.Render("VLAN Tag")+valueStyle.Render(strconv.Itoa(iface.Tag)))
 	}
 
 	// Physical
@@ -468,10 +487,7 @@ func (m InterfacesModel) renderDetailPanel(iface models.Interface) string {
 	arpEntries := m.getARPEntriesForInterface(iface.Name)
 	if len(arpEntries) > 0 {
 		lines = append(lines, sectionStyle.Render("ARP Entries"))
-		maxShow := 5
-		if len(arpEntries) < maxShow {
-			maxShow = len(arpEntries)
-		}
+		maxShow := min(len(arpEntries), 5)
 		for i := 0; i < maxShow; i++ {
 			entry := arpEntries[i]
 			var statusIndicator string

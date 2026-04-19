@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 )
@@ -164,13 +164,13 @@ func TestLogsModel_Update_Navigation(t *testing.T) {
 	m = m.SetSystemLogs(logs, nil)
 
 	// Move down
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if m.Cursor != 1 {
 		t.Errorf("expected Cursor=1 after j, got %d", m.Cursor)
 	}
 
 	// Move up
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if m.Cursor != 0 {
 		t.Errorf("expected Cursor=0 after k, got %d", m.Cursor)
 	}
@@ -233,19 +233,19 @@ func TestLogsModel_Update_LogTypeCycleForward(t *testing.T) {
 	}
 
 	// Press ] to cycle forward: System -> Traffic
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("]")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
 	if m.activeLogType != models.LogTypeTraffic {
 		t.Errorf("expected Traffic after ], got %v", m.activeLogType)
 	}
 
 	// Press ] again: Traffic -> Threat
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("]")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
 	if m.activeLogType != models.LogTypeThreat {
 		t.Errorf("expected Threat after ], got %v", m.activeLogType)
 	}
 
 	// Press ] again: Threat -> System (wraps around)
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("]")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
 	if m.activeLogType != models.LogTypeSystem {
 		t.Errorf("expected System after ] (wrap), got %v", m.activeLogType)
 	}
@@ -261,19 +261,19 @@ func TestLogsModel_Update_LogTypeCycleBackward(t *testing.T) {
 	}
 
 	// Press [ to cycle backward: System -> Threat
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
 	if m.activeLogType != models.LogTypeThreat {
 		t.Errorf("expected Threat after [, got %v", m.activeLogType)
 	}
 
 	// Press [ again: Threat -> Traffic
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
 	if m.activeLogType != models.LogTypeTraffic {
 		t.Errorf("expected Traffic after [, got %v", m.activeLogType)
 	}
 
 	// Press [ again: Traffic -> System (wraps around)
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
 	if m.activeLogType != models.LogTypeSystem {
 		t.Errorf("expected System after [ (wrap), got %v", m.activeLogType)
 	}

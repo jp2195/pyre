@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/tui/views"
 )
@@ -45,11 +45,7 @@ func (m Model) renderHeader() string {
 	leftWidth := lipgloss.Width(left)
 	tabsWidth := lipgloss.Width(tabs)
 	viewWidth := lipgloss.Width(viewLabel)
-	availableWidth := m.width - leftWidth - tabsWidth - viewWidth - 2
-
-	if availableWidth < 0 {
-		availableWidth = 0
-	}
+	availableWidth := max(m.width-leftWidth-tabsWidth-viewWidth-2, 0)
 
 	leftPad := availableWidth / 2
 	rightPad := availableWidth - leftPad
@@ -62,10 +58,7 @@ func (m Model) renderHeader() string {
 	if subTabs != "" {
 		// Center the sub-tabs
 		subTabWidth := lipgloss.Width(subTabs)
-		subPad := (m.width - subTabWidth) / 2
-		if subPad < 0 {
-			subPad = 0
-		}
+		subPad := max((m.width-subTabWidth)/2, 0)
 		subTabRow = "\n" + strings.Repeat(" ", subPad) + subTabs
 	}
 

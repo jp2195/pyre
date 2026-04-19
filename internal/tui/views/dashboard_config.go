@@ -3,25 +3,24 @@ package views
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 )
 
 // ConfigDashboardModel represents the configuration-focused dashboard
 type ConfigDashboardModel struct {
+	DashboardBase
+
 	policies       []models.SecurityRule
 	pendingChanges []models.PendingChange
 
 	policyErr  error
 	changesErr error
-
-	width        int
-	height       int
-	SpinnerFrame string
 }
 
 // NewConfigDashboardModel creates a new config dashboard model
@@ -37,8 +36,8 @@ func (m ConfigDashboardModel) SetSpinnerFrame(frame string) ConfigDashboardModel
 
 // SetSize sets the terminal dimensions
 func (m ConfigDashboardModel) SetSize(width, height int) ConfigDashboardModel {
-	m.width = width
-	m.height = height
+	m.Width = width
+	m.Height = height
 	return m
 }
 
@@ -68,15 +67,13 @@ func (m ConfigDashboardModel) HasData() bool {
 
 // View renders the config dashboard
 func (m ConfigDashboardModel) View() string {
-	if m.width == 0 {
+	if m.Width == 0 {
 		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
-	totalWidth := m.width - 4
-	leftColWidth := totalWidth / 2
-	rightColWidth := totalWidth - leftColWidth - 2
+	totalWidth, leftColWidth, rightColWidth := m.ColumnWidths()
 
-	if leftColWidth < 35 {
+	if m.IsNarrow() {
 		return m.renderSingleColumn(totalWidth)
 	}
 
@@ -85,26 +82,23 @@ func (m ConfigDashboardModel) View() string {
 		m.renderPolicyStats(leftColWidth),
 		m.renderPendingChanges(leftColWidth),
 	}
-	leftCol := lipgloss.JoinVertical(lipgloss.Left, leftPanels...)
 
 	// Right column: rule analysis
 	rightPanels := []string{
 		m.renderZeroHitRules(rightColWidth),
 		m.renderMostHitRules(rightColWidth),
 	}
-	rightCol := lipgloss.JoinVertical(lipgloss.Left, rightPanels...)
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, leftCol, "  ", rightCol)
+	return m.RenderTwoColumn(leftPanels, rightPanels)
 }
 
 func (m ConfigDashboardModel) renderSingleColumn(width int) string {
-	panels := []string{
+	return m.RenderSingleColumn([]string{
 		m.renderPolicyStats(width),
 		m.renderPendingChanges(width),
 		m.renderZeroHitRules(width),
 		m.renderMostHitRules(width),
-	}
-	return lipgloss.JoinVertical(lipgloss.Left, panels...)
+	})
 }
 
 func (m ConfigDashboardModel) renderPolicyStats(width int) string {
@@ -151,25 +145,25 @@ func (m ConfigDashboardModel) renderPolicyStats(width int) string {
 	}
 
 	// Summary
-	b.WriteString(valueStyle().Render(fmt.Sprintf("%d", totalRules)))
+	b.WriteString(valueStyle().Render(strconv.Itoa(totalRules)))
 	b.WriteString(dimStyle().Render(" total rules ("))
-	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", enabledRules)))
+	b.WriteString(highlightStyle().Render(strconv.Itoa(enabledRules)))
 	b.WriteString(dimStyle().Render(" enabled)"))
 	b.WriteString("\n\n")
 
 	// Breakdown
 	labelWidth := 12
 	b.WriteString(labelStyle().Render(fmt.Sprintf("%-*s", labelWidth, "Allow:")))
-	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", allowRules)))
+	b.WriteString(highlightStyle().Render(strconv.Itoa(allowRules)))
 	b.WriteString("\n")
 
 	b.WriteString(labelStyle().Render(fmt.Sprintf("%-*s", labelWidth, "Deny/Drop:")))
-	b.WriteString(errorStyle().Render(fmt.Sprintf("%d", denyRules)))
+	b.WriteString(errorStyle().Render(strconv.Itoa(denyRules)))
 	b.WriteString("\n")
 
 	b.WriteString(labelStyle().Render(fmt.Sprintf("%-*s", labelWidth, "Zero-hit:")))
 	if zeroHitRules > 0 {
-		b.WriteString(warningStyle().Render(fmt.Sprintf("%d", zeroHitRules)))
+		b.WriteString(warningStyle().Render(strconv.Itoa(zeroHitRules)))
 	} else {
 		b.WriteString(highlightStyle().Render("0"))
 	}
@@ -203,7 +197,7 @@ func (m ConfigDashboardModel) renderPendingChanges(width int) string {
 	}
 
 	// Count
-	b.WriteString(warningStyle().Render(fmt.Sprintf("%d", len(m.pendingChanges))))
+	b.WriteString(warningStyle().Render(strconv.Itoa(len(m.pendingChanges))))
 	b.WriteString(dimStyle().Render(" uncommitted changes"))
 	b.WriteString("\n\n")
 
@@ -223,16 +217,13 @@ func (m ConfigDashboardModel) renderPendingChanges(width int) string {
 		for user, count := range userChanges {
 			userName := truncateEllipsis(user, 15)
 			b.WriteString(labelStyle().Render(fmt.Sprintf("  %-15s ", userName)))
-			b.WriteString(valueStyle().Render(fmt.Sprintf("%d", count)))
+			b.WriteString(valueStyle().Render(strconv.Itoa(count)))
 			b.WriteString("\n")
 		}
 	}
 
 	// Show recent changes
-	maxShow := 4
-	if len(m.pendingChanges) < maxShow {
-		maxShow = len(m.pendingChanges)
-	}
+	maxShow := min(len(m.pendingChanges), 4)
 
 	if maxShow > 0 {
 		b.WriteString("\n")
@@ -305,20 +296,14 @@ func (m ConfigDashboardModel) renderZeroHitRules(width int) string {
 	}
 
 	pct := float64(len(zeroHitRules)) / float64(totalActive) * 100
-	b.WriteString(warningStyle().Render(fmt.Sprintf("%d", len(zeroHitRules))))
+	b.WriteString(warningStyle().Render(strconv.Itoa(len(zeroHitRules))))
 	b.WriteString(dimStyle().Render(fmt.Sprintf(" of %d rules (%.0f%%)", totalActive, pct)))
 	b.WriteString("\n\n")
 
 	// List rules
-	maxShow := 8
-	if len(zeroHitRules) < maxShow {
-		maxShow = len(zeroHitRules)
-	}
+	maxShow := min(len(zeroHitRules), 8)
 
-	nameWidth := width - 15
-	if nameWidth > 30 {
-		nameWidth = 30
-	}
+	nameWidth := min(width-15, 30)
 
 	for i := 0; i < maxShow; i++ {
 		rule := zeroHitRules[i]
@@ -380,10 +365,7 @@ func (m ConfigDashboardModel) renderMostHitRules(width int) string {
 	maxShow := 10
 	shown := 0
 	totalWithHits := 0
-	nameWidth := width - 20
-	if nameWidth > 25 {
-		nameWidth = 25
-	}
+	nameWidth := min(width-20, 25)
 
 	for _, rule := range sorted {
 		if rule.HitCount == 0 {

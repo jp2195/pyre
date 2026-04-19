@@ -1,6 +1,6 @@
 package tui
 
-import "github.com/charmbracelet/bubbles/key"
+import "charm.land/bubbles/v2/key"
 
 type KeyMap struct {
 	// Global
@@ -10,11 +10,10 @@ type KeyMap struct {
 	Refresh      key.Binding
 	OpenPalette  key.Binding
 
-	// Navigation groups (1-4 for top-level groups)
+	// Navigation groups (1-3 for top-level groups)
 	NavGroup1 key.Binding
 	NavGroup2 key.Binding
 	NavGroup3 key.Binding
-	NavGroup4 key.Binding
 
 	// Navigation
 	Up       key.Binding
@@ -68,10 +67,6 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("3"),
 			key.WithHelp("3", "Tools"),
 		),
-		NavGroup4: key.NewBinding(
-			key.WithKeys("4"),
-			key.WithHelp("4", "Connections"),
-		),
 
 		Up: key.NewBinding(
 			key.WithKeys("up", "k"),
@@ -123,13 +118,13 @@ func DefaultKeyMap() KeyMap {
 
 func (k KeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
-		k.NavGroup1, k.NavGroup2, k.NavGroup3, k.NavGroup4, k.Refresh, k.Help, k.Quit,
+		k.NavGroup1, k.NavGroup2, k.NavGroup3, k.Refresh, k.Help, k.Quit,
 	}
 }
 
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.NavGroup1, k.NavGroup2, k.NavGroup3, k.NavGroup4},
+		{k.NavGroup1, k.NavGroup2, k.NavGroup3},
 		{k.Refresh, k.OpenPalette, k.Help, k.Quit},
 		{k.Up, k.Down, k.PageUp, k.PageDown},
 		{k.Filter, k.Enter, k.Escape},
@@ -306,7 +301,7 @@ func DefaultConnectionFormKeyMap() ConnectionFormKeyMap {
 			key.WithHelp("shift+tab", "prev field"),
 		),
 		Space: key.NewBinding(
-			key.WithKeys(" "),
+			key.WithKeys(" ", "space"),
 			key.WithHelp("space", "toggle"),
 		),
 		Quit: key.NewBinding(

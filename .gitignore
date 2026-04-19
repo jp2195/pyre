@@ -25,6 +25,9 @@ go.work.sum
 # Claude Code
 .claude/
 
+# Local plans, brainstorms, and Superpowers artifacts — never commit
+docs/superpowers/
+
 # Environment files
 .env
 .env.*
@@ -37,3 +40,6 @@ Thumbs.db
 # Build artifacts
 dist/
 bin/
+
+# Worktrees
+.worktrees/

@@ -1,8 +1,10 @@
 package api
 
 import (
+	"bytes"
+	"cmp"
 	"context"
-	"encoding/xml"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -10,9 +12,9 @@ import (
 	"github.com/jp2195/pyre/internal/models"
 )
 
-func (c *Client) GetThreatSummary(ctx context.Context) (*models.ThreatSummary, error) {
+func (c *Client) GetThreatSummary(ctx context.Context, target string) (*models.ThreatSummary, error) {
 	// Query threat logs for the last hour to get a summary
-	resp, err := c.Op(ctx, "<show><counter><global><name>flow_threat_*</name></global></counter></show>")
+	resp, err := c.Op(ctx, "<show><counter><global><name>flow_threat_*</name></global></counter></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +34,7 @@ func (c *Client) GetThreatSummary(ctx context.Context) (*models.ThreatSummary, e
 			Severity string `xml:"severity"`
 		} `xml:"global>counters>entry"`
 	}
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
 		// Fallback: try to parse simple counter format
 		// Return empty summary if parsing fails (device may not have threat prevention)
 		return summary, nil
@@ -62,8 +64,8 @@ func (c *Client) GetThreatSummary(ctx context.Context) (*models.ThreatSummary, e
 	return summary, nil
 }
 
-func (c *Client) GetGlobalProtectInfo(ctx context.Context) (*models.GlobalProtectInfo, error) {
-	resp, err := c.Op(ctx, "<show><global-protect-gateway><current-user></current-user></global-protect-gateway></show>")
+func (c *Client) GetGlobalProtectInfo(ctx context.Context, target string) (*models.GlobalProtectInfo, error) {
+	resp, err := c.Op(ctx, "<show><global-protect-gateway><current-user></current-user></global-protect-gateway></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +85,7 @@ func (c *Client) GetGlobalProtectInfo(ctx context.Context) (*models.GlobalProtec
 			LoginTime string `xml:"login-time"`
 		} `xml:"entry"`
 	}
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
 		return info, nil
 	}
 
@@ -93,8 +95,34 @@ func (c *Client) GetGlobalProtectInfo(ctx context.Context) (*models.GlobalProtec
 	return info, nil
 }
 
-func (c *Client) GetJobs(ctx context.Context) ([]models.Job, error) {
-	resp, err := c.Op(ctx, "<show><jobs><all></all></jobs></show>")
+// jobEntry is the shared XML structure for job entries across different PAN-OS response formats.
+type jobEntry struct {
+	ID        int    `xml:"id"`
+	Type      string `xml:"type"`
+	Status    string `xml:"status"`
+	Result    string `xml:"result"`
+	Progress  string `xml:"progress"`
+	Details   string `xml:"details>line"`
+	TEnq      string `xml:"tenq"` // Time enqueued
+	TDeq      string `xml:"tdeq"` // Time dequeued (started)
+	Tfin      string `xml:"tfin"` // Time finished
+	User      string `xml:"user"`
+	Stoppable string `xml:"stoppable"`
+}
+
+// parseJobTimestamp tries multiple time layouts to parse a PAN-OS job timestamp.
+func parseJobTimestamp(s string) time.Time {
+	if s == "" {
+		return time.Time{}
+	}
+	if t, err := parsePANTime(s); err == nil {
+		return t
+	}
+	return time.Time{}
+}
+
+func (c *Client) GetJobs(ctx context.Context, target string) ([]models.Job, error) {
+	resp, err := c.Op(ctx, "<show><jobs><all></all></jobs></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -106,71 +134,28 @@ func (c *Client) GetJobs(ctx context.Context) ([]models.Job, error) {
 		return []models.Job{}, nil
 	}
 
-	var result struct {
-		Entry []struct {
-			ID        int    `xml:"id"`
-			Type      string `xml:"type"`
-			Status    string `xml:"status"`
-			Result    string `xml:"result"`
-			Progress  string `xml:"progress"`
-			Details   string `xml:"details>line"`
-			TEnq      string `xml:"tenq"` // Time enqueued
-			TDeq      string `xml:"tdeq"` // Time dequeued (started)
-			Tfin      string `xml:"tfin"` // Time finished
-			User      string `xml:"user"`
-			Stoppable string `xml:"stoppable"`
-		} `xml:"job"`
+	var entries []jobEntry
+
+	// Try <job> wrapper first (most common)
+	var jobResult struct {
+		Entry []jobEntry `xml:"job"`
+	}
+	if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &jobResult) == nil && len(jobResult.Entry) > 0 {
+		entries = jobResult.Entry
 	}
 
-	// Try multiple parsing approaches
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil || len(result.Entry) == 0 {
-		// Try alternate structure with entry wrapper
-		var alt struct {
-			Entry []struct {
-				ID       int    `xml:"id"`
-				Type     string `xml:"type"`
-				Status   string `xml:"status"`
-				Result   string `xml:"result"`
-				Progress string `xml:"progress"`
-				Details  string `xml:"details>line"`
-				TEnq     string `xml:"tenq"`
-				TDeq     string `xml:"tdeq"`
-				Tfin     string `xml:"tfin"`
-				User     string `xml:"user"`
-			} `xml:"entry"`
+	// Fall back to <entry> wrapper
+	if len(entries) == 0 {
+		var entryResult struct {
+			Entry []jobEntry `xml:"entry"`
 		}
-		if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &alt); err == nil {
-			for _, e := range alt.Entry {
-				result.Entry = append(result.Entry, struct {
-					ID        int    `xml:"id"`
-					Type      string `xml:"type"`
-					Status    string `xml:"status"`
-					Result    string `xml:"result"`
-					Progress  string `xml:"progress"`
-					Details   string `xml:"details>line"`
-					TEnq      string `xml:"tenq"`
-					TDeq      string `xml:"tdeq"`
-					Tfin      string `xml:"tfin"`
-					User      string `xml:"user"`
-					Stoppable string `xml:"stoppable"`
-				}{
-					ID:       e.ID,
-					Type:     e.Type,
-					Status:   e.Status,
-					Result:   e.Result,
-					Progress: e.Progress,
-					Details:  e.Details,
-					TEnq:     e.TEnq,
-					TDeq:     e.TDeq,
-					Tfin:     e.Tfin,
-					User:     e.User,
-				})
-			}
+		if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &entryResult) == nil {
+			entries = entryResult.Entry
 		}
 	}
 
-	jobs := make([]models.Job, 0, len(result.Entry))
-	for _, e := range result.Entry {
+	jobs := make([]models.Job, 0, len(entries))
+	for _, e := range entries {
 		job := models.Job{
 			ID:      e.ID,
 			Type:    e.Type,
@@ -180,53 +165,27 @@ func (c *Client) GetJobs(ctx context.Context) ([]models.Job, error) {
 			User:    e.User,
 		}
 
-		// Parse progress - ignore error, zero value acceptable for non-numeric progress
 		if e.Progress != "" {
 			job.Progress, _ = strconv.Atoi(strings.TrimSuffix(e.Progress, "%")) //nolint:errcheck // intentional - default to 0 on parse error
 		}
 
-		// Parse timestamps - PAN-OS typically uses format like "2024/01/15 10:30:45"
-		timeLayouts := []string{
-			"2006/01/02 15:04:05",
-			"2006-01-02 15:04:05",
-			"Mon Jan 2 15:04:05 2006",
-		}
-
-		for _, layout := range timeLayouts {
-			if e.TDeq != "" {
-				if t, err := time.Parse(layout, e.TDeq); err == nil {
-					job.StartTime = t
-					break
-				}
-			}
-		}
-		for _, layout := range timeLayouts {
-			if e.Tfin != "" {
-				if t, err := time.Parse(layout, e.Tfin); err == nil {
-					job.EndTime = t
-					break
-				}
-			}
-		}
+		job.StartTime = parseJobTimestamp(e.TDeq)
+		job.EndTime = parseJobTimestamp(e.Tfin)
 
 		jobs = append(jobs, job)
 	}
 
-	// Sort by ID descending (most recent first)
-	for i := 0; i < len(jobs)-1; i++ {
-		for j := i + 1; j < len(jobs); j++ {
-			if jobs[j].ID > jobs[i].ID {
-				jobs[i], jobs[j] = jobs[j], jobs[i]
-			}
-		}
-	}
+	// Sort by ID descending (most recent first).
+	slices.SortFunc(jobs, func(a, b models.Job) int {
+		return cmp.Compare(b.ID, a.ID)
+	})
 
 	return jobs, nil
 }
 
 // GetDiskUsage retrieves disk usage information
-func (c *Client) GetDiskUsage(ctx context.Context) ([]models.DiskUsage, error) {
-	resp, err := c.Op(ctx, "<show><system><disk-space></disk-space></system></show>")
+func (c *Client) GetDiskUsage(ctx context.Context, target string) ([]models.DiskUsage, error) {
+	resp, err := c.Op(ctx, "<show><system><disk-space></disk-space></system></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -268,8 +227,8 @@ func (c *Client) GetDiskUsage(ctx context.Context) ([]models.DiskUsage, error) {
 // GetEnvironmentals retrieves hardware environmental sensor data
 //
 //nolint:misspell // "environmentals" is the PAN-OS XML API tag name
-func (c *Client) GetEnvironmentals(ctx context.Context) ([]models.Environmental, error) {
-	resp, err := c.Op(ctx, "<show><system><environmentals></environmentals></system></show>")
+func (c *Client) GetEnvironmentals(ctx context.Context, target string) ([]models.Environmental, error) {
+	resp, err := c.Op(ctx, "<show><system><environmentals></environmentals></system></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +264,7 @@ func (c *Client) GetEnvironmentals(ctx context.Context) ([]models.Environmental,
 	var powerResult struct {
 		Power powerSection `xml:"power"`
 	}
-	if xml.Unmarshal(WrapInner(resp.Result.Inner), &powerResult) == nil {
+	if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &powerResult) == nil {
 		for _, slot := range powerResult.Power.Slots {
 			for _, e := range slot.Entry {
 				alarm := strings.ToLower(e.Alarm) == "true"
@@ -330,7 +289,7 @@ func (c *Client) GetEnvironmentals(ctx context.Context) ([]models.Environmental,
 	var thermalResult struct {
 		Thermal thermalSection `xml:"thermal"`
 	}
-	if xml.Unmarshal(WrapInner(resp.Result.Inner), &thermalResult) == nil {
+	if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &thermalResult) == nil {
 		for _, slot := range thermalResult.Thermal.Slots {
 			for _, e := range slot.Entry {
 				alarm := strings.ToLower(e.Alarm) == "true"
@@ -362,7 +321,7 @@ func (c *Client) GetEnvironmentals(ctx context.Context) ([]models.Environmental,
 	var fanResult struct {
 		Fan fanSection `xml:"fan"`
 	}
-	if xml.Unmarshal(WrapInner(resp.Result.Inner), &fanResult) == nil {
+	if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &fanResult) == nil {
 		for _, slot := range fanResult.Fan.Slots {
 			for _, e := range slot.Entry {
 				alarm := strings.ToLower(e.Alarm) == "true"
@@ -391,8 +350,8 @@ func (c *Client) GetEnvironmentals(ctx context.Context) ([]models.Environmental,
 }
 
 // GetCertificates retrieves certificate information
-func (c *Client) GetCertificates(ctx context.Context) ([]models.Certificate, error) {
-	resp, err := c.Op(ctx, "<show><sslmgr-store><certificate><all></all></certificate></sslmgr-store></show>")
+func (c *Client) GetCertificates(ctx context.Context, target string) ([]models.Certificate, error) {
+	resp, err := c.Op(ctx, "<show><sslmgr-store><certificate><all></all></certificate></sslmgr-store></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -416,7 +375,7 @@ func (c *Client) GetCertificates(ctx context.Context) ([]models.Certificate, err
 		} `xml:"certificate>entry"`
 	}
 
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
 		// Try alternate structure
 		var alt struct {
 			Entry []struct {
@@ -429,7 +388,7 @@ func (c *Client) GetCertificates(ctx context.Context) ([]models.Certificate, err
 				Algorithm      string `xml:"algorithm"`
 			} `xml:"entry"`
 		}
-		if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &alt); err != nil {
+		if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &alt); err != nil {
 			return []models.Certificate{}, nil
 		}
 		result.Entry = alt.Entry
@@ -446,22 +405,11 @@ func (c *Client) GetCertificates(ctx context.Context) ([]models.Certificate, err
 		}
 
 		// Parse dates
-		dateLayouts := []string{
-			"Jan 2 15:04:05 2006 MST",
-			"2006-01-02 15:04:05",
-			"Mon Jan 2 15:04:05 2006",
+		if t, err := parsePANTime(e.NotValidBefore); err == nil {
+			cert.NotBefore = t
 		}
-		for _, layout := range dateLayouts {
-			if t, err := time.Parse(layout, e.NotValidBefore); err == nil {
-				cert.NotBefore = t
-				break
-			}
-		}
-		for _, layout := range dateLayouts {
-			if t, err := time.Parse(layout, e.NotValidAfter); err == nil {
-				cert.NotAfter = t
-				break
-			}
+		if t, err := parsePANTime(e.NotValidAfter); err == nil {
+			cert.NotAfter = t
 		}
 
 		// Calculate days left and status

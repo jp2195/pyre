@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 )
@@ -199,19 +199,19 @@ func TestSessionsModel_Update_Navigation(t *testing.T) {
 	m = m.SetSessions(sessions, nil)
 
 	// Move down
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if m.Cursor != 1 {
 		t.Errorf("expected Cursor=1 after j, got %d", m.Cursor)
 	}
 
 	// Move up
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if m.Cursor != 0 {
 		t.Errorf("expected Cursor=0 after k, got %d", m.Cursor)
 	}
 
 	// Sort key
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	if m.sortBy != SessionSortBytes {
 		t.Errorf("expected sort to change after s, got %d", m.sortBy)
 	}

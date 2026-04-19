@@ -10,11 +10,11 @@ import (
 func TestNewDashboardModel(t *testing.T) {
 	m := NewDashboardModel()
 
-	if m.width != 0 {
-		t.Errorf("expected width=0, got %d", m.width)
+	if m.Width != 0 {
+		t.Errorf("expected Width=0, got %d", m.Width)
 	}
-	if m.height != 0 {
-		t.Errorf("expected height=0, got %d", m.height)
+	if m.Height != 0 {
+		t.Errorf("expected Height=0, got %d", m.Height)
 	}
 	if m.systemInfo != nil {
 		t.Error("expected systemInfo=nil")
@@ -25,11 +25,11 @@ func TestDashboardModel_SetSize(t *testing.T) {
 	m := NewDashboardModel()
 	m = m.SetSize(100, 50)
 
-	if m.width != 100 {
-		t.Errorf("expected width=100, got %d", m.width)
+	if m.Width != 100 {
+		t.Errorf("expected Width=100, got %d", m.Width)
 	}
-	if m.height != 50 {
-		t.Errorf("expected height=50, got %d", m.height)
+	if m.Height != 50 {
+		t.Errorf("expected Height=50, got %d", m.Height)
 	}
 }
 

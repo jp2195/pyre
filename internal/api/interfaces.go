@@ -2,14 +2,14 @@ package api
 
 import (
 	"context"
-	"encoding/xml"
+	"bytes"
 	"strings"
 
 	"github.com/jp2195/pyre/internal/models"
 )
 
-func (c *Client) GetInterfaces(ctx context.Context) ([]models.Interface, error) {
-	resp, err := c.Op(ctx, "<show><interface>all</interface></show>")
+func (c *Client) GetInterfaces(ctx context.Context, target string) ([]models.Interface, error) {
+	resp, err := c.Op(ctx, "<show><interface>all</interface></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func (c *Client) GetInterfaces(ctx context.Context) ([]models.Interface, error) 
 			} `xml:"entry"`
 		} `xml:"hw"`
 	}
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
 		// Return empty list rather than error
 		return []models.Interface{}, nil
 	}
@@ -124,14 +124,14 @@ func (c *Client) GetInterfaces(ctx context.Context) ([]models.Interface, error) 
 	}
 
 	// Fetch counters separately
-	c.fetchInterfaceCounters(ctx, interfaces)
+	c.fetchInterfaceCounters(ctx, target, interfaces)
 
 	return interfaces, nil
 }
 
 // fetchInterfaceCounters fetches counter data for interfaces
-func (c *Client) fetchInterfaceCounters(ctx context.Context, interfaces []models.Interface) {
-	resp, err := c.Op(ctx, "<show><counter><interface>all</interface></counter></show>")
+func (c *Client) fetchInterfaceCounters(ctx context.Context, target string, interfaces []models.Interface) {
+	resp, err := c.Op(ctx, "<show><counter><interface>all</interface></counter></show>", target)
 	if err != nil || CheckResponse(resp) != nil {
 		return
 	}
@@ -151,7 +151,7 @@ func (c *Client) fetchInterfaceCounters(ctx context.Context, interfaces []models
 			} `xml:"entry"`
 		} `xml:"ifnet"`
 	}
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
 		return
 	}
 

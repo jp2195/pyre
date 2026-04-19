@@ -187,20 +187,19 @@ func TestRunbook_Fields(t *testing.T) {
 		Description: "Test Description",
 		Category:    "test-category",
 		Tags:        []string{"tag1", "tag2"},
-		RequiresSSH: true,
 		Steps: []Step{
 			{
 				ID:       "step1",
 				Name:     "Step 1",
-				Type:     StepTypeSSH,
-				Command:  "show system info",
+				Type:     StepTypeAPI,
+				APICall:  "system_info",
 				Required: true,
 			},
 			{
 				ID:      "step2",
 				Name:    "Step 2",
 				Type:    StepTypeAPI,
-				APICall: "system_info",
+				APICall: "ha_status",
 			},
 		},
 	}
@@ -220,14 +219,11 @@ func TestRunbook_Fields(t *testing.T) {
 	if len(runbook.Tags) != 2 || runbook.Tags[0] != "tag1" {
 		t.Errorf("expected Tags ['tag1', 'tag2'], got %v", runbook.Tags)
 	}
-	if !runbook.RequiresSSH {
-		t.Error("expected RequiresSSH to be true")
-	}
 	if len(runbook.Steps) != 2 {
 		t.Errorf("expected 2 steps, got %d", len(runbook.Steps))
 	}
-	if runbook.Steps[0].Type != StepTypeSSH {
-		t.Errorf("expected first step type SSH, got %s", runbook.Steps[0].Type)
+	if runbook.Steps[0].Type != StepTypeAPI {
+		t.Errorf("expected first step type API, got %s", runbook.Steps[0].Type)
 	}
 	if runbook.Steps[1].Type != StepTypeAPI {
 		t.Errorf("expected second step type API, got %s", runbook.Steps[1].Type)
@@ -239,8 +235,8 @@ func TestStep_Fields(t *testing.T) {
 		ID:          "step-id",
 		Name:        "Step Name",
 		Description: "Step description",
-		Type:        StepTypeSSH,
-		Command:     "show clock",
+		Type:        StepTypeAPI,
+		APICall:     "system_info",
 		Required:    true,
 		Patterns: []Pattern{
 			{
@@ -264,11 +260,11 @@ func TestStep_Fields(t *testing.T) {
 	if step.Description != "Step description" {
 		t.Errorf("expected Description 'Step description', got %q", step.Description)
 	}
-	if step.Type != StepTypeSSH {
-		t.Errorf("expected type SSH, got %s", step.Type)
+	if step.Type != StepTypeAPI {
+		t.Errorf("expected type API, got %s", step.Type)
 	}
-	if step.Command != "show clock" {
-		t.Errorf("expected Command 'show clock', got %q", step.Command)
+	if step.APICall != "system_info" {
+		t.Errorf("expected APICall 'system_info', got %q", step.APICall)
 	}
 	if !step.Required {
 		t.Error("expected Required to be true")
@@ -336,7 +332,6 @@ func TestStepTypeConstants(t *testing.T) {
 		expected string
 	}{
 		{StepTypeAPI, "api"},
-		{StepTypeSSH, "ssh"},
 	}
 
 	for _, tt := range tests {

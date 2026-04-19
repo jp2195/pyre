@@ -3,7 +3,7 @@ package views
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/auth"
 	"github.com/jp2195/pyre/internal/config"
@@ -25,8 +25,8 @@ func TestPickerModel_WithConnections(t *testing.T) {
 	session := auth.NewSession(cfg)
 
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
-	session.AddConnection("10.0.0.2", fwConfig, "key2")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.2", fwConfig, "key2")
 
 	m := NewPickerModel(session)
 
@@ -43,12 +43,12 @@ func TestPickerModel_UpdateConnections(t *testing.T) {
 	session := auth.NewSession(cfg)
 
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
 
 	m := NewPickerModel(session)
 
 	// Add another connection
-	session.AddConnection("10.0.0.2", fwConfig, "key2")
+	_, _ = session.AddConnection("10.0.0.2", fwConfig, "key2")
 	m = m.UpdateConnections(session)
 
 	if len(m.connections) != 2 {
@@ -83,8 +83,8 @@ func TestPickerModel_Selected(t *testing.T) {
 
 	// With connections
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
-	session.AddConnection("10.0.0.2", fwConfig, "key2")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.2", fwConfig, "key2")
 
 	m = NewPickerModel(session)
 	if m.Selected() == "" {
@@ -97,15 +97,15 @@ func TestPickerModel_Update_Navigation(t *testing.T) {
 	session := auth.NewSession(cfg)
 
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
-	session.AddConnection("10.0.0.2", fwConfig, "key2")
-	session.AddConnection("10.0.0.3", fwConfig, "key3")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.2", fwConfig, "key2")
+	_, _ = session.AddConnection("10.0.0.3", fwConfig, "key3")
 
 	m := NewPickerModel(session)
 	initialCursor := m.cursor
 
 	// Move down with j
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	expectedAfterJ := initialCursor + 1
 	if initialCursor >= 2 {
 		expectedAfterJ = 2 // Can't go past end
@@ -116,7 +116,7 @@ func TestPickerModel_Update_Navigation(t *testing.T) {
 
 	// Move up with k
 	prevCursor := m.cursor
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	expectedAfterK := prevCursor - 1
 	if prevCursor == 0 {
 		expectedAfterK = 0 // Can't go below 0
@@ -128,7 +128,7 @@ func TestPickerModel_Update_Navigation(t *testing.T) {
 	// Go to start
 	m.cursor = 0
 	// At start, shouldn't go negative
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if m.cursor != 0 {
 		t.Errorf("expected cursor to stay at 0, got %d", m.cursor)
 	}
@@ -136,7 +136,7 @@ func TestPickerModel_Update_Navigation(t *testing.T) {
 	// Go to end
 	m.cursor = 2
 	// At end, shouldn't go further
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if m.cursor != 2 {
 		t.Errorf("expected cursor to stay at 2, got %d", m.cursor)
 	}
@@ -160,7 +160,7 @@ func TestPickerModel_View_WithConnections(t *testing.T) {
 	session := auth.NewSession(cfg)
 
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
 
 	m := NewPickerModel(session)
 	m = m.SetSize(100, 50)
@@ -187,9 +187,9 @@ func TestPickerModel_CursorOnActive(t *testing.T) {
 	session := auth.NewSession(cfg)
 
 	fwConfig := &config.ConnectionConfig{}
-	session.AddConnection("10.0.0.1", fwConfig, "key1")
-	session.AddConnection("10.0.0.2", fwConfig, "key2")
-	session.AddConnection("10.0.0.3", fwConfig, "key3")
+	_, _ = session.AddConnection("10.0.0.1", fwConfig, "key1")
+	_, _ = session.AddConnection("10.0.0.2", fwConfig, "key2")
+	_, _ = session.AddConnection("10.0.0.3", fwConfig, "key3")
 
 	// Set 10.0.0.2 as active
 	session.SetActiveFirewall("10.0.0.2")

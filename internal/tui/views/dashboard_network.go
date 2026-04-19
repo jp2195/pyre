@@ -3,16 +3,18 @@ package views
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 )
 
 // NetworkDashboardModel represents the network-focused dashboard
 type NetworkDashboardModel struct {
+	DashboardBase
+
 	interfaces    []models.Interface
 	arpTable      []models.ARPEntry
 	routes        []models.RouteEntry
@@ -24,10 +26,6 @@ type NetworkDashboardModel struct {
 	routeErr error
 	bgpErr   error
 	ospfErr  error
-
-	width        int
-	height       int
-	SpinnerFrame string
 }
 
 // NewNetworkDashboardModel creates a new network dashboard model
@@ -43,8 +41,8 @@ func (m NetworkDashboardModel) SetSpinnerFrame(frame string) NetworkDashboardMod
 
 // SetSize sets the terminal dimensions
 func (m NetworkDashboardModel) SetSize(width, height int) NetworkDashboardModel {
-	m.width = width
-	m.height = height
+	m.Width = width
+	m.Height = height
 	return m
 }
 
@@ -90,32 +88,23 @@ func (m NetworkDashboardModel) Update(msg tea.Msg) (NetworkDashboardModel, tea.C
 
 // HasData returns true if the dashboard has already loaded its data
 func (m NetworkDashboardModel) HasData() bool {
-	// Check if any of the network-specific data has been loaded
-	// We need to check multiple sources since this dashboard shows:
-	// - interfaces (shared with main dashboard)
-	// - ARP table
-	// - routing table
-	// - BGP/OSPF neighbors
 	hasInterfaces := m.interfaces != nil
 	hasARP := m.arpTable != nil || m.arpErr != nil
 	hasRoutes := m.routes != nil || m.routeErr != nil
 	hasNeighbors := m.bgpNeighbors != nil || m.bgpErr != nil || m.ospfNeighbors != nil || m.ospfErr != nil
 
-	// Only consider data loaded if we have interfaces AND at least tried to load the others
 	return hasInterfaces && hasARP && hasRoutes && hasNeighbors
 }
 
 // View renders the network dashboard
 func (m NetworkDashboardModel) View() string {
-	if m.width == 0 {
+	if m.Width == 0 {
 		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
-	totalWidth := m.width - 4
-	leftColWidth := totalWidth / 2
-	rightColWidth := totalWidth - leftColWidth - 2
+	totalWidth, leftColWidth, rightColWidth := m.ColumnWidths()
 
-	if leftColWidth < 35 {
+	if m.IsNarrow() {
 		return m.renderSingleColumn(totalWidth)
 	}
 
@@ -124,7 +113,6 @@ func (m NetworkDashboardModel) View() string {
 		m.renderTopInterfaces(leftColWidth),
 		m.renderInterfaceErrors(leftColWidth),
 	}
-	leftCol := lipgloss.JoinVertical(lipgloss.Left, leftPanels...)
 
 	// Right column: ARP, routing, and neighbors
 	rightPanels := []string{
@@ -132,20 +120,18 @@ func (m NetworkDashboardModel) View() string {
 		m.renderRoutingSummary(rightColWidth),
 		m.renderNeighborsSummary(rightColWidth),
 	}
-	rightCol := lipgloss.JoinVertical(lipgloss.Left, rightPanels...)
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, leftCol, "  ", rightCol)
+	return m.RenderTwoColumn(leftPanels, rightPanels)
 }
 
 func (m NetworkDashboardModel) renderSingleColumn(width int) string {
-	panels := []string{
+	return m.RenderSingleColumn([]string{
 		m.renderTopInterfaces(width),
 		m.renderInterfaceErrors(width),
 		m.renderARPSummary(width),
 		m.renderRoutingSummary(width),
 		m.renderNeighborsSummary(width),
-	}
-	return lipgloss.JoinVertical(lipgloss.Left, panels...)
+	})
 }
 
 func (m NetworkDashboardModel) renderTopInterfaces(width int) string {
@@ -177,10 +163,7 @@ func (m NetworkDashboardModel) renderTopInterfaces(width int) string {
 	})
 
 	// Show top 8 interfaces
-	maxShow := 8
-	if len(sorted) < maxShow {
-		maxShow = len(sorted)
-	}
+	maxShow := min(len(sorted), 8)
 
 	nameWidth := 16
 	shown := 0
@@ -246,10 +229,7 @@ func (m NetworkDashboardModel) renderInterfaceErrors(width int) string {
 		return totalI > totalJ
 	})
 
-	maxShow := 6
-	if len(problemIfaces) < maxShow {
-		maxShow = len(problemIfaces)
-	}
+	maxShow := min(len(problemIfaces), 6)
 
 	nameWidth := 16
 	for i := 0; i < maxShow; i++ {
@@ -303,11 +283,11 @@ func (m NetworkDashboardModel) renderARPSummary(width int) string {
 	}
 
 	// Summary
-	b.WriteString(valueStyle().Render(fmt.Sprintf("%d", len(m.arpTable))))
+	b.WriteString(valueStyle().Render(strconv.Itoa(len(m.arpTable))))
 	b.WriteString(dimStyle().Render(" entries"))
 	if completeCount > 0 {
 		b.WriteString(dimStyle().Render(" ("))
-		b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", completeCount)))
+		b.WriteString(highlightStyle().Render(strconv.Itoa(completeCount)))
 		b.WriteString(dimStyle().Render(" complete)"))
 	}
 
@@ -344,7 +324,7 @@ func (m NetworkDashboardModel) renderRoutingSummary(width int) string {
 	}
 
 	// Total routes
-	b.WriteString(valueStyle().Render(fmt.Sprintf("%d", len(m.routes))))
+	b.WriteString(valueStyle().Render(strconv.Itoa(len(m.routes))))
 	b.WriteString(dimStyle().Render(" routes"))
 	b.WriteString("\n")
 
@@ -407,7 +387,7 @@ func (m NetworkDashboardModel) renderNeighborsSummary(width int) string {
 			}
 		}
 		b.WriteString(dimStyle().Render("BGP: "))
-		b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", established)))
+		b.WriteString(highlightStyle().Render(strconv.Itoa(established)))
 		b.WriteString(dimStyle().Render(fmt.Sprintf("/%d up", len(m.bgpNeighbors))))
 		if hasOSPF {
 			b.WriteString("\n")
@@ -424,7 +404,7 @@ func (m NetworkDashboardModel) renderNeighborsSummary(width int) string {
 			}
 		}
 		b.WriteString(dimStyle().Render("OSPF: "))
-		b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", full)))
+		b.WriteString(highlightStyle().Render(strconv.Itoa(full)))
 		b.WriteString(dimStyle().Render(fmt.Sprintf("/%d full", len(m.ospfNeighbors))))
 	}
 

@@ -4,166 +4,112 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/jp2195/pyre)](https://github.com/jp2195/pyre/releases)
 
-A terminal user interface (TUI) for managing and monitoring Palo Alto firewalls.
+A terminal user interface for Palo Alto firewalls (PAN-OS).
 
 ## Why pyre?
 
-The Palo Alto web interface requires clicking through multiple menus to gather basic information—checking system health, then navigating to policies, then sessions, then logs. Each view is a separate page load and context switch.
+The PAN-OS web interface turns every question into a sequence of clicks — system info, then policies, then sessions, then logs. Each view is a separate page load.
 
-pyre solves this by combining multiple API calls into unified terminal views. Get system info, HA status, resource usage, and session counts in a single dashboard. Filter policies and sessions instantly with keyboard shortcuts. No more clicking through menus to get the information you need.
-
-**Built for network engineers who want answers fast.**
+pyre combines those calls into unified terminal views: system health, HA, resource usage, and sessions in one dashboard; instant filter and sort on policies and sessions; no context switches. Built for network engineers who want answers fast.
 
 ## Features
 
-- **Dashboard** - Real-time system info, resource usage, HA status, network, security, and VPN monitoring
-- **Security Policies** - Browse, filter, and sort security rules with hit count analysis
-- **NAT Policies** - View NAT translation rules and hit counts
-- **Active Sessions** - View and filter live sessions with detailed traffic information
-- **Logs** - Browse system, traffic, and threat logs with filtering
-- **Interfaces** - Monitor interface status, traffic counters, and errors
-- **Panorama Support** - Manage multiple firewalls through Panorama device targeting
-- **Multi-Firewall** - Switch between multiple firewall connections
-- **Command Palette** - Quick access to any view or action with `Ctrl+P`
-- **Theming** - 10 built-in color themes including nord, dracula, catppuccin, and more
+- **Dashboard** — live system, resources, HA, network, security, VPN
+- **Security & NAT policies** — browse, filter, sort, hit-count analysis
+- **Sessions** — active sessions with filtering and detail view
+- **Logs** — system / traffic / threat logs
+- **Interfaces** — status, counters, errors
+- **Panorama** — manage multiple firewalls via device targeting
+- **Multi-firewall** — connection hub + quick picker
+- **Command palette** — `Ctrl+P` jumps to any view or action
+- **Theming** — 10 built-in themes (nord, dracula, catppuccin, …)
 
 ## Installation
 
-### Download Binary
+### Download
 
-Download the latest release for your platform from the [Releases](https://github.com/jp2195/pyre/releases) page.
+Grab a binary for your platform from [Releases](https://github.com/jp2195/pyre/releases). Archives ship with an SPDX SBOM and a shared `checksums.txt`.
 
-**macOS/Linux:**
 ```bash
-chmod +x pyre-darwin-arm64
-sudo mv pyre-darwin-arm64 /usr/local/bin/pyre
+# macOS / Linux
+chmod +x pyre-<os>-<arch>
+sudo mv pyre-<os>-<arch> /usr/local/bin/pyre
 ```
 
-**Windows:**
-1. Download `pyre-windows-amd64.exe`
-2. Rename to `pyre.exe` and move to a directory in your PATH, or run directly:
-```powershell
-.\pyre-windows-amd64.exe --host firewall.example.com --api-key YOUR_API_KEY
-```
+Windows: rename to `pyre.exe` and place somewhere on your `PATH`.
 
-### Build from Source
+### Build from source
 
-Requires Go 1.25 or later.
+Requires Go 1.26 or later.
 
 ```bash
 go install github.com/jp2195/pyre/cmd/pyre@latest
 ```
 
-## Quick Start
+Or clone and use the `Makefile`: `make build` → `./pyre`.
 
-### CLI Flags
+## Quick start
 
 ```bash
+# one-off
 pyre --host firewall.example.com --api-key YOUR_API_KEY
-```
 
-### Environment Variables
+# env var
+export PYRE_API_KEY=...
+pyre --host firewall.example.com
 
-```bash
-export PYRE_HOST=firewall.example.com
-export PYRE_API_KEY=YOUR_API_KEY
-pyre
-```
-
-### Configuration File
-
-Create `~/.pyre.yaml`:
-
-```yaml
+# saved connection
+cat > ~/.pyre.yaml <<'YAML'
 default: 10.0.0.1
-
 connections:
   10.0.0.1:
     insecure: true
-
-settings:
-  theme: dark
-```
-
-Then set your API key and run:
-
-```bash
-export PYRE_API_KEY=YOUR_API_KEY
-pyre
-```
-
-Or use the `-c` flag to connect to a saved connection:
-
-```bash
+YAML
 pyre -c 10.0.0.1
 ```
 
-See [Getting Started](docs/getting-started.md) for more options.
+**pyre does not persist credentials.** Supply an API key at each
+invocation via `--api-key`, `PYRE_API_KEY`, or per-host
+`PYRE_<HOST>_API_KEY`. If none is provided, pyre runs an interactive
+login (username/password → keygen) and uses the resulting key for the
+current session only. `~/.pyre.yaml` never contains credentials.
+
+For private-CA firewalls, use `ca_cert_path: /path/to/ca.pem` in the
+connection config instead of `--insecure`.
+
+See [Getting Started](docs/getting-started.md) for more detail.
 
 ## Navigation
 
-pyre uses a group-based navigation system:
+Three numbered groups plus the command palette:
 
-| Key | Group | Views |
-|-----|-------|-------|
-| `1` | Monitor | Overview, Network, Security, VPN |
-| `2` | Analyze | Policies, NAT, Sessions, Interfaces, Logs |
-| `3` | Tools | Config |
-| `4` | Connections | Switch Device |
+| Key      | Group   | Views                                            |
+|----------|---------|--------------------------------------------------|
+| `1`      | Monitor | Overview, Network, Security, VPN                 |
+| `2`      | Analyze | Policies, NAT, Sessions, Interfaces, Logs        |
+| `3`      | Tools   | Config                                           |
+| `Tab`    |         | next view in the current group                   |
+| `Ctrl+P` |         | command palette (jump anywhere)                  |
+| `:`      |         | connection picker                                |
+| `D`      |         | device picker (Panorama only)                    |
 
-- Press the same number to cycle through views in that group
-- Press `Tab` to move to the next view in the current group
-- Press `Ctrl+P` to open the command palette
+Common keys within a list view: `j`/`k` to move, `/` to filter, `s` to cycle
+sort, `Enter` to expand detail, `r` to refresh, `?` for help, `q` to quit.
 
-See [Navigation](docs/navigation.md) for details.
-
-## Keybindings
-
-### Global
-
-| Key | Action |
-|-----|--------|
-| `1-4` | Switch navigation groups |
-| `Tab` | Next view in group |
-| `Ctrl+P` | Command palette |
-| `:` | Connection picker |
-| `D` | Device picker (Panorama) |
-| `r` | Refresh |
-| `?` | Help |
-| `q` | Quit |
-
-### View Navigation
-
-| Key | Action |
-|-----|--------|
-| `j` / `k` | Move up/down |
-| `/` | Filter |
-| `s` | Cycle sort |
-| `Enter` | Expand details |
-
-See [Keybindings](docs/keybindings.md) for the complete reference.
+Full reference: [docs/keybindings.md](docs/keybindings.md).
 
 ## Documentation
 
-- [Getting Started](docs/getting-started.md) - Installation and first connection
-- [Navigation](docs/navigation.md) - How to navigate pyre
-- [Keybindings](docs/keybindings.md) - Complete keyboard shortcut reference
-- [Configuration](docs/configuration.md) - Configuration file reference
-- [Panorama](docs/panorama.md) - Panorama-specific features
-
-### View Reference
-
-- [Dashboard](docs/views/dashboard.md) - Monitor sub-views
-- [Policies](docs/views/policies.md) - Security policies
-- [NAT](docs/views/nat.md) - NAT policies
-- [Sessions](docs/views/sessions.md) - Active sessions
-- [Interfaces](docs/views/interfaces.md) - Interface status
-- [Logs](docs/views/logs.md) - Log viewer
+- [Getting Started](docs/getting-started.md) — install and first connection
+- [Configuration](docs/configuration.md) — `~/.pyre.yaml`, env vars, CLI flags
+- [Keybindings & Navigation](docs/keybindings.md) — every key in every view
+- [Panorama](docs/panorama.md) — managing devices through Panorama
+- View reference: [Dashboard](docs/views/dashboard.md) · [Policies](docs/views/policies.md) · [NAT](docs/views/nat.md) · [Sessions](docs/views/sessions.md) · [Interfaces](docs/views/interfaces.md) · [Logs](docs/views/logs.md)
 
 ## Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Apache License 2.0 - see [LICENSE](LICENSE) for details.
+Apache 2.0. See [LICENSE](LICENSE).

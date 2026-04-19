@@ -2,25 +2,24 @@ package views
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 )
 
 // VPNDashboardModel represents the VPN-focused dashboard
 type VPNDashboardModel struct {
+	DashboardBase
+
 	tunnels []models.IPSecTunnel
 	gpUsers []models.GlobalProtectUser
 
 	tunnelErr error
 	gpErr     error
-
-	width        int
-	height       int
-	SpinnerFrame string
 }
 
 // NewVPNDashboardModel creates a new VPN dashboard model
@@ -36,8 +35,8 @@ func (m VPNDashboardModel) SetSpinnerFrame(frame string) VPNDashboardModel {
 
 // SetSize sets the terminal dimensions
 func (m VPNDashboardModel) SetSize(width, height int) VPNDashboardModel {
-	m.width = width
-	m.height = height
+	m.Width = width
+	m.Height = height
 	return m
 }
 
@@ -67,15 +66,13 @@ func (m VPNDashboardModel) HasData() bool {
 
 // View renders the VPN dashboard
 func (m VPNDashboardModel) View() string {
-	if m.width == 0 {
+	if m.Width == 0 {
 		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
-	totalWidth := m.width - 4
-	leftColWidth := totalWidth / 2
-	rightColWidth := totalWidth - leftColWidth - 2
+	totalWidth, leftColWidth, rightColWidth := m.ColumnWidths()
 
-	if leftColWidth < 35 {
+	if m.IsNarrow() {
 		return m.renderSingleColumn(totalWidth)
 	}
 
@@ -84,26 +81,23 @@ func (m VPNDashboardModel) View() string {
 		m.renderIPSecSummary(leftColWidth),
 		m.renderIPSecTunnels(leftColWidth),
 	}
-	leftCol := lipgloss.JoinVertical(lipgloss.Left, leftPanels...)
 
 	// Right column: GlobalProtect users
 	rightPanels := []string{
 		m.renderGlobalProtectSummary(rightColWidth),
 		m.renderGlobalProtectUsers(rightColWidth),
 	}
-	rightCol := lipgloss.JoinVertical(lipgloss.Left, rightPanels...)
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, leftCol, "  ", rightCol)
+	return m.RenderTwoColumn(leftPanels, rightPanels)
 }
 
 func (m VPNDashboardModel) renderSingleColumn(width int) string {
-	panels := []string{
+	return m.RenderSingleColumn([]string{
 		m.renderIPSecSummary(width),
 		m.renderIPSecTunnels(width),
 		m.renderGlobalProtectSummary(width),
 		m.renderGlobalProtectUsers(width),
-	}
-	return lipgloss.JoinVertical(lipgloss.Left, panels...)
+	})
 }
 
 func (m VPNDashboardModel) renderIPSecSummary(width int) string {
@@ -141,30 +135,27 @@ func (m VPNDashboardModel) renderIPSecSummary(width int) string {
 	}
 
 	// Status indicators
-	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", upCount)))
+	b.WriteString(highlightStyle().Render(strconv.Itoa(upCount)))
 	b.WriteString(dimStyle().Render(" up"))
 
 	if downCount > 0 {
 		b.WriteString(dimStyle().Render("  "))
-		b.WriteString(errorStyle().Render(fmt.Sprintf("%d", downCount)))
+		b.WriteString(errorStyle().Render(strconv.Itoa(downCount)))
 		b.WriteString(dimStyle().Render(" down"))
 	}
 
 	if initCount > 0 {
 		b.WriteString(dimStyle().Render("  "))
-		b.WriteString(warningStyle().Render(fmt.Sprintf("%d", initCount)))
+		b.WriteString(warningStyle().Render(strconv.Itoa(initCount)))
 		b.WriteString(dimStyle().Render(" init"))
 	}
 
 	// Visual bar
 	if len(m.tunnels) > 0 {
 		b.WriteString("\n")
-		barWidth := width - 8
-		if barWidth < 10 {
-			barWidth = 10
-		}
+		barWidth := max(width-8, 10)
 		upPct := float64(upCount) / float64(len(m.tunnels)) * 100
-		b.WriteString(renderBar(upPct, barWidth, "#10B981"))
+		b.WriteString(renderBar(upPct, barWidth, lipgloss.Color("#10B981")))
 	}
 
 	return panelStyle().Width(width).Render(b.String())
@@ -190,10 +181,7 @@ func (m VPNDashboardModel) renderIPSecTunnels(width int) string {
 		nameWidth = 15
 	}
 
-	maxShow := 10
-	if len(m.tunnels) < maxShow {
-		maxShow = len(m.tunnels)
-	}
+	maxShow := min(len(m.tunnels), 10)
 
 	for i := 0; i < maxShow; i++ {
 		tunnel := m.tunnels[i]
@@ -269,7 +257,7 @@ func (m VPNDashboardModel) renderGlobalProtectSummary(width int) string {
 	}
 
 	// User count
-	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", len(m.gpUsers))))
+	b.WriteString(highlightStyle().Render(strconv.Itoa(len(m.gpUsers))))
 	b.WriteString(dimStyle().Render(" active users"))
 
 	// Count by gateway if available
@@ -289,7 +277,7 @@ func (m VPNDashboardModel) renderGlobalProtectSummary(width int) string {
 		for gw, count := range gatewayCounts {
 			gwName := truncateEllipsis(gw, 20)
 			b.WriteString(labelStyle().Render(fmt.Sprintf("  %-20s ", gwName)))
-			b.WriteString(valueStyle().Render(fmt.Sprintf("%d", count)))
+			b.WriteString(valueStyle().Render(strconv.Itoa(count)))
 			b.WriteString("\n")
 		}
 	}
@@ -319,10 +307,7 @@ func (m VPNDashboardModel) renderGlobalProtectUsers(width int) string {
 		ipWidth = 12
 	}
 
-	maxShow := 12
-	if len(m.gpUsers) < maxShow {
-		maxShow = len(m.gpUsers)
-	}
+	maxShow := min(len(m.gpUsers), 12)
 
 	for i := 0; i < maxShow; i++ {
 		user := m.gpUsers[i]

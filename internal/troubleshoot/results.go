@@ -91,7 +91,7 @@ func (r *RunbookResult) Finalize() {
 	// Determine overall pass/fail
 	r.Passed = true
 
-	// Fail if there's an error (e.g., SSH not available)
+	// Fail if there's an error
 	if r.Error != nil {
 		r.Passed = false
 		return

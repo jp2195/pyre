@@ -2,7 +2,7 @@ package api
 
 import (
 	"context"
-	"encoding/xml"
+	"bytes"
 	"log"
 	"strings"
 	"time"
@@ -11,8 +11,8 @@ import (
 )
 
 // GetIPSecTunnels retrieves IPSec VPN tunnel status
-func (c *Client) GetIPSecTunnels(ctx context.Context) ([]models.IPSecTunnel, error) {
-	resp, err := c.Op(ctx, "<show><vpn><ipsec-sa></ipsec-sa></vpn></show>")
+func (c *Client) GetIPSecTunnels(ctx context.Context, target string) ([]models.IPSecTunnel, error) {
+	resp, err := c.Op(ctx, "<show><vpn><ipsec-sa></ipsec-sa></vpn></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (c *Client) GetIPSecTunnels(ctx context.Context) ([]models.IPSecTunnel, err
 		} `xml:"entries>entry"`
 	}
 
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
 		log.Printf("[API Warning] failed to parse IPSec tunnels XML: %v", err)
 		return []models.IPSecTunnel{}, nil
 	}
@@ -82,8 +82,8 @@ func (c *Client) GetIPSecTunnels(ctx context.Context) ([]models.IPSecTunnel, err
 }
 
 // GetGlobalProtectUsers retrieves detailed GlobalProtect user information
-func (c *Client) GetGlobalProtectUsers(ctx context.Context) ([]models.GlobalProtectUser, error) {
-	resp, err := c.Op(ctx, "<show><global-protect-gateway><current-user></current-user></global-protect-gateway></show>")
+func (c *Client) GetGlobalProtectUsers(ctx context.Context, target string) ([]models.GlobalProtectUser, error) {
+	resp, err := c.Op(ctx, "<show><global-protect-gateway><current-user></current-user></global-protect-gateway></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (c *Client) GetGlobalProtectUsers(ctx context.Context) ([]models.GlobalProt
 		} `xml:"entry"`
 	}
 
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
 		log.Printf("[API Warning] failed to parse GlobalProtect users XML: %v", err)
 		return []models.GlobalProtectUser{}, nil
 	}
@@ -128,12 +128,9 @@ func (c *Client) GetGlobalProtectUsers(ctx context.Context) ([]models.GlobalProt
 		}
 
 		// Parse login time
-		for _, layout := range []string{"2006/01/02 15:04:05", "Mon Jan 2 15:04:05 2006"} {
-			if t, err := time.Parse(layout, e.LoginTime); err == nil {
-				user.LoginTime = t
-				user.Duration = formatDuration(time.Since(t))
-				break
-			}
+		if t, err := parsePANTime(e.LoginTime); err == nil {
+			user.LoginTime = t
+			user.Duration = formatDuration(time.Since(t))
 		}
 
 		users = append(users, user)

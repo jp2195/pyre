@@ -15,7 +15,7 @@ type State struct {
 
 // ConnectionState holds state for a single connection
 type ConnectionState struct {
-	LastConnected time.Time `json:"last_connected,omitempty"`
+	LastConnected time.Time `json:"last_connected"`
 	LastUser      string    `json:"last_user,omitempty"`
 	ConnectCount  int       `json:"connect_count"`
 }
@@ -78,7 +78,7 @@ func (s *State) Save() error {
 		return fmt.Errorf("failed to marshal state: %w", err)
 	}
 
-	if err := os.WriteFile(statePath, data, 0600); err != nil {
+	if err := atomicWriteFile(statePath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write state file: %w", err)
 	}
 

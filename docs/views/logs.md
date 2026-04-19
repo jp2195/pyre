@@ -1,146 +1,70 @@
 # Logs
 
-The Logs view displays system, traffic, and threat logs from the firewall. Access it through the Analyze group (press `2`, then cycle to Logs).
+System, traffic, and threat logs. Analyze group (`2`). Cycle log type
+with `]` (forward) or `[` (backward).
 
-## Log Types
+## System logs
 
-Use `]` to cycle forward or `[` to cycle backward between log types:
+Config changes, HA state changes, errors / warnings, auth events,
+license events.
 
-### System Logs
+| Column      | Description                                     |
+|-------------|-------------------------------------------------|
+| Time        | Event time                                      |
+| Severity    | Info / Warning / Error / Critical               |
+| Event Type  | Category                                        |
+| Description | Details                                         |
 
-System events including:
-- Configuration changes
-- HA state changes
-- System errors and warnings
-- Authentication events
-- License events
+## Traffic logs
 
-### Traffic Logs
+Session traffic.
 
-Session traffic logging showing:
-- Source and destination
-- Application identified
-- Action (allow, deny, drop)
-- Rule matched
-- Bytes transferred
-- Session duration
+| Column       | Description                                  |
+|--------------|----------------------------------------------|
+| Time         | Session end time                             |
+| Source       | Source IP                                    |
+| Destination  | Destination IP                               |
+| App          | Identified application                       |
+| Action       | Allow / Deny / Drop / Reset                  |
+| Rule         | Matched security rule                        |
+| Bytes        | Transferred                                  |
 
-### Threat Logs
+## Threat logs
 
-Security events including:
-- Threat name and type
-- Severity level
-- Action taken
-- Source of threat
-- Affected destination
-- URL/file information
+Security events.
 
-## Display
+| Column       | Description                                    |
+|--------------|------------------------------------------------|
+| Time         | Detection time                                 |
+| Threat       | Signature / threat name                        |
+| Severity     | Critical / High / Medium / Low / Info          |
+| Source       | Threat source IP                               |
+| Destination  | Target IP                                      |
+| Action       | Alert / Block / Reset / …                      |
 
-### System Log Columns
+## View-specific keys
 
-| Column | Description |
-|--------|-------------|
-| Time | When the event occurred |
-| Severity | Info, Warning, Error, Critical |
-| Event Type | Category of event |
-| Description | Event details |
+| Key   | Action                                               |
+|-------|------------------------------------------------------|
+| `]`   | Next log type (System → Traffic → Threat)            |
+| `[`   | Previous log type                                    |
 
-### Traffic Log Columns
+## Standard keys
 
-| Column | Description |
-|--------|-------------|
-| Time | Session end time |
-| Source | Source IP address |
-| Destination | Destination IP address |
-| App | Identified application |
-| Action | Allow, Deny, Drop, Reset |
-| Rule | Matched security rule |
-| Bytes | Data transferred |
+Filter (`/`), sort (`s` cycle, `S` reverse), detail (`Enter`), refresh
+(`r`). Defaults to time-descending (newest first). See
+[keybindings.md](../keybindings.md).
 
-### Threat Log Columns
+## Threat action glossary
 
-| Column | Description |
-|--------|-------------|
-| Time | When threat was detected |
-| Threat | Threat name/signature |
-| Severity | Critical, High, Medium, Low, Info |
-| Source | Threat source IP |
-| Destination | Target IP |
-| Action | Alert, Block, Reset, etc. |
-
-## Filtering
-
-Press `/` to enter filter mode. The filter matches against all displayed columns.
-
-Filter examples:
-- `10.0.1.50` - Events involving this IP
-- `deny` - Denied traffic
-- `critical` - Critical severity events
-- `config` - Configuration changes
-
-Press `Esc` to clear the filter.
-
-## Sorting
-
-Press `s` to cycle through sort fields (varies by log type).
-
-Press `S` (shift+s) to toggle sort direction.
-
-By default, logs are sorted by time (newest first).
-
-## Log Details
-
-Press `Enter` on a log entry to expand its details. The expanded view shows all available fields for that log type.
-
-Press `Enter` again or `Esc` to collapse.
-
-## Keybindings
-
-| Key | Action |
-|-----|--------|
-| `]` | Next log type (System -> Traffic -> Threat) |
-| `[` | Previous log type (System -> Threat -> Traffic) |
-| `j` / `Down` | Move cursor down |
-| `k` / `Up` | Move cursor up |
-| `g` / `Home` | Jump to first entry |
-| `G` / `End` | Jump to last entry |
-| `Ctrl+d` / `PgDn` | Page down |
-| `Ctrl+u` / `PgUp` | Page up |
-| `/` | Enter filter mode |
-| `Esc` | Clear filter |
-| `s` | Cycle sort field |
-| `S` | Toggle sort direction |
-| `Enter` | Toggle log details |
-| `r` | Refresh logs |
+- **Alert** — logged, traffic allowed
+- **Block** — connection blocked
+- **Reset client / server / both** — RST sent to the named side(s)
+- **Drop** — silently dropped
 
 ## Tips
 
-### Investigating Security Events
-
-1. Switch to Threat logs with `]` (press twice from System)
-2. Sort by Severity to see critical threats first
-3. Expand entries to see full threat details
-4. Note the source IP and rule that triggered
-
-### Tracking Configuration Changes
-
-1. Use System logs
-2. Filter by `config` or `commit`
-3. See who made changes and when
-
-### Analyzing Denied Traffic
-
-1. Switch to Traffic logs
-2. Filter by `deny` or `drop`
-3. Check which rule is blocking
-4. Verify it's expected behavior
-
-### Understanding Threat Actions
-
-- **Alert** - Threat logged but allowed
-- **Block** - Connection blocked
-- **Reset client** - RST sent to client
-- **Reset server** - RST sent to server
-- **Reset both** - RST sent to both sides
-- **Drop** - Silently dropped
+- Threat investigation: `]` twice → sort by Severity → expand.
+- Config audit: System logs → filter `config` or `commit`.
+- Denied traffic: Traffic logs → filter `deny` / `drop` → check the
+  Rule column.

@@ -3,17 +3,14 @@ package views
 import (
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 // RenderLoadingBanner renders a centered loading indicator with spinner frame.
 func RenderLoadingBanner(spinnerFrame, message string, width int) string {
 	content := LoadingSpinnerStyle.Render(spinnerFrame) + " " + LoadingMsgStyle.Render(message)
 	contentWidth := lipgloss.Width(content)
-	padding := (width - contentWidth) / 2
-	if padding < 0 {
-		padding = 0
-	}
+	padding := max((width-contentWidth)/2, 0)
 	return strings.Repeat(" ", padding) + content
 }
 

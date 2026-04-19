@@ -2,14 +2,14 @@ package api
 
 import (
 	"context"
-	"encoding/xml"
+	"bytes"
 	"log"
 
 	"github.com/jp2195/pyre/internal/models"
 )
 
-func (c *Client) GetHAStatus(ctx context.Context) (*models.HAStatus, error) {
-	resp, err := c.Op(ctx, "<show><high-availability><state></state></high-availability></show>")
+func (c *Client) GetHAStatus(ctx context.Context, target string) (*models.HAStatus, error) {
+	resp, err := c.Op(ctx, "<show><high-availability><state></state></high-availability></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +35,7 @@ func (c *Client) GetHAStatus(ctx context.Context) (*models.HAStatus, error) {
 			RunningSyncState   string `xml:"running-sync"`
 		} `xml:"group"`
 	}
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
 		log.Printf("[API Warning] failed to parse HA status XML: %v", err)
 		return &models.HAStatus{Enabled: false}, nil
 	}

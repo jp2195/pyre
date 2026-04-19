@@ -2,289 +2,98 @@ package views
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/models"
-	"github.com/jp2195/pyre/internal/tui/theme"
-)
-
-type NATSortField int
-
-const (
-	NATSortPosition NATSortField = iota
-	NATSortName
-	NATSortHits
-	NATSortLastHit
 )
 
 type NATPoliciesModel struct {
-	TableBase
-	rules    []models.NATRule
-	filtered []models.NATRule
-	sortBy   NATSortField
+	list RuleListModel[models.NATRule]
 }
 
 func NewNATPoliciesModel() NATPoliciesModel {
-	return NATPoliciesModel{
-		TableBase: NewTableBase("Filter NAT rules..."),
+	config := RuleListConfig[models.NATRule]{
+		Title:             "NAT Policies",
+		LoadingMsg:        "Loading NAT rules...",
+		EmptyMsg:          "No NAT rules found",
+		FilterPlaceholder: "Filter NAT rules...",
+		SortLabels:        []string{"Position", "Name", "Hits", "Last Hit"},
+		DefaultSortAsc:    func(idx int) bool { return idx == 0 || idx == 1 },
+		MatchFilter:       matchNATRule,
+		CompareItems:      compareNATRule,
+		FormatHeaderRow:   formatNATHeader,
+		FormatRow:         formatNATRow,
+		RenderDetail:      renderNATDetail,
+		IsDisabled:        func(r models.NATRule) bool { return r.Disabled },
 	}
+	return NATPoliciesModel{list: NewRuleListModel(config)}
 }
 
 func (m NATPoliciesModel) SetSize(width, height int) NATPoliciesModel {
-	m.TableBase = m.TableBase.SetSize(width, height)
+	m.list = m.list.SetSize(width, height)
 	return m
 }
 
 func (m NATPoliciesModel) SetLoading(loading bool) NATPoliciesModel {
-	m.TableBase = m.TableBase.SetLoading(loading)
+	m.list = m.list.SetLoading(loading)
 	return m
 }
 
-// HasData returns true if NAT rules have been loaded.
 func (m NATPoliciesModel) HasData() bool {
-	return m.rules != nil
+	return m.list.HasData()
 }
 
 func (m NATPoliciesModel) SetRules(rules []models.NATRule, err error) NATPoliciesModel {
-	m.rules = rules
-	m.Err = err
-	m.Loading = false
-	m.Cursor = 0
-	m.Offset = 0
-	m.applyFilter()
+	m.list = m.list.SetItems(rules, err)
 	return m
 }
 
-func (m *NATPoliciesModel) applyFilter() {
-	if m.FilterValue() == "" {
-		m.filtered = make([]models.NATRule, len(m.rules))
-		copy(m.filtered, m.rules)
-	} else {
-		query := strings.ToLower(m.FilterValue())
-		m.filtered = nil
-
-		for _, r := range m.rules {
-			if strings.Contains(strings.ToLower(r.Name), query) ||
-				strings.Contains(strings.ToLower(r.Description), query) ||
-				strings.Contains(strings.ToLower(string(r.RuleBase)), query) ||
-				containsAny(r.Tags, query) ||
-				containsAny(r.SourceZones, query) ||
-				containsAny(r.DestZones, query) ||
-				containsAny(r.Sources, query) ||
-				containsAny(r.Destinations, query) ||
-				strings.Contains(strings.ToLower(r.TranslatedSource), query) ||
-				strings.Contains(strings.ToLower(r.TranslatedDest), query) {
-				m.filtered = append(m.filtered, r)
-			}
-		}
-	}
-	m.applySort()
-}
-
-func (m *NATPoliciesModel) applySort() {
-	sort.Slice(m.filtered, func(i, j int) bool {
-		var less bool
-		switch m.sortBy {
-		case NATSortName:
-			less = m.filtered[i].Name < m.filtered[j].Name
-		case NATSortHits:
-			less = m.filtered[i].HitCount < m.filtered[j].HitCount
-		case NATSortLastHit:
-			less = m.filtered[i].LastHit.Before(m.filtered[j].LastHit)
-		default: // NATSortPosition
-			less = m.filtered[i].Position < m.filtered[j].Position
-		}
-		if m.SortAsc {
-			return less
-		}
-		return !less
-	})
-}
-
-func (m *NATPoliciesModel) cycleSort() {
-	m.sortBy = (m.sortBy + 1) % 4
-	m.SortAsc = m.sortBy == NATSortPosition || m.sortBy == NATSortName
-	m.applySort()
-}
-
-func (m NATPoliciesModel) sortLabel() string {
-	dir := "↓"
-	if m.SortAsc {
-		dir = "↑"
-	}
-	switch m.sortBy {
-	case NATSortName:
-		return fmt.Sprintf("Name %s", dir)
-	case NATSortHits:
-		return fmt.Sprintf("Hits %s", dir)
-	case NATSortLastHit:
-		return fmt.Sprintf("Last Hit %s", dir)
-	default:
-		return fmt.Sprintf("Position %s", dir)
-	}
-}
-
 func (m NATPoliciesModel) Update(msg tea.Msg) (NATPoliciesModel, tea.Cmd) {
-	if m.FilterMode {
-		return m.updateFilter(msg)
-	}
-
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		// Handle NAT-specific keys first
-		switch msg.String() {
-		case "esc":
-			if m.HandleCollapseIfExpanded() {
-				return m, nil
-			}
-			if m.HandleClearFilter() {
-				m.applyFilter()
-			}
-			return m, nil
-		case "s":
-			m.cycleSort()
-			m.Cursor = 0
-			m.Offset = 0
-			return m, nil
-		}
-
-		// Delegate to TableBase for common navigation
-		visible := m.visibleRows()
-		base, handled, cmd := m.HandleNavigation(msg, len(m.filtered), visible)
-		if handled {
-			m.TableBase = base
-			return m, cmd
-		}
-	}
-
-	return m, nil
-}
-
-func (m NATPoliciesModel) updateFilter(msg tea.Msg) (NATPoliciesModel, tea.Cmd) {
-	base, exited, cmd := m.HandleFilterMode(msg)
-	m.TableBase = base
-	if exited {
-		m.applyFilter()
-	}
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
 	return m, cmd
 }
 
-func (m NATPoliciesModel) visibleRows() int {
-	rows := m.Height - 8
-	if m.Expanded {
-		rows -= 14
-	}
-	if rows < 1 {
-		rows = 1
-	}
-	return rows
-}
-
 func (m NATPoliciesModel) View() string {
-	if m.Width == 0 {
-		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
-	}
-
-	titleStyle := ViewTitleStyle.MarginBottom(1)
-	panelStyle := ViewPanelStyle.Width(m.Width - 4)
-
-	var b strings.Builder
-	title := "NAT Policies"
-	sortInfo := BannerInfoStyle.Render(fmt.Sprintf(" [%d rules | Sort: %s | s: change | /: filter | enter: details]", len(m.filtered), m.sortLabel()))
-	b.WriteString(titleStyle.Render(title) + sortInfo)
-	b.WriteString("\n")
-
-	if m.FilterMode {
-		b.WriteString(FilterBorderStyle.Render(m.Filter.View()))
-		b.WriteString("\n\n")
-	} else if m.IsFiltered() {
-		filterInfo := FilterActiveStyle.Render(fmt.Sprintf("Filtered: \"%s\"", m.FilterValue()))
-		clearHint := FilterClearHintStyle.Render(" (esc to clear)")
-		b.WriteString(filterInfo + clearHint)
-		b.WriteString("\n\n")
-	}
-
-	if m.Err != nil {
-		b.WriteString(ErrorMsgStyle.Render("Error: " + m.Err.Error()))
-		return panelStyle.Render(b.String())
-	}
-
-	if m.Loading || m.rules == nil {
-		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading NAT rules..."))
-		return panelStyle.Render(b.String())
-	}
-
-	if len(m.filtered) == 0 {
-		b.WriteString(EmptyMsgStyle.Render("No NAT rules found"))
-		return panelStyle.Render(b.String())
-	}
-
-	b.WriteString(m.renderTable())
-
-	if m.Expanded && m.Cursor < len(m.filtered) {
-		b.WriteString("\n")
-		b.WriteString(m.renderDetail(m.filtered[m.Cursor]))
-	}
-
-	return panelStyle.Render(b.String())
+	return m.list.View()
 }
 
-func (m NATPoliciesModel) renderTable() string {
-	// Styles from centralized definitions
-	headerStyle := DetailLabelStyle.Bold(true)
-	selectedStyle := TableRowSelectedStyle.Bold(true)
-	normalStyle := DetailValueStyle
-	disabledStyle := TableRowDisabledStyle
-	dimStyle := DetailDimStyle
-
-	// Calculate available width
-	availableWidth := m.Width - 12
-
-	var b strings.Builder
-
-	// Header
-	header := m.formatHeaderRow(availableWidth)
-	b.WriteString(headerStyle.Render(header))
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(strings.Repeat("-", minInt(availableWidth, len(header)+10))))
-	b.WriteString("\n")
-
-	visibleRows := m.visibleRows()
-	end := m.Offset + visibleRows
-	if end > len(m.filtered) {
-		end = len(m.filtered)
-	}
-
-	for i := m.Offset; i < end; i++ {
-		r := m.filtered[i]
-		isSelected := i == m.Cursor
-
-		row := m.formatRuleRow(r, availableWidth, dimStyle)
-
-		if isSelected {
-			b.WriteString(selectedStyle.Render(row))
-		} else if r.Disabled {
-			b.WriteString(disabledStyle.Render(row))
-		} else {
-			b.WriteString(normalStyle.Render(row))
-		}
-		b.WriteString("\n")
-	}
-
-	// Show scroll indicator if needed
-	if len(m.filtered) > visibleRows {
-		scrollInfo := fmt.Sprintf("  Showing %d-%d of %d", m.Offset+1, end, len(m.filtered))
-		b.WriteString(dimStyle.Render(scrollInfo))
-	}
-
-	return b.String()
+func (m NATPoliciesModel) SetSpinnerFrame(frame string) NATPoliciesModel {
+	m.list.SpinnerFrame = frame
+	return m
 }
 
-func (m NATPoliciesModel) formatHeaderRow(width int) string {
+// --- Type-specific functions ---
+
+func matchNATRule(r models.NATRule, query string) bool {
+	return strings.Contains(strings.ToLower(r.Name), query) ||
+		strings.Contains(strings.ToLower(r.Description), query) ||
+		strings.Contains(strings.ToLower(string(r.RuleBase)), query) ||
+		containsAny(r.Tags, query) ||
+		containsAny(r.SourceZones, query) ||
+		containsAny(r.DestZones, query) ||
+		containsAny(r.Sources, query) ||
+		containsAny(r.Destinations, query) ||
+		strings.Contains(strings.ToLower(r.TranslatedSource), query) ||
+		strings.Contains(strings.ToLower(r.TranslatedDest), query)
+}
+
+func compareNATRule(a, b models.NATRule, sortIdx int) bool {
+	switch sortIdx {
+	case 1: // Name
+		return a.Name < b.Name
+	case 2: // Hits
+		return a.HitCount < b.HitCount
+	case 3: // Last Hit
+		return a.LastHit.Before(b.LastHit)
+	default: // Position
+		return a.Position < b.Position
+	}
+}
+
+func formatNATHeader(width int) string {
 	if width >= 150 {
 		return fmt.Sprintf("%-4s %-5s %-20s %-16s %-16s %-18s %-18s %-10s %-10s",
 			"#", "Base", "Name", "Src Zone", "Dst Zone", "Src NAT", "Dst NAT", "Hits", "Last Hit")
@@ -294,40 +103,26 @@ func (m NATPoliciesModel) formatHeaderRow(width int) string {
 	} else if width >= 100 {
 		return fmt.Sprintf("%-4s %-5s %-14s %-12s %-14s %-14s %-8s",
 			"#", "Base", "Name", "Zones", "Src NAT", "Dst NAT", "Hits")
-	} else {
-		return fmt.Sprintf("%-4s %-14s %-12s %-14s %-8s",
-			"#", "Name", "Zones", "Src NAT", "Hits")
 	}
+	return fmt.Sprintf("%-4s %-14s %-12s %-14s %-8s",
+		"#", "Name", "Zones", "Src NAT", "Hits")
 }
 
-func (m NATPoliciesModel) formatRuleRow(r models.NATRule, width int, dimStyle lipgloss.Style) string {
-	// Format rulebase indicator
+func formatNATRow(r models.NATRule, width int) string {
 	base := formatRuleBase(r.RuleBase)
-
-	// Format zones
 	srcZone := formatZoneCompact(r.SourceZones)
 	dstZone := formatZoneCompact(r.DestZones)
 	zones := srcZone + "->" + dstZone
-
-	// Format source NAT
 	srcNAT := formatSourceNAT(r)
-
-	// Format destination NAT
 	dstNAT := formatDestNAT(r)
+	hits := formatHitCount(r.HitCount)
+	lastHit := formatLastHit(r.LastHit)
 
-	// Format service
 	service := "any"
 	if len(r.Services) > 0 && r.Services[0] != "any" {
 		service = formatListCompact(r.Services, 14)
 	}
 
-	// Format hits
-	hits := formatHitCount(r.HitCount)
-
-	// Format last hit
-	lastHit := formatLastHit(r.LastHit)
-
-	// Format name with tags indicator
 	name := r.Name
 	if len(r.Tags) > 0 {
 		name = name + " *"
@@ -349,12 +144,11 @@ func (m NATPoliciesModel) formatRuleRow(r models.NATRule, width int, dimStyle li
 			r.Position, base, truncateEllipsis(name, 14),
 			truncateEllipsis(zones, 12),
 			truncateEllipsis(srcNAT, 14), truncateEllipsis(dstNAT, 14), hits)
-	} else {
-		return fmt.Sprintf("%-4d %-14s %-12s %-14s %-8s",
-			r.Position, truncateEllipsis(name, 14),
-			truncateEllipsis(zones, 12),
-			truncateEllipsis(srcNAT, 14), hits)
 	}
+	return fmt.Sprintf("%-4d %-14s %-12s %-14s %-8s",
+		r.Position, truncateEllipsis(name, 14),
+		truncateEllipsis(zones, 12),
+		truncateEllipsis(srcNAT, 14), hits)
 }
 
 func formatSourceNAT(r models.NATRule) string {
@@ -384,105 +178,61 @@ func formatDestNAT(r models.NATRule) string {
 	return result
 }
 
-func (m NATPoliciesModel) renderDetail(r models.NATRule) string {
-	c := theme.Colors()
-	boxStyle := ViewPanelStyle.
-		BorderForeground(c.Primary).
-		Width(m.Width - 10)
+func renderNATDetail(r models.NATRule, width int) string {
+	dr := NewDetailRenderer(width, 18)
 
-	titleStyle := ViewTitleStyle
-	labelStyle := DetailLabelStyle.Width(18)
-	valueStyle := DetailValueStyle
-	dimValueStyle := DetailDimStyle
-	tagStyle := TagStyle
-	sectionStyle := DetailSectionStyle.Foreground(c.Primary)
-
-	var b strings.Builder
-
-	// Title with status indicators
 	title := r.Name
 	if r.Disabled {
-		title += dimValueStyle.Render(" (disabled)")
+		title += DetailDimStyle.Render(" (disabled)")
 	}
-	b.WriteString(titleStyle.Render(title))
-	b.WriteString("\n")
+	dr.Title(title)
+	dr.Subtitle(fmt.Sprintf("Position: %d | %s", r.Position, formatRuleBaseFull(r.RuleBase)))
+	dr.Tags(r.Tags)
+	dr.Description(r.Description)
 
-	// Rule metadata (position and rulebase)
-	ruleInfo := fmt.Sprintf("Position: %d | %s", r.Position, formatRuleBaseFull(r.RuleBase))
-	b.WriteString(dimValueStyle.Render(ruleInfo))
-	b.WriteString("\n")
-
-	// Tags
-	if len(r.Tags) > 0 {
-		b.WriteString(tagStyle.Render("Tags: " + strings.Join(r.Tags, ", ")))
-		b.WriteString("\n")
-	}
-
-	// Description
-	if r.Description != "" {
-		b.WriteString(dimValueStyle.Render(r.Description))
-		b.WriteString("\n")
-	}
-
-	b.WriteString("\n")
-
-	// Original Packet Section
-	b.WriteString(sectionStyle.Render("Original Packet (Match)"))
-	b.WriteString("\n")
-	b.WriteString(labelStyle.Render("Source Zones:") + " " + valueStyle.Render(formatListFull(r.SourceZones)) + "\n")
-	b.WriteString(labelStyle.Render("Source Addresses:") + " " + valueStyle.Render(formatListFull(r.Sources)) + "\n")
-	b.WriteString(labelStyle.Render("Dest Zones:") + " " + valueStyle.Render(formatListFull(r.DestZones)) + "\n")
-	b.WriteString(labelStyle.Render("Dest Addresses:") + " " + valueStyle.Render(formatListFull(r.Destinations)) + "\n")
-	b.WriteString(labelStyle.Render("Service:") + " " + valueStyle.Render(formatListFull(r.Services)) + "\n")
+	dr.Section("Original Packet (Match)")
+	dr.Field("Source Zones:", formatListFull(r.SourceZones))
+	dr.Field("Source Addresses:", formatListFull(r.Sources))
+	dr.Field("Dest Zones:", formatListFull(r.DestZones))
+	dr.Field("Dest Addresses:", formatListFull(r.Destinations))
+	dr.Field("Service:", formatListFull(r.Services))
 	if r.DestInterface != "" && r.DestInterface != "any" {
-		b.WriteString(labelStyle.Render("Dest Interface:") + " " + valueStyle.Render(r.DestInterface) + "\n")
+		dr.Field("Dest Interface:", r.DestInterface)
 	}
 
-	// Translated Packet Section
-	b.WriteString("\n")
-	b.WriteString(sectionStyle.Render("Translated Packet"))
-	b.WriteString("\n")
+	dr.Section("Translated Packet")
 
-	// Source Translation
-	srcTransLabel := "Source Translation:"
 	switch r.SourceTransType {
 	case models.SourceTransDynamicIPPort:
 		transType := "Dynamic IP and Port"
 		if r.SourceInterfaceIP {
 			transType += " (Interface)"
 		}
-		b.WriteString(labelStyle.Render(srcTransLabel) + " " + valueStyle.Render(transType) + "\n")
-		b.WriteString(labelStyle.Render("  Translated To:") + " " + valueStyle.Render(r.TranslatedSource) + "\n")
+		dr.Field("Source Translation:", transType)
+		dr.Field("  Translated To:", r.TranslatedSource)
 	case models.SourceTransDynamicIP:
-		b.WriteString(labelStyle.Render(srcTransLabel) + " " + valueStyle.Render("Dynamic IP") + "\n")
-		b.WriteString(labelStyle.Render("  Translated To:") + " " + valueStyle.Render(r.TranslatedSource) + "\n")
+		dr.Field("Source Translation:", "Dynamic IP")
+		dr.Field("  Translated To:", r.TranslatedSource)
 	case models.SourceTransStaticIP:
-		b.WriteString(labelStyle.Render(srcTransLabel) + " " + valueStyle.Render("Static IP") + "\n")
-		b.WriteString(labelStyle.Render("  Translated To:") + " " + valueStyle.Render(r.TranslatedSource) + "\n")
+		dr.Field("Source Translation:", "Static IP")
+		dr.Field("  Translated To:", r.TranslatedSource)
 	default:
-		b.WriteString(labelStyle.Render(srcTransLabel) + " " + dimValueStyle.Render("None") + "\n")
+		dr.FieldDim("Source Translation:", "None")
 	}
 
-	// Destination Translation
-	dstTransLabel := "Dest Translation:"
 	if r.TranslatedDest != "" {
-		b.WriteString(labelStyle.Render(dstTransLabel) + " " + valueStyle.Render(r.TranslatedDest) + "\n")
-		if r.TranslatedDestPort != "" {
-			b.WriteString(labelStyle.Render("  Translated Port:") + " " + valueStyle.Render(r.TranslatedDestPort) + "\n")
-		}
+		dr.Field("Dest Translation:", r.TranslatedDest)
+		dr.FieldIf("  Translated Port:", r.TranslatedDestPort)
 	} else {
-		b.WriteString(labelStyle.Render(dstTransLabel) + " " + dimValueStyle.Render("None") + "\n")
+		dr.FieldDim("Dest Translation:", "None")
 	}
 
-	// Usage Stats Section
-	b.WriteString("\n")
-	b.WriteString(sectionStyle.Render("Usage Statistics"))
-	b.WriteString("\n")
-	b.WriteString(labelStyle.Render("Hit Count:") + " " + valueStyle.Render(formatHitCountFull(r.HitCount)) + "\n")
-	b.WriteString(labelStyle.Render("Last Hit:") + " " + valueStyle.Render(formatTimestamp(r.LastHit)) + "\n")
+	dr.Section("Usage Statistics")
+	dr.Field("Hit Count:", formatHitCountFull(r.HitCount))
+	dr.Field("Last Hit:", formatTimestamp(r.LastHit))
 	if !r.FirstHit.IsZero() {
-		b.WriteString(labelStyle.Render("First Hit:") + " " + valueStyle.Render(formatTimestamp(r.FirstHit)) + "\n")
+		dr.Field("First Hit:", formatTimestamp(r.FirstHit))
 	}
 
-	return boxStyle.Render(b.String())
+	return dr.Render()
 }

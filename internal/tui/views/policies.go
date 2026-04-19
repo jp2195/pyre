@@ -2,307 +2,99 @@ package views
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/models"
-	"github.com/jp2195/pyre/internal/tui/theme"
-)
-
-type PolicySortField int
-
-const (
-	PolicySortPosition PolicySortField = iota
-	PolicySortName
-	PolicySortHits
-	PolicySortLastHit
 )
 
 type PoliciesModel struct {
-	TableBase
-	policies []models.SecurityRule
-	filtered []models.SecurityRule
-	sortBy   PolicySortField
+	list RuleListModel[models.SecurityRule]
 }
 
 func NewPoliciesModel() PoliciesModel {
-	return PoliciesModel{
-		TableBase: NewTableBase("Filter rules..."),
+	config := RuleListConfig[models.SecurityRule]{
+		Title:             "Security Policies",
+		LoadingMsg:        "Loading policies...",
+		EmptyMsg:          "No policies found",
+		FilterPlaceholder: "Filter rules...",
+		SortLabels:        []string{"Position", "Name", "Hits", "Last Hit"},
+		DefaultSortAsc:    func(idx int) bool { return idx == 0 || idx == 1 }, // Position and Name ascending
+		MatchFilter:       matchSecurityRule,
+		CompareItems:      compareSecurityRule,
+		FormatHeaderRow:   formatSecurityHeader,
+		FormatRow:         formatSecurityRow,
+		RenderDetail:      renderSecurityDetail,
+		IsDisabled:        func(r models.SecurityRule) bool { return r.Disabled },
 	}
+	return PoliciesModel{list: NewRuleListModel(config)}
 }
 
 func (m PoliciesModel) SetSize(width, height int) PoliciesModel {
-	m.TableBase = m.TableBase.SetSize(width, height)
-
-	// Clamp cursor to valid range after resize
-	count := len(m.filtered)
-	if m.Cursor >= count && count > 0 {
-		m.Cursor = count - 1
-	}
-
-	// Adjust offset to keep cursor visible
-	visibleRows := m.visibleRows()
-	if visibleRows > 0 && m.Cursor >= m.Offset+visibleRows {
-		m.Offset = m.Cursor - visibleRows + 1
-	}
-
+	m.list = m.list.SetSize(width, height)
 	return m
 }
 
 func (m PoliciesModel) SetLoading(loading bool) PoliciesModel {
-	m.TableBase = m.TableBase.SetLoading(loading)
+	m.list = m.list.SetLoading(loading)
 	return m
 }
 
-// HasData returns true if policies have been loaded.
 func (m PoliciesModel) HasData() bool {
-	return m.policies != nil
+	return m.list.HasData()
 }
 
 func (m PoliciesModel) SetPolicies(policies []models.SecurityRule, err error) PoliciesModel {
-	m.policies = policies
-	m.Err = err
-	m.Loading = false
-	m.Cursor = 0
-	m.Offset = 0
-	m.applyFilter()
+	m.list = m.list.SetItems(policies, err)
 	return m
 }
 
-func (m *PoliciesModel) applyFilter() {
-	if m.FilterValue() == "" {
-		m.filtered = make([]models.SecurityRule, len(m.policies))
-		copy(m.filtered, m.policies)
-	} else {
-		query := strings.ToLower(m.FilterValue())
-		m.filtered = nil
-
-		for _, p := range m.policies {
-			if strings.Contains(strings.ToLower(p.Name), query) ||
-				strings.Contains(strings.ToLower(p.Description), query) ||
-				strings.Contains(strings.ToLower(string(p.RuleBase)), query) ||
-				containsAny(p.Tags, query) ||
-				containsAny(p.SourceZones, query) ||
-				containsAny(p.DestZones, query) ||
-				containsAny(p.Sources, query) ||
-				containsAny(p.Destinations, query) ||
-				containsAny(p.Applications, query) ||
-				containsAny(p.Services, query) {
-				m.filtered = append(m.filtered, p)
-			}
-		}
-	}
-	m.applySort()
-}
-
-func (m *PoliciesModel) applySort() {
-	sort.Slice(m.filtered, func(i, j int) bool {
-		var less bool
-		switch m.sortBy {
-		case PolicySortName:
-			less = m.filtered[i].Name < m.filtered[j].Name
-		case PolicySortHits:
-			less = m.filtered[i].HitCount < m.filtered[j].HitCount
-		case PolicySortLastHit:
-			less = m.filtered[i].LastHit.Before(m.filtered[j].LastHit)
-		default: // PolicySortPosition
-			less = m.filtered[i].Position < m.filtered[j].Position
-		}
-		if m.SortAsc {
-			return less
-		}
-		return !less
-	})
-}
-
-func (m *PoliciesModel) cycleSort() {
-	m.sortBy = (m.sortBy + 1) % 4
-	m.SortAsc = m.sortBy == PolicySortPosition || m.sortBy == PolicySortName
-	m.applySort()
-}
-
-func (m PoliciesModel) sortLabel() string {
-	dir := "↓"
-	if m.SortAsc {
-		dir = "↑"
-	}
-	switch m.sortBy {
-	case PolicySortName:
-		return fmt.Sprintf("Name %s", dir)
-	case PolicySortHits:
-		return fmt.Sprintf("Hits %s", dir)
-	case PolicySortLastHit:
-		return fmt.Sprintf("Last Hit %s", dir)
-	default:
-		return fmt.Sprintf("Position %s", dir)
-	}
-}
-
 func (m PoliciesModel) Update(msg tea.Msg) (PoliciesModel, tea.Cmd) {
-	if m.FilterMode {
-		return m.updateFilter(msg)
-	}
-
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		// Handle policy-specific keys first
-		switch msg.String() {
-		case "esc":
-			if m.HandleCollapseIfExpanded() {
-				return m, nil
-			}
-			if m.HandleClearFilter() {
-				m.applyFilter()
-			}
-			return m, nil
-		case "s":
-			m.cycleSort()
-			m.Cursor = 0
-			m.Offset = 0
-			return m, nil
-		}
-
-		// Delegate to TableBase for common navigation
-		visible := m.visibleRows()
-		base, handled, cmd := m.HandleNavigation(msg, len(m.filtered), visible)
-		if handled {
-			m.TableBase = base
-			return m, cmd
-		}
-	}
-
-	return m, nil
-}
-
-func (m PoliciesModel) updateFilter(msg tea.Msg) (PoliciesModel, tea.Cmd) {
-	base, exited, cmd := m.HandleFilterMode(msg)
-	m.TableBase = base
-	if exited {
-		m.applyFilter()
-	}
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
 	return m, cmd
 }
 
-func (m PoliciesModel) visibleRows() int {
-	rows := m.Height - 8
-	if m.Expanded {
-		rows -= 14
-	}
-	if rows < 1 {
-		rows = 1
-	}
-	return rows
-}
-
 func (m PoliciesModel) View() string {
-	if m.Width == 0 {
-		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
-	}
-
-	titleStyle := ViewTitleStyle.MarginBottom(1)
-	panelStyle := ViewPanelStyle.Width(m.Width - 4)
-
-	var b strings.Builder
-	title := "Security Policies"
-	sortInfo := BannerInfoStyle.Render(fmt.Sprintf(" [%d rules | Sort: %s | s: change | /: filter | enter: details]", len(m.filtered), m.sortLabel()))
-	b.WriteString(titleStyle.Render(title) + sortInfo)
-	b.WriteString("\n")
-
-	if m.FilterMode {
-		b.WriteString(FilterBorderStyle.Render(m.Filter.View()))
-		b.WriteString("\n\n")
-	} else if m.IsFiltered() {
-		filterInfo := FilterActiveStyle.Render(fmt.Sprintf("Filtered: \"%s\"", m.FilterValue()))
-		clearHint := FilterClearHintStyle.Render(" (esc to clear)")
-		b.WriteString(filterInfo + clearHint)
-		b.WriteString("\n\n")
-	}
-
-	if m.Err != nil {
-		b.WriteString(ErrorMsgStyle.Render("Error: " + m.Err.Error()))
-		return panelStyle.Render(b.String())
-	}
-
-	if m.Loading || m.policies == nil {
-		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading policies..."))
-		return panelStyle.Render(b.String())
-	}
-
-	if len(m.filtered) == 0 {
-		b.WriteString(EmptyMsgStyle.Render("No policies found"))
-		return panelStyle.Render(b.String())
-	}
-
-	b.WriteString(m.renderTable())
-
-	if m.Expanded && m.Cursor < len(m.filtered) {
-		b.WriteString("\n")
-		b.WriteString(m.renderDetail(m.filtered[m.Cursor]))
-	}
-
-	return panelStyle.Render(b.String())
+	return m.list.View()
 }
 
-func (m PoliciesModel) renderTable() string {
-	// Styles from centralized definitions
-	headerStyle := DetailLabelStyle.Bold(true)
-	selectedStyle := TableRowSelectedStyle.Bold(true)
-	normalStyle := DetailValueStyle
-	disabledStyle := TableRowDisabledStyle
-	dimStyle := DetailDimStyle
-	allowStyle := ActionAllowStyle
-	denyStyle := ActionDenyStyle
-	tagStyle := TagStyle
-
-	// Calculate available width
-	availableWidth := m.Width - 12 // Account for padding and borders
-
-	var b strings.Builder
-
-	// Header
-	header := m.formatHeaderRow(availableWidth)
-	b.WriteString(headerStyle.Render(header))
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(strings.Repeat("─", minInt(availableWidth, len(header)+10))))
-	b.WriteString("\n")
-
-	visibleRows := m.visibleRows()
-	end := m.Offset + visibleRows
-	if end > len(m.filtered) {
-		end = len(m.filtered)
-	}
-
-	for i := m.Offset; i < end; i++ {
-		p := m.filtered[i]
-		isSelected := i == m.Cursor
-
-		row := m.formatRuleRow(p, availableWidth, allowStyle, denyStyle, tagStyle, dimStyle)
-
-		if isSelected {
-			b.WriteString(selectedStyle.Render(row))
-		} else if p.Disabled {
-			b.WriteString(disabledStyle.Render(row))
-		} else {
-			b.WriteString(normalStyle.Render(row))
-		}
-		b.WriteString("\n")
-	}
-
-	// Show scroll indicator if needed
-	if len(m.filtered) > visibleRows {
-		scrollInfo := fmt.Sprintf("  Showing %d-%d of %d", m.Offset+1, end, len(m.filtered))
-		b.WriteString(dimStyle.Render(scrollInfo))
-	}
-
-	return b.String()
+// Expose TableBase fields needed by app.go
+func (m PoliciesModel) SetSpinnerFrame(frame string) PoliciesModel {
+	m.list.SpinnerFrame = frame
+	return m
 }
 
-func (m PoliciesModel) formatHeaderRow(width int) string {
-	// Adaptive column layout based on width
-	// Base column shows pre/local/post origin
+// --- Type-specific functions ---
+
+func matchSecurityRule(p models.SecurityRule, query string) bool {
+	return strings.Contains(strings.ToLower(p.Name), query) ||
+		strings.Contains(strings.ToLower(p.Description), query) ||
+		strings.Contains(strings.ToLower(string(p.RuleBase)), query) ||
+		containsAny(p.Tags, query) ||
+		containsAny(p.SourceZones, query) ||
+		containsAny(p.DestZones, query) ||
+		containsAny(p.Sources, query) ||
+		containsAny(p.Destinations, query) ||
+		containsAny(p.Applications, query) ||
+		containsAny(p.Services, query)
+}
+
+func compareSecurityRule(a, b models.SecurityRule, sortIdx int) bool {
+	switch sortIdx {
+	case 1: // Name
+		return a.Name < b.Name
+	case 2: // Hits
+		return a.HitCount < b.HitCount
+	case 3: // Last Hit
+		return a.LastHit.Before(b.LastHit)
+	default: // Position
+		return a.Position < b.Position
+	}
+}
+
+func formatSecurityHeader(width int) string {
 	if width >= 150 {
 		return fmt.Sprintf("%-4s %-5s %-24s %-8s %-20s %-18s %-16s %-10s %-10s",
 			"#", "Base", "Name", "Action", "Source → Dest Zone", "Application", "Service", "Hits", "Last Hit")
@@ -312,40 +104,26 @@ func (m PoliciesModel) formatHeaderRow(width int) string {
 	} else if width >= 100 {
 		return fmt.Sprintf("%-4s %-5s %-16s %-7s %-14s %-10s %-8s",
 			"#", "Base", "Name", "Action", "Zones", "App", "Hits")
-	} else {
-		return fmt.Sprintf("%-4s %-16s %-7s %-14s %-8s",
-			"#", "Name", "Action", "Zones", "Hits")
 	}
+	return fmt.Sprintf("%-4s %-16s %-7s %-14s %-8s",
+		"#", "Name", "Action", "Zones", "Hits")
 }
 
-func (m PoliciesModel) formatRuleRow(p models.SecurityRule, width int, allowStyle, denyStyle, tagStyle, dimStyle lipgloss.Style) string {
-	// Format action with color
+func formatSecurityRow(p models.SecurityRule, width int) string {
 	action := strings.ToUpper(p.Action)
 	if len(action) > 8 {
 		action = action[:7] + "…"
 	}
 
-	// Format rulebase indicator
 	base := formatRuleBase(p.RuleBase)
-
-	// Format zones
 	srcZone := formatZoneCompact(p.SourceZones)
 	dstZone := formatZoneCompact(p.DestZones)
 	zones := srcZone + "→" + dstZone
-
-	// Format apps
 	apps := formatListCompact(p.Applications, 14)
-
-	// Format services
 	services := formatListCompact(p.Services, 14)
-
-	// Format hits
 	hits := formatHitCount(p.HitCount)
-
-	// Format last hit
 	lastHit := formatLastHit(p.LastHit)
 
-	// Format name with tags indicator
 	name := p.Name
 	if len(p.Tags) > 0 {
 		name = name + " •"
@@ -364,88 +142,50 @@ func (m PoliciesModel) formatRuleRow(p models.SecurityRule, width int, allowStyl
 		return fmt.Sprintf("%-4d %-5s %-16s %-7s %-14s %-10s %-8s",
 			p.Position, base, truncateStr(name, 16), truncateStr(action, 7),
 			truncateStr(zones, 14), truncateStr(apps, 10), hits)
-	} else {
-		return fmt.Sprintf("%-4d %-16s %-7s %-14s %-8s",
-			p.Position, truncateStr(name, 16), truncateStr(action, 7),
-			truncateStr(zones, 14), hits)
 	}
+	return fmt.Sprintf("%-4d %-16s %-7s %-14s %-8s",
+		p.Position, truncateStr(name, 16), truncateStr(action, 7),
+		truncateStr(zones, 14), hits)
 }
 
-func (m PoliciesModel) renderDetail(p models.SecurityRule) string {
-	c := theme.Colors()
-	boxStyle := ViewPanelStyle.
-		BorderForeground(c.Primary).
-		Width(m.Width - 10)
+func renderSecurityDetail(p models.SecurityRule, width int) string {
+	dr := NewDetailRenderer(width, 16)
 
-	titleStyle := ViewTitleStyle
-	labelStyle := DetailLabelStyle.Width(16)
-	valueStyle := DetailValueStyle
-	dimValueStyle := DetailDimStyle
-	tagStyle := TagStyle
-	sectionStyle := DetailSectionStyle.Foreground(c.Primary)
-
-	var b strings.Builder
-
-	// Title with status indicators
 	title := p.Name
 	if p.Disabled {
-		title += dimValueStyle.Render(" (disabled)")
+		title += DetailDimStyle.Render(" (disabled)")
 	}
-	b.WriteString(titleStyle.Render(title))
-	b.WriteString("\n")
-
-	// Rule metadata (position and rulebase)
-	ruleInfo := fmt.Sprintf("Position: %d | %s", p.Position, formatRuleBaseFull(p.RuleBase))
-	b.WriteString(dimValueStyle.Render(ruleInfo))
-	b.WriteString("\n")
-
-	// Tags
-	if len(p.Tags) > 0 {
-		b.WriteString(tagStyle.Render("Tags: " + strings.Join(p.Tags, ", ")))
-		b.WriteString("\n")
-	}
-
-	// Description
-	if p.Description != "" {
-		b.WriteString(dimValueStyle.Render(p.Description))
-		b.WriteString("\n")
-	}
-
-	b.WriteString("\n")
+	dr.Title(title)
+	dr.Subtitle(fmt.Sprintf("Position: %d | %s", p.Position, formatRuleBaseFull(p.RuleBase)))
+	dr.Tags(p.Tags)
+	dr.Description(p.Description)
 
 	// Source/Destination Section
-	b.WriteString(sectionStyle.Render("Traffic Match"))
-	b.WriteString("\n")
-	b.WriteString(labelStyle.Render("Source Zones:") + " " + valueStyle.Render(formatListFull(p.SourceZones)) + "\n")
-	b.WriteString(labelStyle.Render("Source Addr:") + " " + formatAddresses(p.Sources, p.NegateSource, valueStyle, dimValueStyle) + "\n")
+	dr.Section("Traffic Match")
+	dr.Field("Source Zones:", formatListFull(p.SourceZones))
+	dr.FieldStyled("Source Addr:", formatAddresses(p.Sources, p.NegateSource, DetailValueStyle, DetailDimStyle))
 	if len(p.SourceUsers) > 0 && (len(p.SourceUsers) != 1 || p.SourceUsers[0] != "any") {
-		b.WriteString(labelStyle.Render("Source Users:") + " " + valueStyle.Render(formatListFull(p.SourceUsers)) + "\n")
+		dr.Field("Source Users:", formatListFull(p.SourceUsers))
 	}
-	b.WriteString(labelStyle.Render("Dest Zones:") + " " + valueStyle.Render(formatListFull(p.DestZones)) + "\n")
-	b.WriteString(labelStyle.Render("Dest Addr:") + " " + formatAddresses(p.Destinations, p.NegateDest, valueStyle, dimValueStyle) + "\n")
+	dr.Field("Dest Zones:", formatListFull(p.DestZones))
+	dr.FieldStyled("Dest Addr:", formatAddresses(p.Destinations, p.NegateDest, DetailValueStyle, DetailDimStyle))
 
 	// Application/Service Section
-	b.WriteString("\n")
-	b.WriteString(sectionStyle.Render("Application/Service"))
-	b.WriteString("\n")
-	b.WriteString(labelStyle.Render("Applications:") + " " + valueStyle.Render(formatListFull(p.Applications)) + "\n")
-	b.WriteString(labelStyle.Render("Services:") + " " + valueStyle.Render(formatListFull(p.Services)) + "\n")
+	dr.Section("Application/Service")
+	dr.Field("Applications:", formatListFull(p.Applications))
+	dr.Field("Services:", formatListFull(p.Services))
 	if len(p.URLCategories) > 0 && (len(p.URLCategories) != 1 || p.URLCategories[0] != "any") {
-		b.WriteString(labelStyle.Render("URL Categories:") + " " + valueStyle.Render(formatListFull(p.URLCategories)) + "\n")
+		dr.Field("URL Categories:", formatListFull(p.URLCategories))
 	}
 
 	// Action & Profiles Section
-	b.WriteString("\n")
-	b.WriteString(sectionStyle.Render("Action & Profiles"))
-	b.WriteString("\n")
-	actionStyle := ActionStyle(p.Action)
-	b.WriteString(labelStyle.Render("Action:") + " " + actionStyle.Render(strings.ToUpper(p.Action)) + "\n")
+	dr.Section("Action & Profiles")
+	dr.FieldStyled("Action:", ActionStyle(p.Action).Render(strings.ToUpper(p.Action)))
 
-	// Security profiles
 	if p.Profile != "" {
-		b.WriteString(labelStyle.Render("Profile Group:") + " " + valueStyle.Render(p.Profile) + "\n")
+		dr.Field("Profile Group:", p.Profile)
 	} else if hasProfiles(p) {
-		profiles := []string{}
+		var profiles []string
 		if p.AntivirusProfile != "" {
 			profiles = append(profiles, "AV:"+p.AntivirusProfile)
 		}
@@ -461,11 +201,11 @@ func (m PoliciesModel) renderDetail(p models.SecurityRule) string {
 		if p.WildFireProfile != "" {
 			profiles = append(profiles, "WF:"+p.WildFireProfile)
 		}
-		b.WriteString(labelStyle.Render("Profiles:") + " " + valueStyle.Render(strings.Join(profiles, ", ")) + "\n")
+		dr.Field("Profiles:", strings.Join(profiles, ", "))
 	}
 
 	// Logging
-	logSettings := []string{}
+	var logSettings []string
 	if p.LogStart {
 		logSettings = append(logSettings, "start")
 	}
@@ -477,18 +217,16 @@ func (m PoliciesModel) renderDetail(p models.SecurityRule) string {
 		if p.LogForwarding != "" {
 			logStr += " → " + p.LogForwarding
 		}
-		b.WriteString(labelStyle.Render("Logging:") + " " + valueStyle.Render(logStr) + "\n")
+		dr.Field("Logging:", logStr)
 	}
 
 	// Usage Stats Section
-	b.WriteString("\n")
-	b.WriteString(sectionStyle.Render("Usage Statistics"))
-	b.WriteString("\n")
-	b.WriteString(labelStyle.Render("Hit Count:") + " " + valueStyle.Render(formatHitCountFull(p.HitCount)) + "\n")
-	b.WriteString(labelStyle.Render("Last Hit:") + " " + valueStyle.Render(formatTimestamp(p.LastHit)) + "\n")
+	dr.Section("Usage Statistics")
+	dr.Field("Hit Count:", formatHitCountFull(p.HitCount))
+	dr.Field("Last Hit:", formatTimestamp(p.LastHit))
 	if !p.FirstHit.IsZero() {
-		b.WriteString(labelStyle.Render("First Hit:") + " " + valueStyle.Render(formatTimestamp(p.FirstHit)) + "\n")
+		dr.Field("First Hit:", formatTimestamp(p.FirstHit))
 	}
 
-	return boxStyle.Render(b.String())
+	return dr.Render()
 }

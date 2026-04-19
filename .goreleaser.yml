@@ -1,0 +1,48 @@
+version: 2
+project_name: pyre
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: pyre
+    main: ./cmd/pyre
+    binary: pyre
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}} -X main.commit={{.Commit}}
+
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - LICENSE*
+      - README*
+
+checksum:
+  name_template: 'checksums.txt'
+
+sboms:
+  - id: archive-sbom
+    artifacts: archive
+    documents:
+      - "${artifact}.spdx.json"
+
+snapshot:
+  version_template: "{{ .Tag }}-next"
+
+# release-please creates the GitHub release with a categorized CHANGELOG.md
+# body. Tell goreleaser to attach artifacts without touching that body, and
+# suppress goreleaser's own changelog generation so the two don't collide.
+release:
+  mode: keep-existing
+
+changelog:
+  disable: true

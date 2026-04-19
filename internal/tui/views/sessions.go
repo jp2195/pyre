@@ -3,10 +3,11 @@ package views
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 )
@@ -58,6 +59,12 @@ func (m SessionsModel) SetSize(width, height int) SessionsModel {
 
 func (m SessionsModel) SetLoading(loading bool) SessionsModel {
 	m.TableBase = m.TableBase.SetLoading(loading)
+	return m
+}
+
+// SetSpinnerFrame updates the current spinner animation frame.
+func (m SessionsModel) SetSpinnerFrame(frame string) SessionsModel {
+	m.TableBase = m.TableBase.SetSpinnerFrame(frame)
 	return m
 }
 
@@ -193,7 +200,7 @@ func (m SessionsModel) Update(msg tea.Msg) (SessionsModel, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		// Handle session-specific keys first
 		switch msg.String() {
 		case "esc":
@@ -323,10 +330,7 @@ func (m SessionsModel) renderTable() string {
 	b.WriteString(headerStyle.Render(header) + "\n")
 
 	visibleRows := m.visibleRows()
-	end := m.Offset + visibleRows
-	if end > len(m.filtered) {
-		end = len(m.filtered)
-	}
+	end := min(m.Offset+visibleRows, len(m.filtered))
 
 	for i := m.Offset; i < end; i++ {
 		s := m.filtered[i]
@@ -482,8 +486,8 @@ func (m SessionsModel) renderDetail(s models.Session) string {
 		b.WriteString("\n")
 		b.WriteString(sectionStyle.Render("Traffic Statistics"))
 		b.WriteString("\n")
-		b.WriteString(labelStyle.Render("Pkts to Client:") + valueStyle.Render(fmt.Sprintf("%d", d.PacketsToClient)) + "\n")
-		b.WriteString(labelStyle.Render("Pkts to Server:") + valueStyle.Render(fmt.Sprintf("%d", d.PacketsToServer)) + "\n")
+		b.WriteString(labelStyle.Render("Pkts to Client:") + valueStyle.Render(strconv.FormatInt(d.PacketsToClient, 10)) + "\n")
+		b.WriteString(labelStyle.Render("Pkts to Server:") + valueStyle.Render(strconv.FormatInt(d.PacketsToServer, 10)) + "\n")
 		b.WriteString(labelStyle.Render("Bytes to Client:") + valueStyle.Render(formatBytes(d.BytesToClient)) + "\n")
 		b.WriteString(labelStyle.Render("Bytes to Server:") + valueStyle.Render(formatBytes(d.BytesToServer)) + "\n")
 

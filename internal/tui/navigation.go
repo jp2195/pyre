@@ -1,7 +1,7 @@
 package tui
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/tui/views"
 )
@@ -129,25 +129,31 @@ type navbarID struct {
 	item  string
 }
 
-var viewToNavbar = map[ViewState][]struct {
-	dashboard views.DashboardType
-	id        navbarID
-}{
+// navbarEntry is an entry in viewToNavbar. isDashboard marks entries whose
+// dashboard field is load-bearing; for all other views it is false and the
+// dashboard field must be ignored (it is zero-valued but not meaningful).
+type navbarEntry struct {
+	isDashboard bool
+	dashboard   views.DashboardType // only valid when isDashboard
+	id          navbarID
+}
+
+var viewToNavbar = map[ViewState][]navbarEntry{
 	ViewDashboard: {
-		{views.DashboardMain, navbarID{"monitor", "overview"}},
-		{views.DashboardNetwork, navbarID{"monitor", "network"}},
-		{views.DashboardSecurity, navbarID{"monitor", "security"}},
-		{views.DashboardVPN, navbarID{"monitor", "vpn"}},
-		{views.DashboardConfig, navbarID{"tools", "config"}},
+		{isDashboard: true, dashboard: views.DashboardMain, id: navbarID{"monitor", "overview"}},
+		{isDashboard: true, dashboard: views.DashboardNetwork, id: navbarID{"monitor", "network"}},
+		{isDashboard: true, dashboard: views.DashboardSecurity, id: navbarID{"monitor", "security"}},
+		{isDashboard: true, dashboard: views.DashboardVPN, id: navbarID{"monitor", "vpn"}},
+		{isDashboard: true, dashboard: views.DashboardConfig, id: navbarID{"tools", "config"}},
 	},
-	ViewPolicies:     {{0, navbarID{"analyze", "policies"}}},
-	ViewNATPolicies:  {{0, navbarID{"analyze", "nat"}}},
-	ViewSessions:     {{0, navbarID{"analyze", "sessions"}}},
-	ViewInterfaces:   {{0, navbarID{"analyze", "interfaces"}}},
-	ViewRoutes:       {{0, navbarID{"analyze", "routes"}}},
-	ViewIPSecTunnels: {{0, navbarID{"analyze", "ipsec"}}},
-	ViewGPUsers:      {{0, navbarID{"analyze", "gpusers"}}},
-	ViewLogs:         {{0, navbarID{"analyze", "logs"}}},
+	ViewPolicies:     {{id: navbarID{"analyze", "policies"}}},
+	ViewNATPolicies:  {{id: navbarID{"analyze", "nat"}}},
+	ViewSessions:     {{id: navbarID{"analyze", "sessions"}}},
+	ViewInterfaces:   {{id: navbarID{"analyze", "interfaces"}}},
+	ViewRoutes:       {{id: navbarID{"analyze", "routes"}}},
+	ViewIPSecTunnels: {{id: navbarID{"analyze", "ipsec"}}},
+	ViewGPUsers:      {{id: navbarID{"analyze", "gpusers"}}},
+	ViewLogs:         {{id: navbarID{"analyze", "logs"}}},
 }
 
 // handleNavGroupKey handles number key presses for navigation
@@ -202,7 +208,7 @@ func (m *Model) syncNavbarToCurrentView() {
 		return
 	}
 	for _, e := range entries {
-		if m.currentView != ViewDashboard || e.dashboard == m.currentDashboard {
+		if !e.isDashboard || e.dashboard == m.currentDashboard {
 			m.navbar = m.navbar.SetActiveByID(e.id.group, e.id.item)
 			return
 		}
