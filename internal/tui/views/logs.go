@@ -47,19 +47,10 @@ func NewLogsModel() LogsModel {
 
 func (m LogsModel) SetSize(width, height int) LogsModel {
 	m.TableBase = m.TableBase.SetSize(width, height)
-
-	// Clamp cursor to valid range after resize
-	count := m.filteredCount()
-	if m.Cursor >= count && count > 0 {
-		m.Cursor = count - 1
+	m.EnsureCursorValid(m.filteredCount())
+	if visibleRows := m.visibleRows(); visibleRows > 0 {
+		m.EnsureVisible(visibleRows)
 	}
-
-	// Adjust offset to keep cursor visible
-	visibleRows := m.visibleRows()
-	if visibleRows > 0 && m.Cursor >= m.Offset+visibleRows {
-		m.Offset = m.Cursor - visibleRows + 1
-	}
-
 	return m
 }
 
@@ -253,23 +244,19 @@ func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
 }
 
 func (m LogsModel) updateFilterMode(msg tea.Msg) (LogsModel, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "enter", "esc":
-			m.FilterMode = false
-			m.Filter.Blur()
-			if msg.String() == "enter" {
-				m.Cursor = 0
-				m.Offset = 0
-				m.applyFilter()
-			}
-			return m, nil
-		}
+	// Detect enter before delegating: TableBase exits filter mode for both
+	// enter and esc but doesn't distinguish them in its return value, and
+	// logs only re-applies its derived filtered slice on enter (commit), not
+	// on esc.
+	committed := false
+	if key, ok := msg.(tea.KeyPressMsg); ok && key.String() == "enter" {
+		committed = true
 	}
-
 	var cmd tea.Cmd
-	m.Filter, cmd = m.Filter.Update(msg)
+	m.TableBase, _, cmd = m.HandleFilterMode(msg)
+	if committed {
+		m.applyFilter()
+	}
 	return m, cmd
 }
 
@@ -446,22 +433,6 @@ func abbreviateSeverity(severity string) string {
 		return "INFO"
 	default:
 		return truncate(severity, 4)
-	}
-}
-
-// severityStyle returns the lipgloss style for a severity level.
-func severityStyle(severity string) lipgloss.Style {
-	switch strings.ToLower(severity) {
-	case "critical":
-		return SeverityCriticalStyle
-	case "high":
-		return SeverityHighStyle
-	case "medium":
-		return SeverityMediumStyle
-	case "low":
-		return SeverityLowStyle
-	default: // informational
-		return StatusMutedStyle
 	}
 }
 

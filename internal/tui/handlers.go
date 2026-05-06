@@ -96,7 +96,9 @@ func (m Model) handleDevicePickerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) 
 		if conn != nil {
 			device := m.devicePicker.SelectedDevice()
 			if err := conn.SetTarget(device); err != nil {
-				return m, m.setError(err)
+				var cmd tea.Cmd
+				m, cmd = m.setError(err)
+				return m, cmd
 			}
 			m.currentView = ViewDashboard
 			return m, m.fetchCurrentDashboardData()

@@ -26,7 +26,7 @@ func (m Model) handleDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		PendingChangesMsg:
 		return m.handleViewDataMsg(msg)
 
-	case DashboardSelectedMsg, SwitchViewMsg, SwitchDashboardMsg,
+	case SwitchViewMsg, SwitchDashboardMsg,
 		ShowPickerMsg, ShowConnectionHubMsg, ShowConnectionFormMsg,
 		ConnectionSelectedMsg, ConnectionFormSubmitMsg,
 		ConnectionDeletedMsg, RefreshMsg, ShowHelpMsg, RefreshTickMsg:
@@ -101,7 +101,7 @@ func (m Model) handleAuthMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case PanoramaDetectedMsg:
 		conn := m.session.GetActiveConnection()
 		if conn != nil {
-			conn.IsPanorama = msg.IsPanorama
+			conn.SetPanoramaInfo(msg.IsPanorama)
 			if msg.IsPanorama {
 				cmds = append(cmds, m.fetchManagedDevices(conn))
 			}
@@ -110,10 +110,12 @@ func (m Model) handleAuthMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ManagedDevicesMsg:
 		conn := m.session.GetActiveConnection()
 		if conn != nil && msg.Err == nil {
-			conn.ManagedDevices = msg.Devices
-			if m.currentView == ViewDashboard && conn.IsPanorama && conn.TargetSerial == "" {
+			conn.SetManagedDevices(msg.Devices)
+			isPano := conn.PanoramaInfo()
+			target := conn.Target()
+			if m.currentView == ViewDashboard && isPano && target == "" {
 				m.currentView = ViewDevicePicker
-				m.devicePicker = m.devicePicker.SetDevices(msg.Devices, conn.TargetSerial, conn.Host)
+				m.devicePicker = m.devicePicker.SetDevices(msg.Devices, target, conn.Host)
 			}
 		}
 	}
@@ -209,11 +211,6 @@ func (m Model) handleViewDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 // handleNavigationMsg processes view transitions and UI navigation messages.
 func (m Model) handleNavigationMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case DashboardSelectedMsg:
-		m.currentDashboard = msg.Dashboard
-		m.currentView = ViewDashboard
-		return m, m.fetchCurrentDashboardData()
-
 	case SwitchViewMsg:
 		return m.handleSwitchView(msg)
 
@@ -275,14 +272,20 @@ func (m Model) handleStatusMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case ConfigSavedMsg:
 		if msg.Err != nil {
-			cmds = append(cmds, m.setError(msg.Err))
+			var cmd tea.Cmd
+			m, cmd = m.setError(msg.Err)
+			cmds = append(cmds, cmd)
 		}
 	case StateSavedMsg:
 		if msg.Err != nil {
-			cmds = append(cmds, m.setError(msg.Err))
+			var cmd tea.Cmd
+			m, cmd = m.setError(msg.Err)
+			cmds = append(cmds, cmd)
 		}
 	case ErrorMsg:
-		cmds = append(cmds, m.setError(msg.Err))
+		var cmd tea.Cmd
+		m, cmd = m.setError(msg.Err)
+		cmds = append(cmds, cmd)
 	case ErrorDismissMsg:
 		m.err = nil
 	}

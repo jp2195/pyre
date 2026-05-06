@@ -141,7 +141,7 @@ func (m DashboardModel) renderSessionsCompact(width int) string {
 		}
 		barWidth := max(width-22, 8)
 		b.WriteString(renderBar(sessPct, barWidth, sessColor))
-		b.WriteString(fmt.Sprintf(" %s/%s\n", formatNumber(int64(si.ActiveCount)), formatNumber(int64(si.MaxCount))))
+		b.WriteString(fmt.Sprintf(" %s/%s\n", formatNumberWithCommas(int64(si.ActiveCount)), formatNumberWithCommas(int64(si.MaxCount))))
 	}
 
 	// CPS and throughput on one line
@@ -154,11 +154,11 @@ func (m DashboardModel) renderSessionsCompact(width int) string {
 	if si.TCPSessions > 0 || si.UDPSessions > 0 || si.ICMPSessions > 0 {
 		b.WriteString("\n")
 		b.WriteString(dimStyle().Render("TCP:"))
-		b.WriteString(valueStyle().Render(formatNumber(int64(si.TCPSessions))))
+		b.WriteString(valueStyle().Render(formatNumberWithCommas(int64(si.TCPSessions))))
 		b.WriteString(dimStyle().Render(" UDP:"))
-		b.WriteString(valueStyle().Render(formatNumber(int64(si.UDPSessions))))
+		b.WriteString(valueStyle().Render(formatNumberWithCommas(int64(si.UDPSessions))))
 		b.WriteString(dimStyle().Render(" ICMP:"))
-		b.WriteString(valueStyle().Render(formatNumber(int64(si.ICMPSessions))))
+		b.WriteString(valueStyle().Render(formatNumberWithCommas(int64(si.ICMPSessions))))
 	}
 
 	return panelStyle().Width(width).Render(b.String())

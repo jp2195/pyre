@@ -81,7 +81,7 @@ func (m LogsModel) renderSystemTable() string {
 			b.WriteString(TableRowSelectedStyle.Render(row) + "\n")
 		} else {
 			// Build row with colored severity indicator
-			sevStyle := severityStyle(log.Severity)
+			sevStyle := SeverityStyle(log.Severity)
 
 			row := DetailLabelStyle.Render(fmt.Sprintf("%-19s", timeStr)) + " " +
 				sevStyle.Render(fmt.Sprintf("%-4s", sevAbbrev)) + " " +
@@ -106,7 +106,7 @@ func (m LogsModel) renderSystemDetail(log models.SystemLogEntry) string {
 	lines = append(lines, ViewTitleStyle.Render("System Log Details"))
 	lines = append(lines, "")
 	lines = append(lines, labelStyle.Render("Time")+DetailValueStyle.Render(log.Time.Format("2006-01-02 15:04:05")))
-	lines = append(lines, labelStyle.Render("Severity")+severityStyle(log.Severity).Render(log.Severity))
+	lines = append(lines, labelStyle.Render("Severity")+SeverityStyle(log.Severity).Render(log.Severity))
 	lines = append(lines, labelStyle.Render("Type")+DetailValueStyle.Render(log.Type))
 	lines = append(lines, "")
 	lines = append(lines, ViewTitleStyle.Render("Message"))

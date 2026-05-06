@@ -5,12 +5,22 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jp2195/pyre/internal/api"
+	"github.com/jp2195/pyre/internal/models"
 )
+
+// APIClient is the narrow PAN-OS API surface the troubleshoot engine needs.
+// *api.Client satisfies this interface implicitly, allowing tests to inject
+// a fake without depending on the full api.Client type.
+type APIClient interface {
+	GetSystemInfo(ctx context.Context, target string) (*models.SystemInfo, error)
+	GetSystemResources(ctx context.Context, target string) (*models.Resources, error)
+	GetHAStatus(ctx context.Context, target string) (*models.HAStatus, error)
+	GetSessionInfo(ctx context.Context, target string) (*models.SessionInfo, error)
+}
 
 // Engine executes troubleshooting runbooks.
 type Engine struct {
-	apiClient      *api.Client
+	apiClient      APIClient
 	registry       *Registry
 	patternMatcher *PatternMatcher
 	stepCallback   StepCallback
@@ -20,7 +30,7 @@ type Engine struct {
 type StepCallback func(stepIndex int, step Step, status StepStatus, output string)
 
 // NewEngine creates a new troubleshooting engine.
-func NewEngine(apiClient *api.Client, registry *Registry) *Engine {
+func NewEngine(apiClient APIClient, registry *Registry) *Engine {
 	return &Engine{
 		apiClient:      apiClient,
 		registry:       registry,
@@ -88,10 +98,10 @@ func (e *Engine) executeStep(ctx context.Context, index int, step Step) StepResu
 	var err error
 
 	// Apply per-step timeout so a hung API call cannot stall the whole runbook.
-	// This context scopes both the step-type dispatch below AND the subsequent
-	// MatchAll pass: `defer cancel()` fires at function return, so any work
-	// that consults stepCtx before we return (including pattern matching)
-	// inherits the same deadline.
+	// stepCtx bounds executeAPIStep only. MatchAll runs after the API call
+	// returns and is not context-aware; pattern matching is fast enough today
+	// that running it unbounded is intentional. If patterns ever scan large
+	// outputs, thread ctx through PatternMatcher.MatchAll.
 	stepCtx, cancel := context.WithTimeout(ctx, step.effectiveTimeout())
 	defer cancel()
 

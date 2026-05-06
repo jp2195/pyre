@@ -3,9 +3,7 @@ package views
 import (
 	"fmt"
 	"image/color"
-	"strconv"
 	"strings"
-	"time"
 
 	"charm.land/lipgloss/v2"
 )
@@ -84,22 +82,6 @@ func renderBar(percent float64, width int, c color.Color) string {
 	return bar.String()
 }
 
-func formatNumber(n int64) string {
-	s := strconv.FormatInt(n, 10)
-	if len(s) <= 3 {
-		return s
-	}
-
-	var result strings.Builder
-	for i, c := range s {
-		if i > 0 && (len(s)-i)%3 == 0 {
-			result.WriteRune(',')
-		}
-		result.WriteRune(c)
-	}
-	return result.String()
-}
-
 func formatThroughput(kbps int64) string {
 	if kbps == 0 {
 		return "0 Kbps"
@@ -111,36 +93,4 @@ func formatThroughput(kbps int64) string {
 		return fmt.Sprintf("%.1f Mbps", float64(kbps)/1_000)
 	}
 	return fmt.Sprintf("%d Kbps", kbps)
-}
-
-func formatTimeAgo(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		mins := int(d.Minutes())
-		if mins == 1 {
-			return "1m ago"
-		}
-		return fmt.Sprintf("%dm ago", mins)
-	case d < 24*time.Hour:
-		hours := int(d.Hours())
-		if hours == 1 {
-			return "1h ago"
-		}
-		return fmt.Sprintf("%dh ago", hours)
-	case d < 7*24*time.Hour:
-		days := int(d.Hours() / 24)
-		if days == 1 {
-			return "1d ago"
-		}
-		return fmt.Sprintf("%dd ago", days)
-	default:
-		return t.Format("Jan 2")
-	}
 }

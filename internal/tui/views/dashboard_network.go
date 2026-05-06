@@ -167,7 +167,7 @@ func (m NetworkDashboardModel) renderTopInterfaces(width int) string {
 
 	nameWidth := 16
 	shown := 0
-	for i := 0; i < maxShow; i++ {
+	for i := range maxShow {
 		iface := sorted[i]
 		total := iface.BytesIn + iface.BytesOut
 		if total == 0 && i > 3 {
@@ -232,7 +232,7 @@ func (m NetworkDashboardModel) renderInterfaceErrors(width int) string {
 	maxShow := min(len(problemIfaces), 6)
 
 	nameWidth := 16
-	for i := 0; i < maxShow; i++ {
+	for i := range maxShow {
 		iface := problemIfaces[i]
 		name := truncateEllipsis(iface.Name, nameWidth)
 

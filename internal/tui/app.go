@@ -149,10 +149,11 @@ func NewModel(cfg *config.Config, state *config.State, creds *auth.Credentials, 
 	return m, nil
 }
 
-// setError sets an error on the model and returns a command to auto-dismiss it.
-func (m *Model) setError(err error) tea.Cmd {
+// setError returns a copy of the model with the error set, plus a Cmd
+// that auto-dismisses the error after errorDismissTimeout.
+func (m Model) setError(err error) (Model, tea.Cmd) {
 	m.err = err
-	return tea.Tick(errorDismissTimeout, func(time.Time) tea.Msg {
+	return m, tea.Tick(errorDismissTimeout, func(time.Time) tea.Msg {
 		return ErrorDismissMsg{}
 	})
 }
@@ -278,14 +279,16 @@ func (m Model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.DevicePicker):
 		conn := m.session.GetActiveConnection()
-		if conn != nil && conn.IsPanorama {
-			m.currentView = ViewDevicePicker
-			m.devicePicker = m.devicePicker.SetDevices(
-				conn.ManagedDevices,
-				conn.TargetSerial,
-				conn.Host,
-			)
-			return m, nil
+		if conn != nil {
+			if conn.PanoramaInfo() {
+				m.currentView = ViewDevicePicker
+				m.devicePicker = m.devicePicker.SetDevices(
+					conn.ManagedDevicesSnapshot(),
+					conn.Target(),
+					conn.Host,
+				)
+				return m, nil
+			}
 		}
 		// Not Panorama — fall through to view-level handler so 'd' reaches
 		// views (e.g. sessions) that bind it to their own action.

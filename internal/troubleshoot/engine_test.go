@@ -2,8 +2,33 @@ package troubleshoot
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
+
+	"github.com/jp2195/pyre/internal/models"
 )
+
+type fakeAPIClient struct {
+	systemInfo      *models.SystemInfo
+	systemResources *models.Resources
+	haStatus        *models.HAStatus
+	sessionInfo     *models.SessionInfo
+	err             error
+}
+
+func (f *fakeAPIClient) GetSystemInfo(_ context.Context, _ string) (*models.SystemInfo, error) {
+	return f.systemInfo, f.err
+}
+func (f *fakeAPIClient) GetSystemResources(_ context.Context, _ string) (*models.Resources, error) {
+	return f.systemResources, f.err
+}
+func (f *fakeAPIClient) GetHAStatus(_ context.Context, _ string) (*models.HAStatus, error) {
+	return f.haStatus, f.err
+}
+func (f *fakeAPIClient) GetSessionInfo(_ context.Context, _ string) (*models.SessionInfo, error) {
+	return f.sessionInfo, f.err
+}
 
 func TestNewEngine(t *testing.T) {
 	registry := NewRegistry()
@@ -229,6 +254,126 @@ func TestEngine_StepCallback(t *testing.T) {
 
 	if receivedStatuses[0] != StepStatusRunning {
 		t.Errorf("expected first status Running, got %s", receivedStatuses[0])
+	}
+}
+
+func TestExecuteAPIStep_SystemInfo(t *testing.T) {
+	fake := &fakeAPIClient{
+		systemInfo: &models.SystemInfo{
+			Hostname: "fw01",
+			Model:    "PA-440",
+			Version:  "11.1.0",
+			Uptime:   "5 days",
+		},
+	}
+	eng := NewEngine(fake, NewRegistry())
+	step := Step{ID: "info", Type: StepTypeAPI, APICall: "system_info"}
+
+	out, err := eng.executeAPIStep(context.Background(), step)
+	if err != nil {
+		t.Fatalf("executeAPIStep err: %v", err)
+	}
+	for _, want := range []string{"fw01", "PA-440", "11.1.0", "5 days"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got: %s", want, out)
+		}
+	}
+}
+
+func TestExecuteAPIStep_SystemResources(t *testing.T) {
+	fake := &fakeAPIClient{
+		systemResources: &models.Resources{
+			CPUPercent:    42.5,
+			MemoryPercent: 67.3,
+			Load1:         1.2,
+			Load5:         0.9,
+			Load15:        0.7,
+		},
+	}
+	eng := NewEngine(fake, NewRegistry())
+	step := Step{ID: "res", Type: StepTypeAPI, APICall: "system_resources"}
+
+	out, err := eng.executeAPIStep(context.Background(), step)
+	if err != nil {
+		t.Fatalf("executeAPIStep err: %v", err)
+	}
+	for _, want := range []string{"42.5", "67.3", "1.20", "CPU", "Memory"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got: %s", want, out)
+		}
+	}
+}
+
+func TestExecuteAPIStep_HAStatus(t *testing.T) {
+	fake := &fakeAPIClient{
+		haStatus: &models.HAStatus{
+			Enabled:   true,
+			State:     "active",
+			PeerState: "passive",
+			SyncState: "synchronized",
+		},
+	}
+	eng := NewEngine(fake, NewRegistry())
+	step := Step{ID: "ha", Type: StepTypeAPI, APICall: "ha_status"}
+
+	out, err := eng.executeAPIStep(context.Background(), step)
+	if err != nil {
+		t.Fatalf("executeAPIStep err: %v", err)
+	}
+	for _, want := range []string{"active", "passive", "synchronized"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got: %s", want, out)
+		}
+	}
+}
+
+func TestExecuteAPIStep_HADisabled(t *testing.T) {
+	fake := &fakeAPIClient{
+		haStatus: &models.HAStatus{Enabled: false},
+	}
+	eng := NewEngine(fake, NewRegistry())
+	step := Step{ID: "ha", Type: StepTypeAPI, APICall: "ha_status"}
+
+	out, err := eng.executeAPIStep(context.Background(), step)
+	if err != nil {
+		t.Fatalf("executeAPIStep err: %v", err)
+	}
+	if !strings.Contains(out, "HA not enabled") {
+		t.Errorf("expected 'HA not enabled' in output, got: %s", out)
+	}
+}
+
+func TestExecuteAPIStep_SessionInfo(t *testing.T) {
+	fake := &fakeAPIClient{
+		sessionInfo: &models.SessionInfo{
+			ActiveCount: 12345,
+			MaxCount:    250000,
+			CPS:         678,
+		},
+	}
+	eng := NewEngine(fake, NewRegistry())
+	step := Step{ID: "sess", Type: StepTypeAPI, APICall: "session_info"}
+
+	out, err := eng.executeAPIStep(context.Background(), step)
+	if err != nil {
+		t.Fatalf("executeAPIStep err: %v", err)
+	}
+	for _, want := range []string{"12345", "250000", "678"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got: %s", want, out)
+		}
+	}
+}
+
+func TestExecuteAPIStep_APIError(t *testing.T) {
+	wantErr := errors.New("boom")
+	fake := &fakeAPIClient{err: wantErr}
+	eng := NewEngine(fake, NewRegistry())
+	step := Step{ID: "info", Type: StepTypeAPI, APICall: "system_info"}
+
+	_, err := eng.executeAPIStep(context.Background(), step)
+	if !errors.Is(err, wantErr) {
+		t.Errorf("expected wrapped error %v, got %v", wantErr, err)
 	}
 }
 

@@ -1,6 +1,7 @@
 package troubleshoot
 
 import (
+	"maps"
 	"regexp"
 	"sync"
 )
@@ -20,9 +21,7 @@ func NewPatternMatcher() *PatternMatcher {
 	pm := &PatternMatcher{
 		compiled: make(map[string]*regexp.Regexp, len(precompiledRegexCache)),
 	}
-	for src, re := range precompiledRegexCache {
-		pm.compiled[src] = re
-	}
+	maps.Copy(pm.compiled, precompiledRegexCache)
 	return pm
 }
 

@@ -201,44 +201,16 @@ func (m ConnectionHubModel) View() string {
 		b.WriteString("\n\n")
 		b.WriteString(HelpDescStyle.Render("Press [n] to add a new connection or [q] for quick connect"))
 	} else {
-		// Group connections by type
-		firewalls := make([]ConnectionEntry, 0)
-		panoramas := make([]ConnectionEntry, 0)
-
-		for _, entry := range m.connections {
-			if entry.Type == "panorama" {
-				panoramas = append(panoramas, entry)
-			} else {
-				firewalls = append(firewalls, entry)
-			}
-		}
-
-		// Track position across both groups for cursor highlighting
-		pos := 0
-
-		// Render firewalls section
-		if len(firewalls) > 0 {
-			b.WriteString(DetailSectionStyle.Render("FIREWALLS"))
+		// Render in original sorted order (recency-based) so the cursor
+		// index maps directly to a row. An inline type tag distinguishes
+		// firewalls from Panoramas without splitting the list — splitting
+		// previously caused the cursor to highlight the wrong row when a
+		// Panorama was interleaved between firewalls.
+		b.WriteString(DetailSectionStyle.Render("CONNECTIONS"))
+		b.WriteString("\n")
+		for i, entry := range m.connections {
+			b.WriteString(m.renderEntry(entry, i == m.cursor))
 			b.WriteString("\n")
-			for _, entry := range firewalls {
-				b.WriteString(m.renderEntry(entry, pos == m.cursor))
-				b.WriteString("\n")
-				pos++
-			}
-		}
-
-		// Render panorama section
-		if len(panoramas) > 0 {
-			if len(firewalls) > 0 {
-				b.WriteString("\n")
-			}
-			b.WriteString(DetailSectionStyle.Render("PANORAMA"))
-			b.WriteString("\n")
-			for _, entry := range panoramas {
-				b.WriteString(m.renderEntry(entry, pos == m.cursor))
-				b.WriteString("\n")
-				pos++
-			}
 		}
 
 		b.WriteString("\n")
@@ -293,58 +265,24 @@ func (m ConnectionHubModel) renderEntry(entry ConnectionEntry, selected bool) st
 		displayHost = displayHost[:37] + "..."
 	}
 
+	// Inline type tag distinguishes firewalls from Panoramas now that the
+	// list is rendered in a single section.
+	typeTag := "[Firewall]"
+	if entry.Type == "panorama" {
+		typeTag = "[Panorama]"
+	}
+
 	// Format last connected time
 	lastConnected := "Never connected"
 	if !entry.LastConnected.IsZero() {
-		lastConnected = formatConnectionTimeAgo(entry.LastConnected)
+		lastConnected = formatTimeAgo(entry.LastConnected)
 	}
 
-	// Build the line - host is now the primary identifier
-	hostStr := rowStyle.Render(fmt.Sprintf("%-40s", displayHost))
+	// Build the line - host is the primary identifier; type tag is rendered
+	// inside rowStyle so the selection highlight covers the whole row.
+	rowText := fmt.Sprintf("%-10s %-40s", typeTag, displayHost)
+	hostStr := rowStyle.Render(rowText)
 	timeStr := DetailDimStyle.Render(lastConnected)
 
 	return indicator + hostStr + " " + timeStr
-}
-
-// formatConnectionTimeAgo returns a human-readable relative time
-func formatConnectionTimeAgo(t time.Time) string {
-	if t.IsZero() {
-		return "Never"
-	}
-
-	d := time.Since(t)
-
-	if d < time.Minute {
-		return "Just now"
-	}
-	if d < time.Hour {
-		mins := int(d.Minutes())
-		if mins == 1 {
-			return "1m ago"
-		}
-		return fmt.Sprintf("%dm ago", mins)
-	}
-	if d < 24*time.Hour {
-		hours := int(d.Hours())
-		if hours == 1 {
-			return "1h ago"
-		}
-		return fmt.Sprintf("%dh ago", hours)
-	}
-	if d < 7*24*time.Hour {
-		days := int(d.Hours() / 24)
-		if days == 1 {
-			return "1d ago"
-		}
-		return fmt.Sprintf("%dd ago", days)
-	}
-	if d < 30*24*time.Hour {
-		weeks := int(d.Hours() / 24 / 7)
-		if weeks == 1 {
-			return "1w ago"
-		}
-		return fmt.Sprintf("%dw ago", weeks)
-	}
-
-	return t.Format("Jan 2, 2006")
 }

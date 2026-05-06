@@ -170,7 +170,7 @@ func (m ConfigDashboardModel) renderPolicyStats(width int) string {
 	b.WriteString("\n")
 
 	b.WriteString(labelStyle().Render(fmt.Sprintf("%-*s", labelWidth, "Total hits:")))
-	b.WriteString(accentStyle().Render(formatNumber(totalHits)))
+	b.WriteString(accentStyle().Render(formatNumberWithCommas(totalHits)))
 
 	return panelStyle().Width(width).Render(b.String())
 }
@@ -230,7 +230,7 @@ func (m ConfigDashboardModel) renderPendingChanges(width int) string {
 		b.WriteString(subtitleStyle().Render("Recent:"))
 		b.WriteString("\n")
 
-		for i := 0; i < maxShow; i++ {
+		for i := range maxShow {
 			change := m.pendingChanges[i]
 
 			typeStyle := dimStyle()
@@ -305,7 +305,7 @@ func (m ConfigDashboardModel) renderZeroHitRules(width int) string {
 
 	nameWidth := min(width-15, 30)
 
-	for i := 0; i < maxShow; i++ {
+	for i := range maxShow {
 		rule := zeroHitRules[i]
 		name := truncateEllipsis(rule.Name, nameWidth)
 
@@ -390,7 +390,7 @@ func (m ConfigDashboardModel) renderMostHitRules(width int) string {
 
 		b.WriteString(valueStyle().Render(fmt.Sprintf("%-*s ", nameWidth, name)))
 		b.WriteString(actionStyle.Render(fmt.Sprintf("%-5s ", rule.Action)))
-		b.WriteString(accentStyle().Render(formatNumber(rule.HitCount)))
+		b.WriteString(accentStyle().Render(formatNumberWithCommas(rule.HitCount)))
 		b.WriteString("\n")
 		shown++
 	}

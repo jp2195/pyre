@@ -266,7 +266,7 @@ func (m SecurityDashboardModel) renderZeroHitRules(width int) string {
 
 	nameWidth := min(width-12, 30)
 
-	for i := 0; i < maxShow; i++ {
+	for i := range maxShow {
 		rule := zeroHitRules[i]
 		name := truncateEllipsis(rule.Name, nameWidth)
 
@@ -351,7 +351,7 @@ func (m SecurityDashboardModel) renderMostHitRules(width int) string {
 
 		b.WriteString(valueStyle().Render(fmt.Sprintf("%-*s ", nameWidth, name)))
 		b.WriteString(actionStyle.Render(fmt.Sprintf("%-5s ", rule.Action)))
-		b.WriteString(accentStyle().Render(formatNumber(rule.HitCount)))
+		b.WriteString(accentStyle().Render(formatNumberWithCommas(rule.HitCount)))
 		b.WriteString("\n")
 		shown++
 	}

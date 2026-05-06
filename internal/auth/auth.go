@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"regexp"
 	"strings"
@@ -30,10 +31,49 @@ type Connection struct {
 	Client    *api.Client
 	Connected bool
 
-	// Panorama fields
+	// mu guards the mutable Panorama fields below. Panorama detection and
+	// device list refreshes run as Bubble Tea Cmd goroutines, while the
+	// Update loop reads/writes these fields from the main goroutine — so
+	// access must be serialized to satisfy the race detector.
+	mu             sync.RWMutex
 	IsPanorama     bool
 	ManagedDevices []models.ManagedDevice
 	TargetSerial   string // Current target device serial (empty = Panorama itself)
+}
+
+// SetPanoramaInfo records whether this connection is a Panorama.
+// Safe for concurrent use; pairs with PanoramaInfo() readers.
+func (c *Connection) SetPanoramaInfo(isPanorama bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.IsPanorama = isPanorama
+}
+
+// PanoramaInfo returns whether this connection is a Panorama.
+func (c *Connection) PanoramaInfo() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.IsPanorama
+}
+
+// SetManagedDevices replaces the device list. Safe for concurrent use.
+func (c *Connection) SetManagedDevices(devs []models.ManagedDevice) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.ManagedDevices = devs
+}
+
+// ManagedDevicesSnapshot returns a copy of the current device list so
+// callers can iterate without holding the lock.
+func (c *Connection) ManagedDevicesSnapshot() []models.ManagedDevice {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.ManagedDevices == nil {
+		return nil
+	}
+	out := make([]models.ManagedDevice, len(c.ManagedDevices))
+	copy(out, c.ManagedDevices)
+	return out
 }
 
 func NewSession(cfg *config.Config) *Session {
@@ -190,7 +230,7 @@ func ResolveCredentials(cfg *config.Config, flags config.CLIFlags) *Credentials 
 	// pyre does not persist credentials. Users manage them via env vars,
 	// CLI flags, or the interactive login flow (session-only).
 	if creds.Host != "" && creds.APIKey == "" {
-		envName := strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(creds.Host, "-", "_"), ".", "_"))
+		envName := normalizeHostForEnv(creds.Host)
 		if envKey := os.Getenv("PYRE_" + envName + "_API_KEY"); envKey != "" {
 			creds.APIKey = envKey
 		}
@@ -216,6 +256,20 @@ func (c *Credentials) NeedsInteractiveAuth() bool {
 	return c.Host == "" || c.APIKey == ""
 }
 
+// normalizeHostForEnv converts a connection host into an env-var-safe
+// suffix. Strips any :port (including bracketed IPv6 forms) and
+// replaces ".", "-", and ":" with "_" before uppercasing.
+func normalizeHostForEnv(host string) string {
+	if host == "" {
+		return ""
+	}
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	r := strings.NewReplacer(".", "_", "-", "_", ":", "_")
+	return strings.ToUpper(r.Replace(host))
+}
+
 // validateSerial checks if the serial number has a valid format.
 func validateSerial(serial string) error {
 	if serial == "" {
@@ -237,7 +291,9 @@ func validateSerial(serial string) error {
 // use different targets.
 func (c *Connection) SetTarget(device *models.ManagedDevice) error {
 	if device == nil {
+		c.mu.Lock()
 		c.TargetSerial = ""
+		c.mu.Unlock()
 		return nil
 	}
 
@@ -246,25 +302,38 @@ func (c *Connection) SetTarget(device *models.ManagedDevice) error {
 		return err
 	}
 
+	c.mu.Lock()
 	c.TargetSerial = device.Serial
+	c.mu.Unlock()
 	return nil
 }
 
 // Target returns the current Panorama target serial, or "" for Panorama
-// itself / standalone firewalls. Safe for concurrent callers because it
-// only reads (callers that set the target serialize via the TUI event loop).
+// itself / standalone firewalls. Safe for concurrent callers.
 func (c *Connection) Target() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.TargetSerial
 }
 
-// GetTargetDevice returns the currently targeted managed device, or nil if targeting Panorama.
+// GetTargetDevice returns a pointer to a copy of the currently targeted
+// managed device, or nil if targeting Panorama itself / no match is found.
+// The returned pointer is safe to retain and mutate: it does not alias the
+// live ManagedDevices slice, so a concurrent SetManagedDevices cannot race
+// with the caller's use of the result.
 func (c *Connection) GetTargetDevice() *models.ManagedDevice {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	if c.TargetSerial == "" {
 		return nil
 	}
 	for i := range c.ManagedDevices {
 		if c.ManagedDevices[i].Serial == c.TargetSerial {
-			return &c.ManagedDevices[i]
+			// Return a copy so the caller can use it without
+			// racing with a subsequent SetManagedDevices that
+			// would replace the backing slice.
+			d := c.ManagedDevices[i]
+			return &d
 		}
 	}
 	return nil
@@ -272,7 +341,10 @@ func (c *Connection) GetTargetDevice() *models.ManagedDevice {
 
 // RefreshManagedDevices fetches the latest list of managed devices from Panorama.
 func (c *Connection) RefreshManagedDevices(ctx context.Context) error {
-	if !c.IsPanorama {
+	c.mu.RLock()
+	isPano := c.IsPanorama
+	c.mu.RUnlock()
+	if !isPano {
 		return nil
 	}
 
@@ -283,12 +355,16 @@ func (c *Connection) RefreshManagedDevices(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	c.mu.Lock()
 	c.ManagedDevices = devices
+	c.mu.Unlock()
 	return nil
 }
 
 // ConnectedDeviceCount returns the count of connected managed devices.
 func (c *Connection) ConnectedDeviceCount() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	count := 0
 	for _, d := range c.ManagedDevices {
 		if d.Connected {

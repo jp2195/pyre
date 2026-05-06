@@ -89,8 +89,9 @@ func TestStep_Validate_UnknownType(t *testing.T) {
 
 func TestStep_Validate_BadRegex(t *testing.T) {
 	s := Step{
-		ID:   "s1",
-		Type: StepTypeAPI,
+		ID:      "s1",
+		Type:    StepTypeAPI,
+		APICall: "system_info",
 		Patterns: []Pattern{
 			{ID: "p1", Regex: "[invalid"},
 		},
@@ -106,14 +107,39 @@ func TestStep_Validate_BadRegex(t *testing.T) {
 
 func TestStep_Validate_HappyPath(t *testing.T) {
 	s := Step{
-		ID:   "s1",
-		Type: StepTypeAPI,
+		ID:      "s1",
+		Type:    StepTypeAPI,
+		APICall: "system_info",
 		Patterns: []Pattern{
 			{ID: "p1", Regex: `ok`},
 		},
 	}
 	if err := s.Validate(); err != nil {
 		t.Fatalf("expected valid step, got: %v", err)
+	}
+}
+
+func TestStep_Validate_APIRequiresKnownCall(t *testing.T) {
+	tests := []struct {
+		name    string
+		step    Step
+		wantErr string
+	}{
+		{"empty api_call", Step{ID: "s1", Type: StepTypeAPI}, "non-empty api_call"},
+		{"unknown api_call", Step{ID: "s2", Type: StepTypeAPI, APICall: "bogus"}, "unknown api_call"},
+		{"valid system_info", Step{ID: "s3", Type: StepTypeAPI, APICall: "system_info"}, ""},
+		{"valid ha_status", Step{ID: "s4", Type: StepTypeAPI, APICall: "ha_status"}, ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.step.Validate()
+			switch {
+			case tc.wantErr == "" && err != nil:
+				t.Errorf("unexpected err: %v", err)
+			case tc.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErr)):
+				t.Errorf("err = %v, want substring %q", err, tc.wantErr)
+			}
+		})
 	}
 }
 

@@ -169,11 +169,8 @@ func (m *RoutesModel) sortRoutes() {
 }
 
 func (m RoutesModel) visibleRows() int {
-	rows := m.Height - 10
-	if rows < 1 {
-		rows = 1
-	}
-	return rows
+	// RoutesModel has no expanded detail panel, so expandedOverhead is 0.
+	return m.VisibleRows(10, 0)
 }
 
 func (m RoutesModel) Update(msg tea.Msg) (RoutesModel, tea.Cmd) {

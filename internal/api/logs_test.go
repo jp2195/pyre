@@ -171,6 +171,34 @@ func TestPollLogJob_FailsAfterThreeConsecutiveErrors(t *testing.T) {
 	}
 }
 
+func TestPollLogJob_FirstAttemptIsImmediate(t *testing.T) {
+	// Use a deliberately long interval. If the loop sleeps before the first
+	// poll, this test will exceed its budget.
+	shrinkPollTimings(t, 30, 2*time.Second)
+	var calls atomic.Int32
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		fmt.Fprint(w, `<response status="success"><result><job><status>FIN</status></job></result></response>`)
+	})
+
+	start := time.Now()
+	resp, err := c.pollLogJob(context.Background(), "1234", "")
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Fatalf("pollLogJob returned err: %v", err)
+	}
+	if resp == nil {
+		t.Fatal("expected non-nil resp")
+	}
+	if elapsed > 500*time.Millisecond {
+		t.Errorf("first poll should be immediate; elapsed=%v (interval=2s)", elapsed)
+	}
+	if got := calls.Load(); got != 1 {
+		t.Errorf("expected 1 LogGet call on first-attempt success, got %d", got)
+	}
+}
+
 func TestPollLogJob_RespectsContextCancellation(t *testing.T) {
 	// Long per-poll interval would ordinarily dominate the loop; cancellation
 	// must interrupt the select immediately.

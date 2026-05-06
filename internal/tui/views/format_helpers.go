@@ -118,45 +118,44 @@ func formatHitCount(count int64) string {
 	return strconv.FormatInt(count, 10)
 }
 
-// formatHitCountFull formats a hit count with thousand separators.
-func formatHitCountFull(count int64) string {
-	if count == 0 {
-		return "0"
-	}
-	s := strconv.FormatInt(count, 10)
-	n := len(s)
-	if n <= 3 {
-		return s
-	}
-	var result strings.Builder
-	for i, c := range s {
-		if i > 0 && (n-i)%3 == 0 {
-			result.WriteRune(',')
-		}
-		result.WriteRune(c)
-	}
-	return result.String()
-}
-
-// formatLastHit formats a time as a relative duration for table display.
-func formatLastHit(t time.Time) string {
+// formatTimeAgo formats a time as a human-readable relative duration.
+// It is the single canonical "time ago" formatter used across views
+// (policy hit counts, dashboard login times, connection hub, etc.).
+func formatTimeAgo(t time.Time) string {
 	if t.IsZero() {
 		return "never"
 	}
 	d := time.Since(t)
-	if d < time.Minute {
+	switch {
+	case d < time.Minute:
 		return "just now"
+	case d < time.Hour:
+		mins := int(d.Minutes())
+		if mins == 1 {
+			return "1m ago"
+		}
+		return fmt.Sprintf("%dm ago", mins)
+	case d < 24*time.Hour:
+		hours := int(d.Hours())
+		if hours == 1 {
+			return "1h ago"
+		}
+		return fmt.Sprintf("%dh ago", hours)
+	case d < 7*24*time.Hour:
+		days := int(d.Hours() / 24)
+		if days == 1 {
+			return "1d ago"
+		}
+		return fmt.Sprintf("%dd ago", days)
+	case d < 30*24*time.Hour:
+		weeks := int(d.Hours() / 24 / 7)
+		if weeks == 1 {
+			return "1w ago"
+		}
+		return fmt.Sprintf("%dw ago", weeks)
+	default:
+		return t.Format("Jan 2, 2006")
 	}
-	if d < time.Hour {
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	}
-	if d < 24*time.Hour {
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	}
-	if d < 7*24*time.Hour {
-		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-	}
-	return t.Format("Jan 2")
 }
 
 // formatTimestamp formats a time as a full timestamp.

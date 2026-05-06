@@ -122,7 +122,7 @@ func formatSecurityRow(p models.SecurityRule, width int) string {
 	apps := formatListCompact(p.Applications, 14)
 	services := formatListCompact(p.Services, 14)
 	hits := formatHitCount(p.HitCount)
-	lastHit := formatLastHit(p.LastHit)
+	lastHit := formatTimeAgo(p.LastHit)
 
 	name := p.Name
 	if len(p.Tags) > 0 {
@@ -222,7 +222,7 @@ func renderSecurityDetail(p models.SecurityRule, width int) string {
 
 	// Usage Stats Section
 	dr.Section("Usage Statistics")
-	dr.Field("Hit Count:", formatHitCountFull(p.HitCount))
+	dr.Field("Hit Count:", formatNumberWithCommas(p.HitCount))
 	dr.Field("Last Hit:", formatTimestamp(p.LastHit))
 	if !p.FirstHit.IsZero() {
 		dr.Field("First Hit:", formatTimestamp(p.FirstHit))

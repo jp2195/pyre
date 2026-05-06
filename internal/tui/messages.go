@@ -124,10 +124,6 @@ type ThreatLogsMsg struct {
 	Err  error
 }
 
-type DashboardSelectedMsg struct {
-	Dashboard views.DashboardType
-}
-
 // SwitchViewMsg requests switching to a specific view
 type SwitchViewMsg struct {
 	View ViewState

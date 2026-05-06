@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -144,6 +146,15 @@ var validStepTypes = map[StepType]struct{}{
 	StepTypeAPI: {},
 }
 
+// validAPICalls lists the api_call values supported by Engine.executeAPIStep.
+// Keep in lockstep with the switch in engine.go.
+var validAPICalls = map[string]struct{}{
+	"system_info":      {},
+	"system_resources": {},
+	"ha_status":        {},
+	"session_info":     {},
+}
+
 // Validate checks that the step is structurally valid.
 func (s *Step) Validate() error {
 	if s.ID == "" {
@@ -151,6 +162,14 @@ func (s *Step) Validate() error {
 	}
 	if _, ok := validStepTypes[s.Type]; !ok {
 		return fmt.Errorf("step %q: unknown type %q", s.ID, s.Type)
+	}
+	if s.Type == StepTypeAPI {
+		if s.APICall == "" {
+			return fmt.Errorf("step %q: type=api requires non-empty api_call", s.ID)
+		}
+		if _, ok := validAPICalls[s.APICall]; !ok {
+			return fmt.Errorf("step %q: unknown api_call %q", s.ID, s.APICall)
+		}
 	}
 	for i, p := range s.Patterns {
 		if _, err := regexp.Compile(p.Regex); err != nil {
@@ -195,7 +214,9 @@ func (r *Registry) Get(id string) (*Runbook, bool) {
 	return runbook, ok
 }
 
-// List returns all registered runbooks.
+// List returns all registered runbooks sorted by Name. Map iteration order
+// is randomized, so we sort here to give callers a stable, deterministic
+// ordering without forcing each one to re-sort.
 func (r *Registry) List() []*Runbook {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -204,6 +225,9 @@ func (r *Registry) List() []*Runbook {
 	for _, rb := range r.runbooks {
 		runbooks = append(runbooks, rb)
 	}
+	slices.SortFunc(runbooks, func(a, b *Runbook) int {
+		return strings.Compare(a.Name, b.Name)
+	})
 	return runbooks
 }
 

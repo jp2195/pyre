@@ -82,6 +82,21 @@ func TestRegistry_List(t *testing.T) {
 	}
 }
 
+func TestRegistry_List_StableOrder(t *testing.T) {
+	r := NewRegistry()
+	r.Register(&Runbook{ID: "zeta", Name: "zeta", Description: "z"})
+	r.Register(&Runbook{ID: "alpha", Name: "alpha", Description: "a"})
+	r.Register(&Runbook{ID: "mike", Name: "mike", Description: "m"})
+
+	got := r.List()
+	want := []string{"alpha", "mike", "zeta"}
+	for i, rb := range got {
+		if rb.Name != want[i] {
+			t.Errorf("List()[%d].Name = %q, want %q", i, rb.Name, want[i])
+		}
+	}
+}
+
 func TestRegistry_ListByCategory(t *testing.T) {
 	r := NewRegistry()
 

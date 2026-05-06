@@ -16,9 +16,6 @@ func TestNewPoliciesModel(t *testing.T) {
 	if m.list.Cursor != 0 {
 		t.Errorf("expected Cursor=0, got %d", m.list.Cursor)
 	}
-	if !m.HasData() == true {
-		// HasData should be false for a new model
-	}
 	if m.HasData() {
 		t.Error("expected HasData=false for new model")
 	}

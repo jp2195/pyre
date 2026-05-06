@@ -148,7 +148,7 @@ func (m Model) fetchManagedDevices(conn *auth.Connection) tea.Cmd {
 	ctx := m.ctx
 	return func() tea.Msg {
 		err := conn.RefreshManagedDevices(ctx)
-		return ManagedDevicesMsg{Devices: conn.ManagedDevices, Err: err}
+		return ManagedDevicesMsg{Devices: conn.ManagedDevicesSnapshot(), Err: err}
 	}
 }
 

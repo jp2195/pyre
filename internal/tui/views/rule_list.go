@@ -44,19 +44,10 @@ func NewRuleListModel[T any](config RuleListConfig[T]) RuleListModel[T] {
 
 func (m RuleListModel[T]) SetSize(width, height int) RuleListModel[T] {
 	m.TableBase = m.TableBase.SetSize(width, height)
-
-	// Clamp cursor to valid range after resize
-	count := len(m.filtered)
-	if m.Cursor >= count && count > 0 {
-		m.Cursor = count - 1
+	m.TableBase.EnsureCursorValid(len(m.filtered))
+	if visibleRows := m.visibleRows(); visibleRows > 0 {
+		m.TableBase.EnsureVisible(visibleRows)
 	}
-
-	// Adjust offset to keep cursor visible
-	visibleRows := m.visibleRows()
-	if visibleRows > 0 && m.Cursor >= m.Offset+visibleRows {
-		m.Offset = m.Cursor - visibleRows + 1
-	}
-
 	return m
 }
 
@@ -141,14 +132,7 @@ func (m RuleListModel[T]) sortLabel() string {
 }
 
 func (m RuleListModel[T]) visibleRows() int {
-	rows := m.Height - 8
-	if m.Expanded {
-		rows -= 14
-	}
-	if rows < 1 {
-		rows = 1
-	}
-	return rows
+	return m.TableBase.VisibleRows(8, 14)
 }
 
 // Update processes messages for the rule list.

@@ -9,6 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/models"
+	"github.com/jp2195/pyre/internal/tui/theme"
 )
 
 // VPNDashboardModel represents the VPN-focused dashboard
@@ -155,7 +156,7 @@ func (m VPNDashboardModel) renderIPSecSummary(width int) string {
 		b.WriteString("\n")
 		barWidth := max(width-8, 10)
 		upPct := float64(upCount) / float64(len(m.tunnels)) * 100
-		b.WriteString(renderBar(upPct, barWidth, lipgloss.Color("#10B981")))
+		b.WriteString(renderBar(upPct, barWidth, theme.Colors().Success))
 	}
 
 	return panelStyle().Width(width).Render(b.String())
@@ -183,7 +184,7 @@ func (m VPNDashboardModel) renderIPSecTunnels(width int) string {
 
 	maxShow := min(len(m.tunnels), 10)
 
-	for i := 0; i < maxShow; i++ {
+	for i := range maxShow {
 		tunnel := m.tunnels[i]
 
 		// State indicator
@@ -309,7 +310,7 @@ func (m VPNDashboardModel) renderGlobalProtectUsers(width int) string {
 
 	maxShow := min(len(m.gpUsers), 12)
 
-	for i := 0; i < maxShow; i++ {
+	for i := range maxShow {
 		user := m.gpUsers[i]
 
 		username := truncateEllipsis(user.Username, userWidth)
