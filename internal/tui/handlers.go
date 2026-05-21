@@ -188,6 +188,13 @@ func (m Model) buildCommandRegistry() []views.Command {
 			Action:      func() tea.Msg { return SwitchViewMsg{ViewNATPolicies} },
 		},
 		{
+			ID:          "analyze-objects",
+			Label:       "Objects",
+			Description: "Address & service objects",
+			Category:    "Analyze",
+			Action:      func() tea.Msg { return SwitchViewMsg{ViewObjects} },
+		},
+		{
 			ID:          "analyze-sessions",
 			Label:       "Sessions",
 			Description: "Active connections",

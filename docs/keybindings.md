@@ -9,7 +9,7 @@ current group.
 | Key | Group   | Views                                         |
 |-----|---------|-----------------------------------------------|
 | `1` | Monitor | Overview · Network · Security · VPN           |
-| `2` | Analyze | Policies · NAT · Sessions · Interfaces · Logs |
+| `2` | Analyze | Policies · NAT · Objects · Sessions · Interfaces · Logs |
 | `3` | Tools   | Config                                        |
 
 The header shows the group tabs on top and the sub-tabs for the active
@@ -77,6 +77,17 @@ Filters use partial (substring) matching.
 - `/` filter by name or translation
 - `s` cycle sort: position, name, hits
 - `Enter` toggle rule detail
+
+### Objects (group 2)
+
+- `Tab` cycle Address ↔ Service tab
+- `a` jump to Address tab
+- `s` jump to Service tab
+- `/` filter (per-tab; preserved on tab switch)
+- `S` cycle sort mode for active tab
+- `Enter` open detail panel
+- `Esc` close detail / clear filter
+- `r` refresh both tabs
 
 ### Sessions (group 2)
 
