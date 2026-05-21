@@ -430,6 +430,8 @@ func (m Model) handleViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.gpUsers, cmd = m.gpUsers.Update(msg)
 	case ViewLogs:
 		m.logs, cmd = m.logs.Update(msg)
+	case ViewObjects:
+		m.objects, cmd = m.objects.Update(msg)
 	}
 
 	return m, cmd

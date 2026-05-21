@@ -65,6 +65,14 @@ var navTargets = map[string]navTarget{
 			return m.fetchNATPolicies()
 		},
 	},
+	"objects": {
+		view:    ViewObjects,
+		hasData: func(m *Model) bool { return m.objects.HasData() },
+		fetch: func(m *Model) tea.Cmd {
+			m.objects = m.objects.SetLoading(true)
+			return m.fetchObjects()
+		},
+	},
 	"sessions": {
 		view:    ViewSessions,
 		hasData: func(m *Model) bool { return m.sessions.HasData() },
@@ -154,6 +162,7 @@ var viewToNavbar = map[ViewState][]navbarEntry{
 	ViewIPSecTunnels: {{id: navbarID{"analyze", "ipsec"}}},
 	ViewGPUsers:      {{id: navbarID{"analyze", "gpusers"}}},
 	ViewLogs:         {{id: navbarID{"analyze", "logs"}}},
+	ViewObjects:      {{id: navbarID{"analyze", "objects"}}},
 }
 
 // handleNavGroupKey handles number key presses for navigation

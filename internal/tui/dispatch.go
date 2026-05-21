@@ -23,7 +23,7 @@ func (m Model) handleDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		SessionsMsg, SessionDetailMsg, SystemLogsMsg, TrafficLogsMsg,
 		ThreatLogsMsg, ARPTableMsg, RoutingTableMsg, BGPNeighborsMsg,
 		OSPFNeighborsMsg, IPSecTunnelsMsg, GlobalProtectUsersMsg,
-		PendingChangesMsg:
+		PendingChangesMsg, AddressesMsg, ServicesMsg:
 		return m.handleViewDataMsg(msg)
 
 	case SwitchViewMsg, SwitchDashboardMsg,
@@ -203,6 +203,10 @@ func (m Model) handleViewDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.gpUsers = m.gpUsers.SetUsers(msg.Users, msg.Err)
 	case PendingChangesMsg:
 		m.configDashboard = m.configDashboard.SetPendingChanges(msg.Changes, msg.Err)
+	case AddressesMsg:
+		m.objects = m.objects.SetAddresses(msg.Items, msg.Err)
+	case ServicesMsg:
+		m.objects = m.objects.SetServices(msg.Items, msg.Err)
 	}
 
 	return m, nil
@@ -349,6 +353,11 @@ func (m Model) handleSwitchView(msg SwitchViewMsg) (tea.Model, tea.Cmd) {
 		if !m.logs.HasData() {
 			m.logs = m.logs.SetLoading(true)
 			return m, m.fetchLogs()
+		}
+	case ViewObjects:
+		if !m.objects.HasData() {
+			m.objects = m.objects.SetLoading(true)
+			return m, m.fetchObjects()
 		}
 	}
 	return m, nil

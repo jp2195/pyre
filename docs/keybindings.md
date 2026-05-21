@@ -58,7 +58,7 @@ Filters use partial (substring) matching.
 | Key | Action                                |
 |-----|---------------------------------------|
 | `s` | Cycle through sort fields             |
-| `S` | Toggle direction (ascending/descending) |
+| `S` | Toggle direction (most views) / cycle sort field (Objects) |
 
 ## Per-view
 

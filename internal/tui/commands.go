@@ -352,6 +352,32 @@ func (m Model) fetchPendingChanges(conn *auth.Connection) tea.Cmd {
 	})
 }
 
+func (m Model) fetchAddresses(conn *auth.Connection) tea.Cmd {
+	target := conn.Target()
+	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.AddressObject, error) {
+		return conn.Client.GetAddresses(ctx, target)
+	}, func(items []models.AddressObject, err error) tea.Msg {
+		return AddressesMsg{Items: items, Err: err}
+	})
+}
+
+func (m Model) fetchServices(conn *auth.Connection) tea.Cmd {
+	target := conn.Target()
+	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.ServiceObject, error) {
+		return conn.Client.GetServices(ctx, target)
+	}, func(items []models.ServiceObject, err error) tea.Msg {
+		return ServicesMsg{Items: items, Err: err}
+	})
+}
+
+func (m Model) fetchObjects() tea.Cmd {
+	conn := m.session.GetActiveConnection()
+	if conn == nil {
+		return nil
+	}
+	return tea.Batch(m.fetchAddresses(conn), m.fetchServices(conn))
+}
+
 func (m Model) fetchNATPoolInfo(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
 	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.NATPoolInfo, error) {
@@ -487,6 +513,8 @@ func (m Model) refreshCurrentView() tea.Cmd {
 		}
 	case ViewLogs:
 		return m.fetchLogs()
+	case ViewObjects:
+		return m.fetchObjects()
 	}
 	return nil
 }

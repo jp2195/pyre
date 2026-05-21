@@ -194,6 +194,16 @@ type PendingChangesMsg struct {
 	Err     error
 }
 
+type AddressesMsg struct {
+	Items []models.AddressObject
+	Err   error
+}
+
+type ServicesMsg struct {
+	Items []models.ServiceObject
+	Err   error
+}
+
 type NATPoolMsg struct {
 	Pools []models.NATPoolInfo
 	Err   error
