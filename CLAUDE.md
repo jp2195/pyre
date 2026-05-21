@@ -87,10 +87,12 @@ unexpected failures are never swallowed.
 
 ## Go 1.26 (Current Version)
 
-`go.mod` is pinned to `go 1.26.2` (stdlib CVE patch release). Go 1.26.0 and
-1.26.1 had several stdlib vulnerabilities in `crypto/tls` and `crypto/x509`,
-all fixed in 1.26.2. CI pins `go-version: '1.26.2'`. Released February 10,
-2026. Key features relevant to this project:
+`go.mod` is pinned to `go 1.26.3` (stdlib CVE patch release). The 1.26.x
+series has shipped two security patches so far: 1.26.2 fixed
+`crypto/tls` / `crypto/x509` issues from 1.26.0–1.26.1, and 1.26.3 fixed
+GO-2026-4971 (`net.Dial` / `LookupPort` NUL-byte panic on Windows) and
+GO-2026-4918 (HTTP/2 transport infinite loop in `golang.org/x/net`).
+CI pins `go-version: '1.26.3'`. Key features relevant to this project:
 
 ### Language Changes
 - **Enhanced `new()` builtin**: `new` now accepts an expression as initial value - `new(expr)` allocates and initializes in one step. Useful for pointer fields: `Age: new(yearsSince(born))`
