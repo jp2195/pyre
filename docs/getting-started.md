@@ -2,34 +2,11 @@
 
 ## Install
 
-Download a binary from [Releases](https://github.com/jp2195/pyre/releases):
-
-- `pyre_<version>_darwin_arm64.tar.gz` — macOS Apple Silicon
-- `pyre_<version>_darwin_amd64.tar.gz` — macOS Intel
-- `pyre_<version>_linux_amd64.tar.gz` — Linux x86-64
-- `pyre_<version>_linux_arm64.tar.gz` — Linux ARM64
-- `pyre_<version>_windows_amd64.zip` — Windows x86-64
-- `pyre_<version>_windows_arm64.zip` — Windows ARM64
-
-Each archive ships with an SPDX-JSON SBOM next to it, and `checksums.txt`
-covers every archive.
-
-```bash
-# macOS / Linux
-tar -xzf pyre_<version>_<os>_<arch>.tar.gz
-chmod +x pyre
-sudo mv pyre /usr/local/bin/pyre
-```
-
-Windows: extract the `.zip`, drop `pyre.exe` somewhere on your `PATH`.
-
-### From source
-
-Requires Go 1.26 or later.
-
-```bash
-go install github.com/jp2195/pyre/cmd/pyre@latest
-```
+Grab a binary from [Releases](https://github.com/jp2195/pyre/releases)
+or `go install github.com/jp2195/pyre/cmd/pyre@latest` (Go 1.26+).
+The [README install section](../README.md#install) has the
+copy-paste shell snippet. Each release archive ships with an SPDX
+SBOM and `checksums.txt`.
 
 ## Connect
 

@@ -123,13 +123,7 @@ Highest to lowest:
 
 Run `pyre` with a config but no specific `-c`/`--host` and you get the
 Connection Hub: saved connections, last-connected time, last user.
-
-- `j`/`k` to move
-- `Enter` to connect
-- `n` to add a new connection
-- `e` to edit
-- `d` to delete
-- `Esc` to exit
+Keys: see [keybindings.md](keybindings.md#connection-hub-launch-screen).
 
 ## State file
 
