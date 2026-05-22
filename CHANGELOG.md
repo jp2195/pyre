@@ -1,5 +1,55 @@
 # Changelog
 
+## [1.3.0](https://github.com/jp2195/pyre/compare/v1.2.1...v1.3.0) (2026-05-22)
+
+
+### Features
+
+* **api:** add Address and Service objects to PAN-OS client, fetching from `/vsys1` and `/shared` with merged scopes; supports all four AddressObject variants (ip-netmask, ip-range, fqdn, ip-wildcard) and preserves Service port strings ([#25](https://github.com/jp2195/pyre/pull/25))
+* **views:** add ObjectsModel with per-tab Address/Service state, per-tab cursor/filter/sort, and Tab/`a`/`s` switching ([#25](https://github.com/jp2195/pyre/pull/25))
+* **tui:** wire Objects view into navigation, dispatch, and refresh (AddressesMsg/ServicesMsg, fetchObjects batch, Analyze nav group between NAT and Sessions) ([#25](https://github.com/jp2195/pyre/pull/25))
+* **tui:** add Objects to command palette and document its keys in `docs/keybindings.md` ([#25](https://github.com/jp2195/pyre/pull/25))
+
+
+### Bug Fixes
+
+* **views/interfaces:** stop slicing into mid-rune of the 3-byte status indicator ([#25](https://github.com/jp2195/pyre/pull/25))
+* **api/policies:** `parseRuleHitCounts` wraps inner XML to match every other call site ([#25](https://github.com/jp2195/pyre/pull/25))
+* **api/logs:** `pollLogJob` polls before sleeping; saves ~500ms per query ([#25](https://github.com/jp2195/pyre/pull/25))
+* **auth:** handle `:port` and IPv6 forms in `PYRE_<HOST>_API_KEY` normalization ([#25](https://github.com/jp2195/pyre/pull/25))
+* **views/dashboard_vpn:** route up-bar color through the theme system ([#25](https://github.com/jp2195/pyre/pull/25))
+* **views/command_palette:** replace handrolled itoa (overflowed `MinInt`) with `strconv.Itoa` ([#25](https://github.com/jp2195/pyre/pull/25))
+* **api/monitoring:** sanitize disk-usage fields before TUI display ([#25](https://github.com/jp2195/pyre/pull/25))
+* **views/connection_hub:** align cursor with sorted slice (was off for interleaved Panorama entries) ([#25](https://github.com/jp2195/pyre/pull/25))
+* **config:** atomic write for `~/.pyre.yaml.bak` ([#25](https://github.com/jp2195/pyre/pull/25))
+
+
+### Code Refactoring
+
+* concurrency: lock `auth.Connection` mutable fields (`IsPanorama`, `ManagedDevices`, `TargetSerial`) behind `sync.RWMutex` with accessor methods; race regression test added ([#25](https://github.com/jp2195/pyre/pull/25))
+* TUI cleanup: collapse duplicate helpers (single canonical `formatNumberWithCommas`, `formatTimeAgo` with weeks tier, `SeverityStyle`); adopt `TableBase.VisibleRows`/`EnsureCursorValid`/`EnsureVisible` across views; `setError` returns `(Model, tea.Cmd)`; drop unused `DashboardSelectedMsg` ([#25](https://github.com/jp2195/pyre/pull/25))
+* modernize: `go fix` sweep (range-N loops, `min`/`max`, `maps.Copy`); migrate `errors.As` to `errors.AsType[T]` ([#25](https://github.com/jp2195/pyre/pull/25))
+* visible UX: Connection Hub renders a single CONNECTIONS section with inline `[Firewall]`/`[Panorama]` tags in recency order; hit-count "Last Hit" gains `Xw ago` tier; informational log severity now uses `SeverityInfoStyle` instead of muted gray ([#25](https://github.com/jp2195/pyre/pull/25))
+* remove orphaned `internal/troubleshoot` package and `views/troubleshoot.go` (never wired into `app.go`; required SSH access that has been removed) ([#25](https://github.com/jp2195/pyre/pull/25))
+* **config:** remove unused `Settings.DefaultView` field — was parsed but no caller ever read it; start view is chosen by `cmd/pyre.determineStartView` ([#26](https://github.com/jp2195/pyre/pull/26))
+
+
+### Documentation
+
+* consolidate docs tree, fix stale references, add missing per-view docs for Objects/Routes/IPSec/GP Users plus a `docs/views/README.md` index; align Analyze nav listings across README/getting-started/keybindings ([#26](https://github.com/jp2195/pyre/pull/26))
+* add a "Your first 60 seconds" walkthrough to getting-started; collapse duplicated navigation reference so `docs/keybindings.md` is the single source of truth ([#26](https://github.com/jp2195/pyre/pull/26))
+* restructure README with centered hero, screenshot slots, condensed install, and a tip callout for credential handling ([#26](https://github.com/jp2195/pyre/pull/26))
+* drop duplicated install / Connection Hub key sections from `getting-started.md` and `configuration.md` in favor of pointers to the authoritative pages ([#26](https://github.com/jp2195/pyre/pull/26))
+
+
+### Miscellaneous Chores
+
+* **deps:** bump Go to 1.26.3 for stdlib CVE patches (GO-2026-4971 `net.Dial`/`LookupPort` NUL-byte panic; GO-2026-4918 HTTP/2 transport infinite loop) ([#25](https://github.com/jp2195/pyre/pull/25))
+* **lint:** bring repo to a lint-clean baseline for golangci-lint v2.11.4 (gofmt, staticcheck QF1008/QF1012/QF1034, prealloc, scoped gosec exclusions on test fixtures) ([#25](https://github.com/jp2195/pyre/pull/25))
+* **ci:** pin security-tool installs (`gosec` via `go install @v2.22.11`, `govulncheck @v1.3.0`) and add a baseline 3-day Renovate `minimumReleaseAge` with `vulnerabilityAlerts` opt-out ([#27](https://github.com/jp2195/pyre/pull/27))
+* **deps:** update `actions/dependency-review-action` to v5 ([#23](https://github.com/jp2195/pyre/pull/23))
+* **deps:** update github actions ([#24](https://github.com/jp2195/pyre/pull/24))
+
 ## [1.2.1](https://github.com/jp2195/pyre/compare/v1.2.0...v1.2.1) (2026-04-19)
 
 
