@@ -84,22 +84,17 @@ See [Getting Started](docs/getting-started.md) for more detail.
 
 ## Navigation
 
-Three numbered groups plus the command palette:
+Three numbered groups: `1` Monitor (dashboards), `2` Analyze (list
+views), `3` Tools (config). Same number again — or `Tab` — cycles
+sub-views within the group. `Ctrl+P` opens a fuzzy command palette
+that jumps anywhere.
 
-| Key      | Group   | Views                                            |
-|----------|---------|--------------------------------------------------|
-| `1`      | Monitor | Overview, Network, Security, VPN                 |
-| `2`      | Analyze | Policies, NAT, Objects, Sessions, Interfaces, Routes, IPSec, GP Users, Logs |
-| `3`      | Tools   | Config                                           |
-| `Tab`    |         | next view in the current group                   |
-| `Ctrl+P` |         | command palette (jump anywhere)                  |
-| `:`      |         | connection picker                                |
-| `D`      |         | device picker (Panorama only)                    |
+Inside a list view: `/` filter, `s` cycle sort, `Enter` open detail,
+`r` refresh, `?` help, `q` quit.
 
-Common keys within a list view: `j`/`k` to move, `/` to filter, `s` to cycle
-sort, `Enter` to expand detail, `r` to refresh, `?` for help, `q` to quit.
-
-Full reference: [docs/keybindings.md](docs/keybindings.md).
+Full key reference: [docs/keybindings.md](docs/keybindings.md). New
+to pyre? Start with [docs/getting-started.md](docs/getting-started.md)
+— the "first 60 seconds" section walks the navigation model.
 
 ## Documentation
 

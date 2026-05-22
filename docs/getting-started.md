@@ -88,30 +88,55 @@ pyre runs keygen against the firewall and uses the returned API key for
 the current session. The key is **not** saved anywhere — next launch
 will prompt again unless you supply a key via env var or CLI flag.
 
-## The interface
+## Your first 60 seconds
 
-After connect you land on the dashboard:
+You've connected. You're staring at the Dashboard. Here's a quick tour
+to get you productive without reading the full key reference.
 
-- **Header** — pyre logo, connection indicator, navigation tabs, sub-tabs
-- **Body** — the current view
-- **Footer** — contextual keybindings
+**1. The screen has three parts.** Top header shows your connection,
+the active navigation group, and sub-tabs. Body shows the current view.
+Footer shows the keys that apply right now — when in doubt, look down.
 
-### The three groups
+**2. Three numbered groups, hit a number to jump.**
 
-Press `1`, `2`, or `3` to switch groups. Press the same number again (or
-`Tab`) to cycle through views within a group.
+- `1` Monitor — dashboards (system health, network, security, VPN)
+- `2` Analyze — list views (policies, sessions, objects, logs, …)
+- `3` Tools — config dashboard
 
-- **1 — Monitor**: Overview · Network · Security · VPN
-- **2 — Analyze**: Policies · NAT · Objects · Sessions · Interfaces · Routes · IPSec · GP Users · Logs
-- **3 — Tools**: Config
+Press the same number again, or `Tab`, to cycle through sub-views in
+that group. Try `2`, `2`, `2` to walk through Policies → NAT → Objects.
 
-`Ctrl+P` opens the command palette — type to jump anywhere. `:` opens
-the connection picker (switch between firewalls). `D` opens the device
-picker (Panorama only).
+**3. Inside a list view, four keys do almost everything:**
+
+- `/` filter (substring match, case-insensitive)
+- `s` cycle sort field
+- `Enter` open the detail panel for the highlighted row
+- `r` refresh
+
+Try it: press `2` to land on Policies, `/web` to filter for "web", `s`
+to flip sort fields, `Enter` to see the full rule, `Esc` to close.
+
+**4. `Ctrl+P` jumps anywhere.** Don't memorize keybindings. Type the
+view name (or any partial — `obj`, `sess`, `logs`) and Enter. Same
+muscle memory as VS Code's command palette.
+
+**5. Two modal pickers.**
+
+- `:` opens the connection picker — switch between saved firewalls.
+- `D` opens the device picker — switch between managed devices when
+  you're connected to a Panorama. (On a standalone firewall, `D` falls
+  through to the view's own handlers.)
+
+**6. `?` toggles help.** `q` or `Ctrl+C` quits.
+
+That's the whole navigation model. Everything else is a refinement.
 
 ## Next steps
 
+- [Keybindings & Navigation](keybindings.md) — the full key reference
+  for every view and every modal
+- [View Reference](views/README.md) — what each view shows, what its
+  filter / sort fields are, what the detail panel reveals
 - [Configuration](configuration.md) — all options in `~/.pyre.yaml`
-- [Keybindings & Navigation](keybindings.md)
-- [Panorama](panorama.md) — device targeting
-- [View Reference](views/) — per-view docs
+- [Panorama](panorama.md) — connecting to Panorama and targeting
+  managed devices
