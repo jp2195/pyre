@@ -9,7 +9,7 @@ current group.
 | Key | Group   | Views                                         |
 |-----|---------|-----------------------------------------------|
 | `1` | Monitor | Overview · Network · Security · VPN           |
-| `2` | Analyze | Policies · NAT · Objects · Sessions · Interfaces · Logs |
+| `2` | Analyze | Policies · NAT · Objects · Sessions · Interfaces · Routes · IPSec · GP Users · Logs |
 | `3` | Tools   | Config                                        |
 
 The header shows the group tabs on top and the sub-tabs for the active
@@ -100,6 +100,25 @@ Filters use partial (substring) matching.
 - `/` filter by name, zone, IP, or state
 - `s` cycle sort: name, zone, state, IP
 - `Enter` toggle interface detail
+
+### Routes (group 2)
+
+- `/` filter by destination, next hop, interface, protocol, or VR
+- `s` cycle sort: destination, protocol, next hop, interface
+- `Enter` toggle route detail. BGP and OSPF neighbor state are
+  available as alternate tabs within the view.
+
+### IPSec (group 2)
+
+- `/` filter by name, gateway, state, protocol, or encryption
+- `s` cycle sort: name, gateway, state, traffic
+- `Enter` toggle tunnel detail (SAs, lifetime, traffic counters)
+
+### GP Users (group 2)
+
+- `/` filter by user, domain, computer, gateway, client / virtual IP, or region
+- `s` cycle sort: user, gateway, login time, duration
+- `Enter` toggle user detail (HIP, gateway, tunnel stats)
 
 ### Logs (group 2)
 

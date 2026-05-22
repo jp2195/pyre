@@ -16,7 +16,10 @@ pyre combines those calls into unified terminal views: system health, HA, resour
 
 - **Dashboard** — live system, resources, HA, network, security, VPN
 - **Security & NAT policies** — browse, filter, sort, hit-count analysis
+- **Address & service objects** — browse, filter, sort, expand detail
 - **Sessions** — active sessions with filtering and detail view
+- **Routing** — routing table + BGP / OSPF neighbor state
+- **VPN** — IPSec tunnels and GlobalProtect connected users
 - **Logs** — system / traffic / threat logs
 - **Interfaces** — status, counters, errors
 - **Panorama** — manage multiple firewalls via device targeting
@@ -86,7 +89,7 @@ Three numbered groups plus the command palette:
 | Key      | Group   | Views                                            |
 |----------|---------|--------------------------------------------------|
 | `1`      | Monitor | Overview, Network, Security, VPN                 |
-| `2`      | Analyze | Policies, NAT, Sessions, Interfaces, Logs        |
+| `2`      | Analyze | Policies, NAT, Objects, Sessions, Interfaces, Routes, IPSec, GP Users, Logs |
 | `3`      | Tools   | Config                                           |
 | `Tab`    |         | next view in the current group                   |
 | `Ctrl+P` |         | command palette (jump anywhere)                  |
@@ -104,7 +107,7 @@ Full reference: [docs/keybindings.md](docs/keybindings.md).
 - [Configuration](docs/configuration.md) — `~/.pyre.yaml`, env vars, CLI flags
 - [Keybindings & Navigation](docs/keybindings.md) — every key in every view
 - [Panorama](docs/panorama.md) — managing devices through Panorama
-- View reference: [Dashboard](docs/views/dashboard.md) · [Policies](docs/views/policies.md) · [NAT](docs/views/nat.md) · [Sessions](docs/views/sessions.md) · [Interfaces](docs/views/interfaces.md) · [Logs](docs/views/logs.md)
+- View reference: [index](docs/views/README.md) · [Dashboard](docs/views/dashboard.md) · [Policies](docs/views/policies.md) · [NAT](docs/views/nat.md) · [Objects](docs/views/objects.md) · [Sessions](docs/views/sessions.md) · [Interfaces](docs/views/interfaces.md) · [Routes](docs/views/routes.md) · [IPSec](docs/views/ipsec.md) · [GP Users](docs/views/gpusers.md) · [Logs](docs/views/logs.md)
 
 ## Contributing
 

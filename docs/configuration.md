@@ -35,7 +35,6 @@ connections:
 settings:
   session_page_size: 50
   theme: catppuccin
-  default_view: dashboard
 ```
 
 ## Connection options
@@ -59,13 +58,10 @@ rather than silently falling back to system roots.
 |---------------------|--------|-------------|--------------------------------------|
 | `session_page_size` | int    | 50          | Sessions per page                    |
 | `theme`             | string | `dark`      | Color theme (see below)              |
-| `default_view`      | string | `dashboard` | Initial view after connect           |
-
-`default_view` accepts: `dashboard`, `policies`, `sessions`, `logs`,
-`interfaces`.
 
 Themes: `dark`, `light`, `nord`, `dracula`, `solarized`, `gruvbox`,
-`tokyonight`, `catppuccin`, `onedark`, `monokai`.
+`tokyonight`, `catppuccin`, `onedark`, `monokai`. Unrecognized names
+fall back to `dark`.
 
 ## Credentials
 

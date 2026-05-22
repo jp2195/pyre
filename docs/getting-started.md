@@ -102,7 +102,7 @@ Press `1`, `2`, or `3` to switch groups. Press the same number again (or
 `Tab`) to cycle through views within a group.
 
 - **1 — Monitor**: Overview · Network · Security · VPN
-- **2 — Analyze**: Policies · NAT · Sessions · Interfaces · Logs
+- **2 — Analyze**: Policies · NAT · Objects · Sessions · Interfaces · Routes · IPSec · GP Users · Logs
 - **3 — Tools**: Config
 
 `Ctrl+P` opens the command palette — type to jump anywhere. `:` opens
