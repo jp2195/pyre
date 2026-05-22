@@ -25,10 +25,6 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Settings.Theme != "default" {
 		t.Errorf("expected Theme 'default', got %q", cfg.Settings.Theme)
 	}
-
-	if cfg.Settings.DefaultView != "dashboard" {
-		t.Errorf("expected DefaultView 'dashboard', got %q", cfg.Settings.DefaultView)
-	}
 }
 
 func TestConfig_GetConnection(t *testing.T) {
@@ -147,7 +143,6 @@ connections:
 settings:
   session_page_size: 100
   theme: dark
-  default_view: policies
 `
 	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		t.Fatalf("failed to write test config: %v", err)
@@ -179,9 +174,6 @@ settings:
 	}
 	if cfg.Settings.Theme != "dark" {
 		t.Errorf("expected Theme 'dark', got %q", cfg.Settings.Theme)
-	}
-	if cfg.Settings.DefaultView != "policies" {
-		t.Errorf("expected DefaultView 'policies', got %q", cfg.Settings.DefaultView)
 	}
 }
 
@@ -374,7 +366,6 @@ func TestSettings_AllFields(t *testing.T) {
 	settings := Settings{
 		SessionPageSize: 100,
 		Theme:           "dark",
-		DefaultView:     "policies",
 	}
 
 	if settings.SessionPageSize != 100 {
@@ -382,9 +373,6 @@ func TestSettings_AllFields(t *testing.T) {
 	}
 	if settings.Theme != "dark" {
 		t.Errorf("expected Theme 'dark', got %q", settings.Theme)
-	}
-	if settings.DefaultView != "policies" {
-		t.Errorf("expected DefaultView 'policies', got %q", settings.DefaultView)
 	}
 }
 

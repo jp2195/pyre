@@ -32,7 +32,6 @@ The `Makefile` wraps the common Go commands: `build`, `test`, `test-race`,
   - `render.go` — header/footer
   - `views/` — individual view models
   - `theme/` — color palette
-- `internal/troubleshoot/` — pattern-matching engine + embedded runbooks
 - `internal/models/` — data structures
 
 ## Key patterns

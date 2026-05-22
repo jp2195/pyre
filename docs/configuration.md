@@ -35,7 +35,6 @@ connections:
 settings:
   session_page_size: 50
   theme: catppuccin
-  default_view: dashboard
 ```
 
 ## Connection options
@@ -59,13 +58,10 @@ rather than silently falling back to system roots.
 |---------------------|--------|-------------|--------------------------------------|
 | `session_page_size` | int    | 50          | Sessions per page                    |
 | `theme`             | string | `dark`      | Color theme (see below)              |
-| `default_view`      | string | `dashboard` | Initial view after connect           |
-
-`default_view` accepts: `dashboard`, `policies`, `sessions`, `logs`,
-`interfaces`.
 
 Themes: `dark`, `light`, `nord`, `dracula`, `solarized`, `gruvbox`,
-`tokyonight`, `catppuccin`, `onedark`, `monokai`.
+`tokyonight`, `catppuccin`, `onedark`, `monokai`. Unrecognized names
+fall back to `dark`.
 
 ## Credentials
 
@@ -127,13 +123,7 @@ Highest to lowest:
 
 Run `pyre` with a config but no specific `-c`/`--host` and you get the
 Connection Hub: saved connections, last-connected time, last user.
-
-- `j`/`k` to move
-- `Enter` to connect
-- `n` to add a new connection
-- `e` to edit
-- `d` to delete
-- `Esc` to exit
+Keys: see [keybindings.md](keybindings.md#connection-hub-launch-screen).
 
 ## State file
 
