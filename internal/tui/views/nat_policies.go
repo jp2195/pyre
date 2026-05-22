@@ -116,7 +116,7 @@ func formatNATRow(r models.NATRule, width int) string {
 	srcNAT := formatSourceNAT(r)
 	dstNAT := formatDestNAT(r)
 	hits := formatHitCount(r.HitCount)
-	lastHit := formatLastHit(r.LastHit)
+	lastHit := formatTimeAgo(r.LastHit)
 
 	service := "any"
 	if len(r.Services) > 0 && r.Services[0] != "any" {
@@ -228,7 +228,7 @@ func renderNATDetail(r models.NATRule, width int) string {
 	}
 
 	dr.Section("Usage Statistics")
-	dr.Field("Hit Count:", formatHitCountFull(r.HitCount))
+	dr.Field("Hit Count:", formatNumberWithCommas(r.HitCount))
 	dr.Field("Last Hit:", formatTimestamp(r.LastHit))
 	if !r.FirstHit.IsZero() {
 		dr.Field("First Hit:", formatTimestamp(r.FirstHit))

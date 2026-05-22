@@ -33,6 +33,7 @@ const (
 	ViewIPSecTunnels
 	ViewGPUsers
 	ViewLogs
+	ViewObjects
 	ViewPicker
 	ViewDevicePicker
 	ViewCommandPalette
@@ -75,6 +76,7 @@ type Model struct {
 	ipsecTunnels      views.IPSecTunnelsModel
 	gpUsers           views.GPUsersModel
 	logs              views.LogsModel
+	objects           views.ObjectsModel
 	picker            views.PickerModel
 	devicePicker      views.DevicePickerModel
 	commandPalette    views.CommandPaletteModel
@@ -142,6 +144,7 @@ func NewModel(cfg *config.Config, state *config.State, creds *auth.Credentials, 
 	m.ipsecTunnels = views.NewIPSecTunnelsModel()
 	m.gpUsers = views.NewGPUsersModel()
 	m.logs = views.NewLogsModel()
+	m.objects = views.NewObjectsModel()
 	m.picker = views.NewPickerModel(session)
 	m.devicePicker = views.NewDevicePickerModel()
 	m.commandPalette = views.NewCommandPaletteModel()
@@ -149,10 +152,11 @@ func NewModel(cfg *config.Config, state *config.State, creds *auth.Credentials, 
 	return m, nil
 }
 
-// setError sets an error on the model and returns a command to auto-dismiss it.
-func (m *Model) setError(err error) tea.Cmd {
+// setError returns a copy of the model with the error set, plus a Cmd
+// that auto-dismisses the error after errorDismissTimeout.
+func (m Model) setError(err error) (Model, tea.Cmd) {
 	m.err = err
-	return tea.Tick(errorDismissTimeout, func(time.Time) tea.Msg {
+	return m, tea.Tick(errorDismissTimeout, func(time.Time) tea.Msg {
 		return ErrorDismissMsg{}
 	})
 }
@@ -212,6 +216,7 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.ipsecTunnels = m.ipsecTunnels.SetSize(msg.Width, contentHeight)
 	m.gpUsers = m.gpUsers.SetSize(msg.Width, contentHeight)
 	m.logs = m.logs.SetSize(msg.Width, contentHeight)
+	m.objects = m.objects.SetSize(msg.Width, contentHeight)
 	m.picker = m.picker.SetSize(msg.Width, contentHeight)
 	m.devicePicker = m.devicePicker.SetSize(msg.Width, contentHeight)
 	m.commandPalette = m.commandPalette.SetSize(msg.Width, msg.Height)
@@ -278,14 +283,16 @@ func (m Model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.DevicePicker):
 		conn := m.session.GetActiveConnection()
-		if conn != nil && conn.IsPanorama {
-			m.currentView = ViewDevicePicker
-			m.devicePicker = m.devicePicker.SetDevices(
-				conn.ManagedDevices,
-				conn.TargetSerial,
-				conn.Host,
-			)
-			return m, nil
+		if conn != nil {
+			if conn.PanoramaInfo() {
+				m.currentView = ViewDevicePicker
+				m.devicePicker = m.devicePicker.SetDevices(
+					conn.ManagedDevicesSnapshot(),
+					conn.Target(),
+					conn.Host,
+				)
+				return m, nil
+			}
 		}
 		// Not Panorama — fall through to view-level handler so 'd' reaches
 		// views (e.g. sessions) that bind it to their own action.
@@ -303,6 +310,10 @@ func (m Model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	// Tab cycles forward through items in current group
 	case key.Matches(msg, m.keys.Tab):
+		// Objects view uses Tab internally to cycle Address ↔ Service.
+		if m.currentView == ViewObjects {
+			return m.handleViewKeys(msg)
+		}
 		group := m.navbar.ActiveGroup()
 		if group != nil && len(group.Items) > 0 {
 			nextItem := (m.navbar.ActiveItemIndex() + 1) % len(group.Items)
@@ -312,6 +323,10 @@ func (m Model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	// Shift+Tab cycles backward through items in current group
 	case key.Matches(msg, m.keys.ShiftTab):
+		// Objects view uses Tab internally to cycle Address ↔ Service.
+		if m.currentView == ViewObjects {
+			return m.handleViewKeys(msg)
+		}
 		group := m.navbar.ActiveGroup()
 		if group != nil && len(group.Items) > 0 {
 			prevItem := m.navbar.ActiveItemIndex() - 1
@@ -345,6 +360,8 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		m.gpUsers = m.gpUsers.SetLoading(true)
 	case ViewLogs:
 		m.logs = m.logs.SetLoading(true)
+	case ViewObjects:
+		m.objects = m.objects.SetLoading(true)
 	}
 	return m, m.refreshCurrentView()
 }
@@ -364,6 +381,7 @@ func (m Model) handleSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
 	m.ipsecTunnels = m.ipsecTunnels.SetSpinnerFrame(frame)
 	m.gpUsers = m.gpUsers.SetSpinnerFrame(frame)
 	m.logs = m.logs.SetSpinnerFrame(frame)
+	m.objects = m.objects.SetSpinnerFrame(frame)
 
 	// Share spinner frame with dashboard views
 	m.dashboard = m.dashboard.SetSpinnerFrame(frame)
@@ -452,6 +470,9 @@ func (m Model) renderContent() string {
 
 	case ViewLogs:
 		content = m.logs.View()
+
+	case ViewObjects:
+		content = m.objects.View()
 	}
 
 	if m.showHelp {

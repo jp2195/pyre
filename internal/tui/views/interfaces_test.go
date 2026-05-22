@@ -4,11 +4,33 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 )
+
+func TestInterfacesModel_RenderEmitsValidUTF8(t *testing.T) {
+	InitStyles()
+	m := NewInterfacesModel()
+	m = m.SetSize(120, 20)
+	m = m.SetInterfaces([]models.Interface{
+		{Name: "ethernet1/1", State: "up", Type: "layer3", Zone: "trust", IP: "10.0.0.1/24", MAC: "aa:bb:cc:dd:ee:ff", VirtualRouter: "default"},
+		{Name: "ethernet1/2", State: "down", Type: "layer3", Zone: "untrust", IP: "", MAC: "", VirtualRouter: ""},
+	}, nil)
+
+	out := m.View()
+	if !utf8.ValidString(out) {
+		t.Fatalf("View() output contains invalid UTF-8\n--- output ---\n%s\n--- end ---", out)
+	}
+	if !strings.Contains(out, "ethernet1/1") {
+		t.Errorf("expected 'ethernet1/1' in output, got: %s", out)
+	}
+	if !strings.Contains(out, "ethernet1/2") {
+		t.Errorf("expected 'ethernet1/2' in output, got: %s", out)
+	}
+}
 
 func TestNewInterfacesModel(t *testing.T) {
 	m := NewInterfacesModel()
@@ -189,6 +211,33 @@ func TestInterfaceSortField_Constants(t *testing.T) {
 	}
 	if InterfaceSortIP != 3 {
 		t.Errorf("expected InterfaceSortIP=3, got %d", InterfaceSortIP)
+	}
+}
+
+func TestInterfacesModel_EscClearsFilterAndCollapsesDetail(t *testing.T) {
+	InitStyles()
+	m := NewInterfacesModel()
+	m = m.SetSize(120, 20)
+	m = m.SetInterfaces([]models.Interface{{Name: "ethernet1/1", State: "up"}}, nil)
+
+	// Set initial state: filter applied AND detail expanded.
+	m.Filter.SetValue("eth")
+	m.applyFilter()
+	m.Expanded = true
+
+	// First esc: collapse the detail panel.
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	if updated.Expanded {
+		t.Error("expected detail panel collapsed after first esc")
+	}
+	if updated.Filter.Value() != "eth" {
+		t.Errorf("expected filter still 'eth' after first esc, got %q", updated.Filter.Value())
+	}
+
+	// Second esc: clear the filter.
+	updated, _ = updated.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	if updated.Filter.Value() != "" {
+		t.Errorf("expected filter cleared after second esc, got %q", updated.Filter.Value())
 	}
 }
 

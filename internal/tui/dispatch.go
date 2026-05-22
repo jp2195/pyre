@@ -10,7 +10,7 @@ import (
 
 // handleDataMsg routes async data messages to categorized sub-handlers.
 func (m Model) handleDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg.(type) {
+	switch msg := msg.(type) {
 	case LoginSuccessMsg, LoginErrorMsg, PanoramaDetectedMsg, ManagedDevicesMsg:
 		return m.handleAuthMsg(msg)
 
@@ -23,10 +23,10 @@ func (m Model) handleDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		SessionsMsg, SessionDetailMsg, SystemLogsMsg, TrafficLogsMsg,
 		ThreatLogsMsg, ARPTableMsg, RoutingTableMsg, BGPNeighborsMsg,
 		OSPFNeighborsMsg, IPSecTunnelsMsg, GlobalProtectUsersMsg,
-		PendingChangesMsg:
+		PendingChangesMsg, AddressesMsg, ServicesMsg:
 		return m.handleViewDataMsg(msg)
 
-	case DashboardSelectedMsg, SwitchViewMsg, SwitchDashboardMsg,
+	case SwitchViewMsg, SwitchDashboardMsg,
 		ShowPickerMsg, ShowConnectionHubMsg, ShowConnectionFormMsg,
 		ConnectionSelectedMsg, ConnectionFormSubmitMsg,
 		ConnectionDeletedMsg, RefreshMsg, ShowHelpMsg, RefreshTickMsg:
@@ -36,7 +36,6 @@ func (m Model) handleDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleStatusMsg(msg)
 
 	case views.FetchDetailCmd:
-		msg := msg.(views.FetchDetailCmd)
 		return m, m.fetchSessionDetail(msg.SessionID)
 
 	default:
@@ -101,7 +100,7 @@ func (m Model) handleAuthMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case PanoramaDetectedMsg:
 		conn := m.session.GetActiveConnection()
 		if conn != nil {
-			conn.IsPanorama = msg.IsPanorama
+			conn.SetPanoramaInfo(msg.IsPanorama)
 			if msg.IsPanorama {
 				cmds = append(cmds, m.fetchManagedDevices(conn))
 			}
@@ -110,10 +109,12 @@ func (m Model) handleAuthMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ManagedDevicesMsg:
 		conn := m.session.GetActiveConnection()
 		if conn != nil && msg.Err == nil {
-			conn.ManagedDevices = msg.Devices
-			if m.currentView == ViewDashboard && conn.IsPanorama && conn.TargetSerial == "" {
+			conn.SetManagedDevices(msg.Devices)
+			isPano := conn.PanoramaInfo()
+			target := conn.Target()
+			if m.currentView == ViewDashboard && isPano && target == "" {
 				m.currentView = ViewDevicePicker
-				m.devicePicker = m.devicePicker.SetDevices(msg.Devices, conn.TargetSerial, conn.Host)
+				m.devicePicker = m.devicePicker.SetDevices(msg.Devices, target, conn.Host)
 			}
 		}
 	}
@@ -201,6 +202,10 @@ func (m Model) handleViewDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.gpUsers = m.gpUsers.SetUsers(msg.Users, msg.Err)
 	case PendingChangesMsg:
 		m.configDashboard = m.configDashboard.SetPendingChanges(msg.Changes, msg.Err)
+	case AddressesMsg:
+		m.objects = m.objects.SetAddresses(msg.Items, msg.Err)
+	case ServicesMsg:
+		m.objects = m.objects.SetServices(msg.Items, msg.Err)
 	}
 
 	return m, nil
@@ -209,11 +214,6 @@ func (m Model) handleViewDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 // handleNavigationMsg processes view transitions and UI navigation messages.
 func (m Model) handleNavigationMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case DashboardSelectedMsg:
-		m.currentDashboard = msg.Dashboard
-		m.currentView = ViewDashboard
-		return m, m.fetchCurrentDashboardData()
-
 	case SwitchViewMsg:
 		return m.handleSwitchView(msg)
 
@@ -275,14 +275,20 @@ func (m Model) handleStatusMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case ConfigSavedMsg:
 		if msg.Err != nil {
-			cmds = append(cmds, m.setError(msg.Err))
+			var cmd tea.Cmd
+			m, cmd = m.setError(msg.Err)
+			cmds = append(cmds, cmd)
 		}
 	case StateSavedMsg:
 		if msg.Err != nil {
-			cmds = append(cmds, m.setError(msg.Err))
+			var cmd tea.Cmd
+			m, cmd = m.setError(msg.Err)
+			cmds = append(cmds, cmd)
 		}
 	case ErrorMsg:
-		cmds = append(cmds, m.setError(msg.Err))
+		var cmd tea.Cmd
+		m, cmd = m.setError(msg.Err)
+		cmds = append(cmds, cmd)
 	case ErrorDismissMsg:
 		m.err = nil
 	}
@@ -346,6 +352,11 @@ func (m Model) handleSwitchView(msg SwitchViewMsg) (tea.Model, tea.Cmd) {
 		if !m.logs.HasData() {
 			m.logs = m.logs.SetLoading(true)
 			return m, m.fetchLogs()
+		}
+	case ViewObjects:
+		if !m.objects.HasData() {
+			m.objects = m.objects.SetLoading(true)
+			return m, m.fetchObjects()
 		}
 	}
 	return m, nil

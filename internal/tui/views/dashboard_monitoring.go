@@ -482,7 +482,7 @@ func (m DashboardModel) renderNATPoolUtilization(width int) string {
 
 		b.WriteString(labelStyle().Render(fmt.Sprintf("%-15s ", name)))
 		b.WriteString(renderBar(pool.Percent, barWidth, poolColor))
-		b.WriteString(fmt.Sprintf(" %3.0f%%", pool.Percent))
+		fmt.Fprintf(&b, " %3.0f%%", pool.Percent)
 
 		if i < len(m.natPools)-1 && i < maxShow-1 {
 			b.WriteString("\n")

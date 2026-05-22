@@ -110,9 +110,9 @@ func (m PickerModel) View() string {
 			line := indicator + style.Render(conn.Host)
 
 			// Add Panorama indicator with device count
-			if conn.IsPanorama {
+			if conn.PanoramaInfo() {
 				connCount := conn.ConnectedDeviceCount()
-				totalCount := len(conn.ManagedDevices)
+				totalCount := len(conn.ManagedDevicesSnapshot())
 				line += " " + panoramaStyle.Render(fmt.Sprintf("[Panorama: %d/%d devices]", connCount, totalCount))
 
 				// Show current target if set

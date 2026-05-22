@@ -1,8 +1,8 @@
 package api
 
 import (
-	"context"
 	"bytes"
+	"context"
 	"log"
 	"strconv"
 	"strings"
@@ -207,7 +207,7 @@ func parseRuleHitCounts(inner []byte) map[string]hitStats {
 			LastReset string `xml:"last-reset-timestamp"`
 		} `xml:"rule-hit-count>vsys>entry>rule-base>entry>rules>entry"`
 	}
-	if decodeXML(bytes.NewReader(inner), &hitResult) != nil {
+	if decodeXML(bytes.NewReader(WrapInner(inner)), &hitResult) != nil {
 		return nil
 	}
 

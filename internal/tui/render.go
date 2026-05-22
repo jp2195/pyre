@@ -18,7 +18,7 @@ func (m Model) renderHeader() string {
 	if conn != nil {
 		statusText := fmt.Sprintf("● %s", conn.Host)
 		// Show current target for Panorama connections
-		if conn.IsPanorama {
+		if conn.PanoramaInfo() {
 			if target := conn.GetTargetDevice(); target != nil {
 				hostname := target.Hostname
 				if hostname == "" {
@@ -138,8 +138,10 @@ func (m Model) renderFooter() string {
 	// Show devices hint for Panorama connections
 	var devicesHint string
 	conn := m.session.GetActiveConnection()
-	if conn != nil && conn.IsPanorama {
-		devicesHint = views.HelpKeyStyle.Render("  d") + views.HelpDescStyle.Render(" devices")
+	if conn != nil {
+		if conn.PanoramaInfo() {
+			devicesHint = views.HelpKeyStyle.Render("  d") + views.HelpDescStyle.Render(" devices")
+		}
 	}
 
 	help := navHint +

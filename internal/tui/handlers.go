@@ -96,7 +96,9 @@ func (m Model) handleDevicePickerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) 
 		if conn != nil {
 			device := m.devicePicker.SelectedDevice()
 			if err := conn.SetTarget(device); err != nil {
-				return m, m.setError(err)
+				var cmd tea.Cmd
+				m, cmd = m.setError(err)
+				return m, cmd
 			}
 			m.currentView = ViewDashboard
 			return m, m.fetchCurrentDashboardData()
@@ -184,6 +186,13 @@ func (m Model) buildCommandRegistry() []views.Command {
 			Description: "NAT translation rules",
 			Category:    "Analyze",
 			Action:      func() tea.Msg { return SwitchViewMsg{ViewNATPolicies} },
+		},
+		{
+			ID:          "analyze-objects",
+			Label:       "Objects",
+			Description: "Address & service objects",
+			Category:    "Analyze",
+			Action:      func() tea.Msg { return SwitchViewMsg{ViewObjects} },
 		},
 		{
 			ID:          "analyze-sessions",
@@ -428,6 +437,8 @@ func (m Model) handleViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.gpUsers, cmd = m.gpUsers.Update(msg)
 	case ViewLogs:
 		m.logs, cmd = m.logs.Update(msg)
+	case ViewObjects:
+		m.objects, cmd = m.objects.Update(msg)
 	}
 
 	return m, cmd

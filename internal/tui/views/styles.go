@@ -1,6 +1,8 @@
 package views
 
 import (
+	"strings"
+
 	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/tui/theme"
@@ -355,9 +357,10 @@ func InitStyles() {
 		Foreground(c.Primary)
 }
 
-// SeverityStyle returns the appropriate style for a severity level
+// SeverityStyle returns the appropriate style for a severity level.
+// Severity is matched case-insensitively.
 func SeverityStyle(severity string) lipgloss.Style {
-	switch severity {
+	switch strings.ToLower(severity) {
 	case "critical":
 		return SeverityCriticalStyle
 	case "high":

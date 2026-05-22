@@ -43,19 +43,10 @@ func NewInterfacesModel() InterfacesModel {
 
 func (m InterfacesModel) SetSize(width, height int) InterfacesModel {
 	m.TableBase = m.TableBase.SetSize(width, height)
-
-	// Clamp cursor to valid range after resize
-	count := len(m.filtered)
-	if m.Cursor >= count && count > 0 {
-		m.Cursor = count - 1
+	m.EnsureCursorValid(len(m.filtered))
+	if visibleRows := m.visibleRows(); visibleRows > 0 {
+		m.EnsureVisible(visibleRows)
 	}
-
-	// Adjust offset to keep cursor visible
-	visibleRows := m.visibleRows()
-	if visibleRows > 0 && m.Cursor >= m.Offset+visibleRows {
-		m.Offset = m.Cursor - visibleRows + 1
-	}
-
 	return m
 }
 
@@ -152,14 +143,7 @@ func (m *InterfacesModel) applySort() {
 }
 
 func (m InterfacesModel) visibleRows() int {
-	rows := m.Height - 8
-	if m.Expanded {
-		rows -= 14
-	}
-	if rows < 1 {
-		rows = 1
-	}
-	return rows
+	return m.VisibleRows(8, 14)
 }
 
 func (m InterfacesModel) Init() tea.Cmd {
@@ -174,6 +158,14 @@ func (m InterfacesModel) Update(msg tea.Msg) (InterfacesModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch msg.String() {
+		case "esc":
+			if m.HandleCollapseIfExpanded() {
+				return m, nil
+			}
+			if m.HandleClearFilter() {
+				m.applyFilter()
+			}
+			return m, nil
 		case "s":
 			m.sortBy = (m.sortBy + 1) % 4
 			m.applySort()
@@ -350,15 +342,18 @@ func (m InterfacesModel) renderTable() string {
 		iface := m.filtered[i]
 		isSelected := i == m.Cursor
 
-		row := m.formatInterfaceRow(iface, availableWidth)
+		bullet := "●"
+		bulletStyle := upStyle
+		if iface.State != "up" {
+			bullet = "○"
+			bulletStyle = downStyle
+		}
+		content := m.formatInterfaceRow(iface, availableWidth)
 
 		if isSelected {
-			b.WriteString(selectedStyle.Render(row))
-		} else if iface.State == "up" {
-			// Render status indicator with color
-			b.WriteString(upStyle.Render("●") + " " + normalStyle.Render(row[2:]))
+			b.WriteString(selectedStyle.Render(bullet + " " + content))
 		} else {
-			b.WriteString(downStyle.Render("○") + " " + normalStyle.Render(row[2:]))
+			b.WriteString(bulletStyle.Render(bullet) + " " + normalStyle.Render(content))
 		}
 		b.WriteString("\n")
 	}
@@ -374,22 +369,17 @@ func (m InterfacesModel) renderTable() string {
 
 func (m InterfacesModel) formatHeaderRow(width int) string {
 	if width >= 120 {
-		return fmt.Sprintf("%-2s %-16s %-10s %-12s %-18s %-17s %-12s",
-			"St", "Name", "Type", "Zone", "IP", "MAC", "VR")
+		return fmt.Sprintf("St %-16s %-10s %-12s %-18s %-17s %-12s",
+			"Name", "Type", "Zone", "IP", "MAC", "VR")
 	} else if width >= 90 {
-		return fmt.Sprintf("%-2s %-14s %-8s %-10s %-16s %-12s",
-			"St", "Name", "Type", "Zone", "IP", "VR")
+		return fmt.Sprintf("St %-14s %-8s %-10s %-16s %-12s",
+			"Name", "Type", "Zone", "IP", "VR")
 	}
-	return fmt.Sprintf("%-2s %-14s %-10s %-16s",
-		"St", "Name", "Zone", "IP")
+	return fmt.Sprintf("St %-14s %-10s %-16s",
+		"Name", "Zone", "IP")
 }
 
 func (m InterfacesModel) formatInterfaceRow(iface models.Interface, width int) string {
-	status := "○"
-	if iface.State == "up" {
-		status = "●"
-	}
-
 	ip := cleanValue(iface.IP)
 	if ip == "" {
 		ip = "—"
@@ -402,17 +392,17 @@ func (m InterfacesModel) formatInterfaceRow(iface models.Interface, width int) s
 	vr := cleanValue(iface.VirtualRouter)
 
 	if width >= 120 {
-		return fmt.Sprintf("%-2s %-16s %-10s %-12s %-18s %-17s %-12s",
-			status, truncateStr(name, 16), truncateStr(ifType, 10),
+		return fmt.Sprintf("%-16s %-10s %-12s %-18s %-17s %-12s",
+			truncateStr(name, 16), truncateStr(ifType, 10),
 			truncateStr(zone, 12), truncateStr(ip, 18), truncateStr(mac, 17),
 			truncateStr(vr, 12))
 	} else if width >= 90 {
-		return fmt.Sprintf("%-2s %-14s %-8s %-10s %-16s %-12s",
-			status, truncateStr(name, 14), truncateStr(ifType, 8),
+		return fmt.Sprintf("%-14s %-8s %-10s %-16s %-12s",
+			truncateStr(name, 14), truncateStr(ifType, 8),
 			truncateStr(zone, 10), truncateStr(ip, 16), truncateStr(vr, 12))
 	}
-	return fmt.Sprintf("%-2s %-14s %-10s %-16s",
-		status, truncateStr(name, 14), truncateStr(zone, 10), truncateStr(ip, 16))
+	return fmt.Sprintf("%-14s %-10s %-16s",
+		truncateStr(name, 14), truncateStr(zone, 10), truncateStr(ip, 16))
 }
 
 func (m InterfacesModel) renderDetailPanel(iface models.Interface) string {
@@ -488,7 +478,7 @@ func (m InterfacesModel) renderDetailPanel(iface models.Interface) string {
 	if len(arpEntries) > 0 {
 		lines = append(lines, sectionStyle.Render("ARP Entries"))
 		maxShow := min(len(arpEntries), 5)
-		for i := 0; i < maxShow; i++ {
+		for i := range maxShow {
 			entry := arpEntries[i]
 			var statusIndicator string
 			switch entry.Status {

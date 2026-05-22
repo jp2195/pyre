@@ -169,11 +169,8 @@ func (m *RoutesModel) sortRoutes() {
 }
 
 func (m RoutesModel) visibleRows() int {
-	rows := m.Height - 10
-	if rows < 1 {
-		rows = 1
-	}
-	return rows
+	// RoutesModel has no expanded detail panel, so expandedOverhead is 0.
+	return m.VisibleRows(10, 0)
 }
 
 func (m RoutesModel) Update(msg tea.Msg) (RoutesModel, tea.Cmd) {
@@ -525,7 +522,7 @@ func (m RoutesModel) renderNeighborsTable() string {
 		vr     string
 	}
 
-	var rows []neighborRow
+	rows := make([]neighborRow, 0, len(m.bgpNeighbors)+len(m.ospfNeighbors))
 	for _, n := range m.bgpNeighbors {
 		state := n.State
 		if len(state) > 12 {

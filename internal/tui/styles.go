@@ -207,10 +207,7 @@ func InitStyles() {
 }
 
 func RenderProgressBar(percent float64, width int) string {
-	filled := min(int(percent/100*float64(width)), width)
-	if filled < 0 {
-		filled = 0
-	}
+	filled := max(min(int(percent/100*float64(width)), width), 0)
 
 	var bar strings.Builder
 	for i := range width {

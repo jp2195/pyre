@@ -157,7 +157,6 @@ func TestClient_ConcurrentTargetsNoInterference(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for i := range 50 {
-		i := i
 		wg.Go(func() {
 			params := url.Values{"type": {"op"}, "cmd": {"<show/>"}}
 			resp, reqErr := c.request(context.Background(), params, fmt.Sprintf("serial-%d", i))
@@ -301,5 +300,3 @@ func TestRequest_DoctypeRejected_NotPanic(t *testing.T) {
 		t.Errorf("err = %v, want to mention doctype/directive", err)
 	}
 }
-
-

@@ -75,12 +75,6 @@ func (c *Client) pollLogJob(ctx context.Context, jobID, target string) (*XMLResp
 	var consecErr int
 	var lastErr error
 	for attempt := 1; attempt <= logPollMaxAttempts; attempt++ {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(interval):
-		}
-
 		resp, err := c.LogGet(ctx, jobID, target)
 		if err == nil {
 			err = CheckResponse(resp)
@@ -91,29 +85,65 @@ func (c *Client) pollLogJob(ctx context.Context, jobID, target string) (*XMLResp
 			if consecErr >= maxConsecErrors {
 				return nil, fmt.Errorf("log poll failed after %d consecutive errors: %w", consecErr, err)
 			}
-			continue
-		}
-		consecErr = 0
-
-		switch status, raw := classifyJobStatus(resp); status {
-		case logJobDone:
-			return resp, nil
-		case logJobFailed:
-			return nil, fmt.Errorf("log job %s reported failure: %s", jobID, SanitizeForDisplay(raw))
-		case logJobRunning:
-			// Exponential backoff, capped at 2s so we don't starve fast jobs.
-			if interval < 2*time.Second {
-				interval *= 2
-				if interval > 2*time.Second {
-					interval = 2 * time.Second
-				}
+		} else {
+			consecErr = 0
+			switch status, raw := classifyJobStatus(resp); status {
+			case logJobDone:
+				return resp, nil
+			case logJobFailed:
+				return nil, fmt.Errorf("log job %s reported failure: %s", jobID, SanitizeForDisplay(raw))
+			case logJobRunning:
+				// Exponential backoff, capped at 2s so we don't starve fast jobs.
+				interval = min(interval*2, 2*time.Second)
 			}
+		}
+
+		// Sleep between attempts (skipped after the final attempt).
+		if attempt == logPollMaxAttempts {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(interval):
 		}
 	}
 	if lastErr != nil {
 		return nil, fmt.Errorf("log poll exhausted %d attempts; last error: %w", logPollMaxAttempts, lastErr)
 	}
 	return nil, fmt.Errorf("log poll timed out after %d attempts", logPollMaxAttempts)
+}
+
+// submitAndPollLog submits a log query of the given type, parses the job ID
+// from the response, and polls until the job reports completion. It returns
+// the completed LogGet response so callers can decode their log-type-specific
+// schema from resp.Result.Inner.
+//
+// The three GetXxxLogs functions share this submit-parse-poll preamble; only
+// the decode-and-convert tail differs (different XML schemas, different model
+// types). Extracting just the shared preamble keeps each caller's
+// log-type-specific schema explicit and avoids forcing a generic over the
+// substantively different per-entry XML shapes.
+func (c *Client) submitAndPollLog(ctx context.Context, logType, query string, maxLogs int, target string) (*XMLResponse, error) {
+	resp, err := c.Log(ctx, logType, maxLogs, query, target)
+	if err != nil {
+		return nil, err
+	}
+	if err := CheckResponse(resp); err != nil {
+		return nil, err
+	}
+
+	var jobResult struct {
+		Job string `xml:"job"`
+	}
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &jobResult); err != nil {
+		return nil, fmt.Errorf("parsing job response: %w", err)
+	}
+	if jobResult.Job == "" {
+		return nil, fmt.Errorf("no job ID returned")
+	}
+
+	return c.pollLogJob(ctx, jobResult.Job, target)
 }
 
 // parseLogTime parses various PAN-OS time formats
@@ -135,29 +165,7 @@ func (c *Client) GetSystemLogs(ctx context.Context, query string, maxLogs int, t
 		maxLogs = 100
 	}
 
-	// Submit log query - this returns a job ID
-	resp, err := c.Log(ctx, "system", maxLogs, query, target)
-	if err != nil {
-		return nil, err
-	}
-	if err := CheckResponse(resp); err != nil {
-		return nil, err
-	}
-
-	// Parse job ID from response
-	var jobResult struct {
-		Job string `xml:"job"`
-	}
-	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &jobResult); err != nil {
-		return nil, fmt.Errorf("parsing job response: %w", err)
-	}
-
-	if jobResult.Job == "" {
-		return nil, fmt.Errorf("no job ID returned")
-	}
-
-	// Poll until the job reports completion (bounded retries, real errors).
-	resultResp, err := c.pollLogJob(ctx, jobResult.Job, target)
+	resultResp, err := c.submitAndPollLog(ctx, "system", query, maxLogs, target)
 	if err != nil {
 		return nil, err
 	}
@@ -203,28 +211,7 @@ func (c *Client) GetTrafficLogs(ctx context.Context, query string, maxLogs int, 
 		maxLogs = 100
 	}
 
-	// Submit log query
-	resp, err := c.Log(ctx, "traffic", maxLogs, query, target)
-	if err != nil {
-		return nil, err
-	}
-	if err := CheckResponse(resp); err != nil {
-		return nil, err
-	}
-
-	var jobResult struct {
-		Job string `xml:"job"`
-	}
-	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &jobResult); err != nil {
-		return nil, fmt.Errorf("parsing job response: %w", err)
-	}
-
-	if jobResult.Job == "" {
-		return nil, fmt.Errorf("no job ID returned")
-	}
-
-	// Poll until the job reports completion (bounded retries, real errors).
-	resultResp, err := c.pollLogJob(ctx, jobResult.Job, target)
+	resultResp, err := c.submitAndPollLog(ctx, "traffic", query, maxLogs, target)
 	if err != nil {
 		return nil, err
 	}
@@ -318,28 +305,7 @@ func (c *Client) GetThreatLogs(ctx context.Context, query string, maxLogs int, t
 		maxLogs = 100
 	}
 
-	// Submit log query
-	resp, err := c.Log(ctx, "threat", maxLogs, query, target)
-	if err != nil {
-		return nil, err
-	}
-	if err := CheckResponse(resp); err != nil {
-		return nil, err
-	}
-
-	var jobResult struct {
-		Job string `xml:"job"`
-	}
-	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &jobResult); err != nil {
-		return nil, fmt.Errorf("parsing job response: %w", err)
-	}
-
-	if jobResult.Job == "" {
-		return nil, fmt.Errorf("no job ID returned")
-	}
-
-	// Poll until the job reports completion (bounded retries, real errors).
-	resultResp, err := c.pollLogJob(ctx, jobResult.Job, target)
+	resultResp, err := c.submitAndPollLog(ctx, "threat", query, maxLogs, target)
 	if err != nil {
 		return nil, err
 	}

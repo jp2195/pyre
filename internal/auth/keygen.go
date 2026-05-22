@@ -114,8 +114,7 @@ func IsAuthenticationError(err error) bool {
 	}
 
 	// Check if this is a KeygenError with authentication-related message
-	var keygenErr *KeygenError
-	if errors.As(err, &keygenErr) {
+	if keygenErr, ok := errors.AsType[*KeygenError](err); ok {
 		msg := strings.ToLower(keygenErr.Message)
 		return strings.Contains(msg, "invalid credential") ||
 			strings.Contains(msg, "authentication failed") ||
@@ -136,6 +135,6 @@ func IsConnectionError(err error) bool {
 	if err == nil {
 		return false
 	}
-	var keygenErr *KeygenError
-	return errors.As(err, &keygenErr)
+	_, ok := errors.AsType[*KeygenError](err) //nolint:errcheck // intentional - only need ok
+	return ok
 }

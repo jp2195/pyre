@@ -210,12 +210,12 @@ func (c *Client) GetDiskUsage(ctx context.Context, target string) ([]models.Disk
 			pct, _ := strconv.ParseFloat(pctStr, 64) //nolint:errcheck // intentional - default to 0 on parse error
 
 			disk := models.DiskUsage{
-				Filesystem: fields[0],
-				Size:       fields[1],
-				Used:       fields[2],
-				Available:  fields[3],
+				Filesystem: SanitizeForDisplay(fields[0]),
+				Size:       SanitizeForDisplay(fields[1]),
+				Used:       SanitizeForDisplay(fields[2]),
+				Available:  SanitizeForDisplay(fields[3]),
 				Percent:    pct,
-				MountPoint: fields[5],
+				MountPoint: SanitizeForDisplay(fields[5]),
 			}
 			disks = append(disks, disk)
 		}

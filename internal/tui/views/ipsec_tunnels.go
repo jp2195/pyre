@@ -37,17 +37,10 @@ func NewIPSecTunnelsModel() IPSecTunnelsModel {
 
 func (m IPSecTunnelsModel) SetSize(width, height int) IPSecTunnelsModel {
 	m.TableBase = m.TableBase.SetSize(width, height)
-
-	count := len(m.filtered)
-	if m.Cursor >= count && count > 0 {
-		m.Cursor = count - 1
+	m.EnsureCursorValid(len(m.filtered))
+	if visibleRows := m.visibleRows(); visibleRows > 0 {
+		m.EnsureVisible(visibleRows)
 	}
-
-	visibleRows := m.visibleRows()
-	if visibleRows > 0 && m.Cursor >= m.Offset+visibleRows {
-		m.Offset = m.Cursor - visibleRows + 1
-	}
-
 	return m
 }
 
@@ -187,14 +180,7 @@ func (m IPSecTunnelsModel) updateFilter(msg tea.Msg) (IPSecTunnelsModel, tea.Cmd
 }
 
 func (m IPSecTunnelsModel) visibleRows() int {
-	rows := m.Height - 8
-	if m.Expanded {
-		rows -= 14
-	}
-	if rows < 1 {
-		rows = 1
-	}
-	return rows
+	return m.VisibleRows(8, 14)
 }
 
 func (m IPSecTunnelsModel) View() string {
