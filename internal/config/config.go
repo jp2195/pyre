@@ -41,7 +41,6 @@ type ConnectionConfig struct {
 type Settings struct {
 	SessionPageSize int    `yaml:"session_page_size"`
 	Theme           string `yaml:"theme"`
-	DefaultView     string `yaml:"default_view"`
 }
 
 // ConfigPath returns the path to the config file (~/.pyre.yaml)
@@ -59,7 +58,6 @@ func DefaultConfig() *Config {
 		Settings: Settings{
 			SessionPageSize: 50,
 			Theme:           "default",
-			DefaultView:     "dashboard",
 		},
 	}
 }
