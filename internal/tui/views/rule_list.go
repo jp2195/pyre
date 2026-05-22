@@ -14,14 +14,14 @@ type RuleListConfig[T any] struct {
 	LoadingMsg        string
 	EmptyMsg          string
 	FilterPlaceholder string
-	SortLabels        []string                                 // Labels for each sort field
-	DefaultSortAsc    func(sortIdx int) bool                   // Whether a sort field defaults to ascending
-	MatchFilter       func(item T, query string) bool          // Returns true if item matches filter query
-	CompareItems      func(a, b T, sortIdx int) bool           // Returns true if a < b for the given sort field
-	FormatHeaderRow   func(width int) string                   // Renders the table header for available width
-	FormatRow         func(item T, width int) string           // Renders a single row
-	RenderDetail      func(item T, width int) string           // Renders the detail panel
-	IsDisabled        func(item T) bool                        // Returns true if item should render as disabled
+	SortLabels        []string                        // Labels for each sort field
+	DefaultSortAsc    func(sortIdx int) bool          // Whether a sort field defaults to ascending
+	MatchFilter       func(item T, query string) bool // Returns true if item matches filter query
+	CompareItems      func(a, b T, sortIdx int) bool  // Returns true if a < b for the given sort field
+	FormatHeaderRow   func(width int) string          // Renders the table header for available width
+	FormatRow         func(item T, width int) string  // Renders a single row
+	RenderDetail      func(item T, width int) string  // Renders the detail panel
+	IsDisabled        func(item T) bool               // Returns true if item should render as disabled
 }
 
 // RuleListModel provides a generic, filterable, sortable list with detail expansion.
@@ -44,9 +44,9 @@ func NewRuleListModel[T any](config RuleListConfig[T]) RuleListModel[T] {
 
 func (m RuleListModel[T]) SetSize(width, height int) RuleListModel[T] {
 	m.TableBase = m.TableBase.SetSize(width, height)
-	m.TableBase.EnsureCursorValid(len(m.filtered))
+	m.EnsureCursorValid(len(m.filtered))
 	if visibleRows := m.visibleRows(); visibleRows > 0 {
-		m.TableBase.EnsureVisible(visibleRows)
+		m.EnsureVisible(visibleRows)
 	}
 	return m
 }
@@ -132,7 +132,7 @@ func (m RuleListModel[T]) sortLabel() string {
 }
 
 func (m RuleListModel[T]) visibleRows() int {
-	return m.TableBase.VisibleRows(8, 14)
+	return m.VisibleRows(8, 14)
 }
 
 // Update processes messages for the rule list.

@@ -10,7 +10,7 @@ import (
 
 // handleDataMsg routes async data messages to categorized sub-handlers.
 func (m Model) handleDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg.(type) {
+	switch msg := msg.(type) {
 	case LoginSuccessMsg, LoginErrorMsg, PanoramaDetectedMsg, ManagedDevicesMsg:
 		return m.handleAuthMsg(msg)
 
@@ -36,7 +36,6 @@ func (m Model) handleDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleStatusMsg(msg)
 
 	case views.FetchDetailCmd:
-		msg := msg.(views.FetchDetailCmd)
 		return m, m.fetchSessionDetail(msg.SessionID)
 
 	default:

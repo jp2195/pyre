@@ -162,22 +162,22 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 	success := false
 	defer func() {
 		if !success {
-			_ = os.Remove(tmpPath)
+			_ = os.Remove(tmpPath) //nolint:errcheck // best-effort cleanup of partially-written temp file
 		}
 	}()
 
 	if err := f.Chmod(perm); err != nil {
-		_ = f.Close()
+		_ = f.Close() //nolint:errcheck // cleanup on error path
 		return fmt.Errorf("setting permissions: %w", err)
 	}
 
 	if _, err := f.Write(data); err != nil {
-		_ = f.Close()
+		_ = f.Close() //nolint:errcheck // cleanup on error path
 		return fmt.Errorf("writing data: %w", err)
 	}
 
 	if err := f.Sync(); err != nil {
-		_ = f.Close()
+		_ = f.Close() //nolint:errcheck // cleanup on error path
 		return fmt.Errorf("syncing file: %w", err)
 	}
 

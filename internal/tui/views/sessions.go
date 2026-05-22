@@ -41,9 +41,9 @@ func NewSessionsModel() SessionsModel {
 
 func (m SessionsModel) SetSize(width, height int) SessionsModel {
 	m.TableBase = m.TableBase.SetSize(width, height)
-	m.TableBase.EnsureCursorValid(len(m.filtered))
+	m.EnsureCursorValid(len(m.filtered))
 	if visibleRows := m.visibleRows(); visibleRows > 0 {
-		m.TableBase.EnsureVisible(visibleRows)
+		m.EnsureVisible(visibleRows)
 	}
 	return m
 }
@@ -246,7 +246,7 @@ func (m SessionsModel) updateFilter(msg tea.Msg) (SessionsModel, tea.Cmd) {
 }
 
 func (m SessionsModel) visibleRows() int {
-	return m.TableBase.VisibleRows(8, 8)
+	return m.VisibleRows(8, 8)
 }
 
 func (m SessionsModel) View() string {

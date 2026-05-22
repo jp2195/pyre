@@ -522,7 +522,7 @@ func (m RoutesModel) renderNeighborsTable() string {
 		vr     string
 	}
 
-	var rows []neighborRow
+	rows := make([]neighborRow, 0, len(m.bgpNeighbors)+len(m.ospfNeighbors))
 	for _, n := range m.bgpNeighbors {
 		state := n.State
 		if len(state) > 12 {

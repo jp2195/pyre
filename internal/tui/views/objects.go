@@ -93,23 +93,23 @@ func (m ObjectsModel) HasData() bool {
 // SetSize propagates dimensions to both sub-tabs.
 func (m ObjectsModel) SetSize(width, height int) ObjectsModel {
 	m.width, m.height = width, height
-	m.addressTab.TableBase = m.addressTab.TableBase.SetSize(width, height)
-	m.serviceTab.TableBase = m.serviceTab.TableBase.SetSize(width, height)
+	m.addressTab.TableBase = m.addressTab.SetSize(width, height)
+	m.serviceTab.TableBase = m.serviceTab.SetSize(width, height)
 	return m
 }
 
 // SetLoading sets the loading state on both sub-tabs.
 func (m ObjectsModel) SetLoading(loading bool) ObjectsModel {
-	m.addressTab.TableBase = m.addressTab.TableBase.SetLoading(loading)
-	m.serviceTab.TableBase = m.serviceTab.TableBase.SetLoading(loading)
+	m.addressTab.TableBase = m.addressTab.SetLoading(loading)
+	m.serviceTab.TableBase = m.serviceTab.SetLoading(loading)
 	return m
 }
 
 // SetSpinnerFrame propagates spinner frame to both sub-tabs.
 func (m ObjectsModel) SetSpinnerFrame(frame string) ObjectsModel {
 	m.spinnerFrame = frame
-	m.addressTab.TableBase = m.addressTab.TableBase.SetSpinnerFrame(frame)
-	m.serviceTab.TableBase = m.serviceTab.TableBase.SetSpinnerFrame(frame)
+	m.addressTab.TableBase = m.addressTab.SetSpinnerFrame(frame)
+	m.serviceTab.TableBase = m.serviceTab.SetSpinnerFrame(frame)
 	return m
 }
 

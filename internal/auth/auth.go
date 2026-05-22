@@ -145,7 +145,7 @@ func (s *Session) RemoveConnection(host string) {
 			conn.Config.Password = ""
 		}
 		if conn.Client != nil {
-			_ = conn.Client.Close()
+			_ = conn.Client.Close() //nolint:errcheck // best-effort cleanup; primary error path already underway
 		}
 	}
 	delete(s.Connections, host)

@@ -84,7 +84,7 @@ func (m DashboardModel) renderResourcesCompact(width int) string {
 	}
 	b.WriteString(labelStyle().Render("Mgmt"))
 	b.WriteString(renderBar(mgmtCPU, barWidth, mgmtColor))
-	b.WriteString(fmt.Sprintf(" %4.0f%%\n", mgmtCPU))
+	fmt.Fprintf(&b, " %4.0f%%\n", mgmtCPU)
 
 	// Dataplane CPU (percentage from resource monitor)
 	dpCPU := m.resources.DataPlaneCPU
@@ -96,7 +96,7 @@ func (m DashboardModel) renderResourcesCompact(width int) string {
 	}
 	b.WriteString(labelStyle().Render("DP  "))
 	b.WriteString(renderBar(dpCPU, barWidth, dpColor))
-	b.WriteString(fmt.Sprintf(" %4.0f%%\n", dpCPU))
+	fmt.Fprintf(&b, " %4.0f%%\n", dpCPU)
 
 	// Memory
 	memPct := m.resources.MemoryPercent
@@ -108,7 +108,7 @@ func (m DashboardModel) renderResourcesCompact(width int) string {
 	}
 	b.WriteString(labelStyle().Render("Mem "))
 	b.WriteString(renderBar(memPct, barWidth, memColor))
-	b.WriteString(fmt.Sprintf(" %4.0f%%", memPct))
+	fmt.Fprintf(&b, " %4.0f%%", memPct)
 
 	return panelStyle().Width(width).Render(b.String())
 }
@@ -141,7 +141,7 @@ func (m DashboardModel) renderSessionsCompact(width int) string {
 		}
 		barWidth := max(width-22, 8)
 		b.WriteString(renderBar(sessPct, barWidth, sessColor))
-		b.WriteString(fmt.Sprintf(" %s/%s\n", formatNumberWithCommas(int64(si.ActiveCount)), formatNumberWithCommas(int64(si.MaxCount))))
+		fmt.Fprintf(&b, " %s/%s\n", formatNumberWithCommas(int64(si.ActiveCount)), formatNumberWithCommas(int64(si.MaxCount)))
 	}
 
 	// CPS and throughput on one line
@@ -253,7 +253,7 @@ func (m DashboardModel) renderDiskUsage(width int) string {
 
 		b.WriteString(labelStyle().Render(fmt.Sprintf("%-12s ", mountPoint)))
 		b.WriteString(renderBar(disk.Percent, barWidth, color))
-		b.WriteString(fmt.Sprintf(" %3.0f%%\n", disk.Percent))
+		fmt.Fprintf(&b, " %3.0f%%\n", disk.Percent)
 		shown++
 	}
 
