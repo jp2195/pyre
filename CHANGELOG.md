@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/jp2195/pyre/compare/v1.2.1...v1.2.2) (2026-05-22)
+
+
+### Bug Fixes
+
+* trigger release for refactor and docs work ([600b33e](https://github.com/jp2195/pyre/commit/600b33ecec1503d36068b04b60a9f114ca69262c))
+
 ## [1.2.1](https://github.com/jp2195/pyre/compare/v1.2.0...v1.2.1) (2026-04-19)
 
 
