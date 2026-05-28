@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.4.0](https://github.com/jp2195/pyre/compare/v1.3.0...v1.4.0) (2026-05-22)
+
+
+### Features
+
+* initial pyre TUI with CI/CD and release automation ([1bc4dc4](https://github.com/jp2195/pyre/commit/1bc4dc4248b4c7dfd04947485de775f5367819bf))
+* **tui:** add 10 navigation and view enhancements ([d9b66df](https://github.com/jp2195/pyre/commit/d9b66dff5300d9c75cce6b5346106e08c44159e5))
+* **tui:** add IPSec Tunnels & GP Users views, UX improvements ([9a0198b](https://github.com/jp2195/pyre/commit/9a0198b952107f58bdca2e7777780c0af811c464))
+* **tui:** add IPSec Tunnels & GP Users views, UX improvements ([931cce5](https://github.com/jp2195/pyre/commit/931cce5c85c3b106ae0abb1cada59e0b93d31598))
+
+
+### Bug Fixes
+
+* Add the d selector to the help menu when utilizing panorama. ([b3ad73c](https://github.com/jp2195/pyre/commit/b3ad73c3674ca5542c04b48f8b9c9689d98a512c))
+* **ci:** add packages config for release-please ([ff256b0](https://github.com/jp2195/pyre/commit/ff256b0cf872683bdfc19bc55d969a402f87954d))
+* **ci:** add release please token ([aac0166](https://github.com/jp2195/pyre/commit/aac0166077e39fea29e8406299d788dd57fe2865))
+* **ci:** pin Go version to 1.25.7 across all workflows ([f2830a4](https://github.com/jp2195/pyre/commit/f2830a47cc1e52c05b5f02d56cdd48cd9ff7e865))
+* **ci:** use merge-multiple for artifact download ([402a8fb](https://github.com/jp2195/pyre/commit/402a8fb78d87c9224e593f398350d75b9bf8dd53))
+* **deps:** update module golang.org/x/crypto to v0.48.0 ([#17](https://github.com/jp2195/pyre/issues/17)) ([8c0da4a](https://github.com/jp2195/pyre/commit/8c0da4a9f697f5aecbd4681a689c1204dd089d6b))
+* **lint:** resolve golangci-lint errors ([59b6513](https://github.com/jp2195/pyre/commit/59b6513794c9b9808bd6e45acb7d7e1874bf0bed))
+* **lint:** resolve golangci-lint errors and remove troubleshooting ([d9a9452](https://github.com/jp2195/pyre/commit/d9a9452e9a1ab5df40425a15aca198359cc8c6f4))
+* Panorama default/entry screen to the device selector. ([b3ad73c](https://github.com/jp2195/pyre/commit/b3ad73c3674ca5542c04b48f8b9c9689d98a512c))
+* resolve lint errors and pin CI Go version to 1.25.7 ([66809e2](https://github.com/jp2195/pyre/commit/66809e2670f65a40e7598cdea32149632461c7e3))
+* space bar to select/toggle and enter to move to the next form. ([b3ad73c](https://github.com/jp2195/pyre/commit/b3ad73c3674ca5542c04b48f8b9c9689d98a512c))
+* trigger release for refactor and docs work ([600b33e](https://github.com/jp2195/pyre/commit/600b33ecec1503d36068b04b60a9f114ca69262c))
+
 ## [1.3.0](https://github.com/jp2195/pyre/compare/v1.2.1...v1.3.0) (2026-05-22)
 
 
