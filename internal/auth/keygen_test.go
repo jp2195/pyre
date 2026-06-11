@@ -116,10 +116,10 @@ func keygenTLSServer(t *testing.T) (*httptest.Server, string) {
 		w.Header().Set("Content-Type", "application/xml")
 		_, _ = w.Write([]byte(`<response status="success"><result><key>LUFRPT-ca==</key></result></response>`))
 	}))
+	t.Cleanup(srv.Close)
 	caPath := filepath.Join(t.TempDir(), "ca.pem")
 	caPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: srv.Certificate().Raw})
 	if err := os.WriteFile(caPath, caPEM, 0o600); err != nil {
-		srv.Close()
 		t.Fatalf("writing CA fixture: %v", err)
 	}
 	return srv, caPath
@@ -127,7 +127,6 @@ func keygenTLSServer(t *testing.T) (*httptest.Server, string) {
 
 func TestGenerateAPIKey_CustomCA(t *testing.T) {
 	srv, caPath := keygenTLSServer(t)
-	defer srv.Close()
 
 	host := strings.TrimPrefix(srv.URL, "https://")
 	result, err := auth.GenerateAPIKey(context.Background(), host, "admin", "admin",
@@ -144,7 +143,6 @@ func TestGenerateAPIKey_UntrustedCert_FailsWithoutCAOrInsecure(t *testing.T) {
 	// Default (verified) TLS against httptest's self-signed cert must fail:
 	// proves keygen is fail-closed when neither Insecure nor a CA is given.
 	srv, _ := keygenTLSServer(t)
-	defer srv.Close()
 
 	host := strings.TrimPrefix(srv.URL, "https://")
 	_, err := auth.GenerateAPIKey(context.Background(), host, "admin", "admin",

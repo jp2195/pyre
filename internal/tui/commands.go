@@ -26,8 +26,16 @@ func (m Model) doLogin() tea.Cmd {
 	password := m.login.Password()
 	insecure := m.login.Insecure()
 
+	// If this host already has a saved connection config, honor its CA
+	// bundle so interactive login can verify a self-signed firewall cert
+	// without resorting to --insecure.
+	opts := api.ClientOptions{Insecure: insecure}
+	if conn, ok := m.config.GetConnection(host); ok {
+		opts.CACertPath = conn.CACertPath
+	}
+
 	return func() tea.Msg {
-		result, err := auth.GenerateAPIKey(ctx, host, username, password, api.ClientOptions{Insecure: insecure})
+		result, err := auth.GenerateAPIKey(ctx, host, username, password, opts)
 		if err != nil {
 			return LoginErrorMsg{Err: err}
 		}
