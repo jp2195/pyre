@@ -311,3 +311,30 @@ func TestLogsModel_SetSize_ClampsCursor(t *testing.T) {
 		t.Errorf("cursor %d should be less than filtered count %d after resize", m.Cursor, m.filteredCount())
 	}
 }
+
+func TestLogsModel_SetSystemLogs_ClearsPreviousError(t *testing.T) {
+	m := NewLogsModel()
+	m = m.SetSystemLogs(nil, errors.New("fetch failed"))
+	m = m.SetSystemLogs([]models.SystemLogEntry{{Severity: "info", Description: "ok"}}, nil)
+	if m.Err != nil {
+		t.Errorf("Err = %v, want nil after successful refresh", m.Err)
+	}
+}
+
+func TestLogsModel_SetTrafficLogs_ClearsPreviousError(t *testing.T) {
+	m := NewLogsModel()
+	m = m.SetTrafficLogs(nil, errors.New("fetch failed"))
+	m = m.SetTrafficLogs([]models.TrafficLogEntry{{Action: "allow", SourceIP: "10.0.0.1"}}, nil)
+	if m.Err != nil {
+		t.Errorf("Err = %v, want nil after successful refresh", m.Err)
+	}
+}
+
+func TestLogsModel_SetThreatLogs_ClearsPreviousError(t *testing.T) {
+	m := NewLogsModel()
+	m = m.SetThreatLogs(nil, errors.New("fetch failed"))
+	m = m.SetThreatLogs([]models.ThreatLogEntry{{Severity: "high", ThreatName: "X"}}, nil)
+	if m.Err != nil {
+		t.Errorf("Err = %v, want nil after successful refresh", m.Err)
+	}
+}
