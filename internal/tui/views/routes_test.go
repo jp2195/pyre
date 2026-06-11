@@ -39,8 +39,8 @@ func TestRoutesModel_SetSize_ScrollsOffsetDownToCursor(t *testing.T) {
 
 	m = m.SetSize(80, 30)
 
-	if m.Offset > m.Cursor {
-		t.Errorf("Offset = %d, want <= Cursor (%d) so the cursor row is visible", m.Offset, m.Cursor)
+	if m.Offset != m.Cursor {
+		t.Errorf("Offset = %d, want %d (cursor becomes new top of window)", m.Offset, m.Cursor)
 	}
 }
 
@@ -68,7 +68,30 @@ func TestRoutesModel_SetSize_ScrollsNeighborOffsetDownToCursor(t *testing.T) {
 
 	m = m.SetSize(80, 30)
 
-	if m.neighborOffset > m.neighborCursor {
-		t.Errorf("neighborOffset = %d, want <= neighborCursor (%d)", m.neighborOffset, m.neighborCursor)
+	if m.neighborOffset != m.neighborCursor {
+		t.Errorf("neighborOffset = %d, want %d (cursor becomes new top of window)", m.neighborOffset, m.neighborCursor)
+	}
+}
+
+func TestRoutesModel_SetSize_ScrollsNeighborOffsetUpToCursor(t *testing.T) {
+	m := NewRoutesModel()
+	neighbors := make([]models.BGPNeighbor, 40)
+	for i := range neighbors {
+		neighbors[i] = models.BGPNeighbor{PeerAddress: fmt.Sprintf("10.0.0.%d", i+1), State: "Established"}
+	}
+	m = m.SetBGPNeighbors(neighbors, nil)
+	// Height 30 with overhead 10 gives 20 visible rows; cursor 35 with
+	// offset 0 is far below the window, so the offset must scroll up to
+	// cursor-visible+1 = 16.
+	m.neighborCursor = 35
+	m.neighborOffset = 0
+
+	m = m.SetSize(80, 30)
+
+	if m.neighborOffset != 16 {
+		t.Errorf("neighborOffset = %d, want 16 (cursor - visibleRows + 1)", m.neighborOffset)
+	}
+	if m.neighborCursor != 35 {
+		t.Errorf("neighborCursor = %d, want 35 (unchanged)", m.neighborCursor)
 	}
 }
