@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -36,16 +35,18 @@ type keygenResponse struct {
 // unverified endpoint from streaming an unbounded body during login.
 const maxKeygenResponseSize = 1 << 20
 
-func GenerateAPIKey(ctx context.Context, host, username, password string, insecure bool) (*KeygenResult, error) {
+// GenerateAPIKey performs the PAN-OS keygen exchange for host using the
+// supplied credentials. TLS behavior is governed by opts exactly as in
+// api.NewClient: verified by default, custom CA via opts.CACertPath
+// (fail-closed), or opts.Insecure to skip verification.
+func GenerateAPIKey(ctx context.Context, host, username, password string, opts api.ClientOptions) (*KeygenResult, error) {
+	tr, err := api.NewTransport(opts)
+	if err != nil {
+		return nil, fmt.Errorf("configuring keygen TLS: %w", err)
+	}
 	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			// #nosec G402 -- InsecureSkipVerify required for self-signed firewall certificates when user enables --insecure
-			TLSClientConfig: &tls.Config{
-				MinVersion:         tls.VersionTLS12,
-				InsecureSkipVerify: insecure, //nolint:gosec
-			},
-		},
+		Timeout:   30 * time.Second,
+		Transport: tr,
 	}
 
 	// Use POST with form body to keep credentials out of URLs/logs

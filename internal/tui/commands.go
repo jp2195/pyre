@@ -27,7 +27,7 @@ func (m Model) doLogin() tea.Cmd {
 	insecure := m.login.Insecure()
 
 	return func() tea.Msg {
-		result, err := auth.GenerateAPIKey(ctx, host, username, password, insecure)
+		result, err := auth.GenerateAPIKey(ctx, host, username, password, api.ClientOptions{Insecure: insecure})
 		if err != nil {
 			return LoginErrorMsg{Err: err}
 		}
