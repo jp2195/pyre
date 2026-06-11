@@ -329,6 +329,9 @@ func TestRequest_OversizedResponse_ReturnsExplicitError(t *testing.T) {
 		t.Fatal("expected error for oversized response, got nil")
 	}
 	if !strings.Contains(reqErr.Error(), "exceeds") {
-		t.Errorf("err = %v, want explicit size-limit error mentioning 'exceeds'", reqErr)
+		t.Errorf("err = %v, want to mention 'exceeds'", reqErr)
+	}
+	if !strings.Contains(reqErr.Error(), "50MB") {
+		t.Errorf("err = %v, want to mention '50MB'", reqErr)
 	}
 }
