@@ -183,7 +183,10 @@ func TestResolveCredentials(t *testing.T) {
 		Insecure: true,
 	}
 
-	creds := ResolveCredentials(cfg, flags)
+	creds, err := ResolveCredentials(cfg, flags)
+	if err != nil {
+		t.Fatalf("ResolveCredentials: %v", err)
+	}
 
 	if creds.Host != "10.0.0.1" {
 		t.Errorf("expected Host '10.0.0.1', got %q", creds.Host)
@@ -210,7 +213,10 @@ func TestResolveCredentials_EnvVars(t *testing.T) {
 		os.Unsetenv("PYRE_INSECURE")
 	}()
 
-	creds := ResolveCredentials(cfg, flags)
+	creds, err := ResolveCredentials(cfg, flags)
+	if err != nil {
+		t.Fatalf("ResolveCredentials: %v", err)
+	}
 
 	if creds.Host != "env-host" {
 		t.Errorf("expected Host 'env-host', got %q", creds.Host)
@@ -232,7 +238,10 @@ func TestResolveCredentials_ConfigDefault(t *testing.T) {
 
 	flags := config.CLIFlags{}
 
-	creds := ResolveCredentials(cfg, flags)
+	creds, err := ResolveCredentials(cfg, flags)
+	if err != nil {
+		t.Fatalf("ResolveCredentials: %v", err)
+	}
 
 	if creds.Host != "config-host" {
 		t.Errorf("expected Host 'config-host', got %q", creds.Host)

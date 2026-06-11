@@ -117,7 +117,11 @@ func main() {
 	tui.InitStyles()
 	views.InitStyles()
 
-	creds := auth.ResolveCredentials(cfg, flags)
+	creds, err := auth.ResolveCredentials(cfg, flags)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 
 	// Determine starting view based on flags and config
 	startView := determineStartView(cfg, flags, creds)

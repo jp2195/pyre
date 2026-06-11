@@ -185,7 +185,7 @@ type Credentials struct {
 	PromptForPassword bool // True when host/user are set but no API key, so prompt for password
 }
 
-func ResolveCredentials(cfg *config.Config, flags config.CLIFlags) *Credentials {
+func ResolveCredentials(cfg *config.Config, flags config.CLIFlags) (*Credentials, error) {
 	creds := &Credentials{}
 
 	// CLI flags take highest priority
@@ -242,7 +242,16 @@ func ResolveCredentials(cfg *config.Config, flags config.CLIFlags) *Credentials 
 		creds.PromptForPassword = true
 	}
 
-	return creds
+	// Hosts from the TUI forms are validated at input time; hosts arriving
+	// via --host / PYRE_HOST / config bypass those forms, so validate here
+	// before any URL is built from them.
+	if creds.Host != "" {
+		if msg := ValidateHost(creds.Host); msg != "" {
+			return nil, fmt.Errorf("invalid host %q: %s", creds.Host, msg)
+		}
+	}
+
+	return creds, nil
 }
 
 func (c *Credentials) HasHost() bool {

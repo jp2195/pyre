@@ -1,11 +1,22 @@
 package auth_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/jp2195/pyre/internal/auth"
 	"github.com/jp2195/pyre/internal/config"
 )
+
+// mustResolve resolves credentials and fails the test on validation error.
+func mustResolve(t *testing.T, cfg *config.Config, flags config.CLIFlags) *auth.Credentials {
+	t.Helper()
+	creds, err := auth.ResolveCredentials(cfg, flags)
+	if err != nil {
+		t.Fatalf("ResolveCredentials: %v", err)
+	}
+	return creds
+}
 
 // newConfigWithHost returns a *config.Config with a single default
 // connection for host. ResolveCredentials consults the default connection
@@ -26,7 +37,7 @@ func TestResolveCredentials_CLIFlagWins(t *testing.T) {
 	t.Setenv("PYRE_API_KEY", "env-key")
 	t.Setenv("PYRE_FW_EXAMPLE_COM_API_KEY", "host-env-key")
 
-	creds := auth.ResolveCredentials(newConfigWithHost(host), config.CLIFlags{APIKey: "flag-key"})
+	creds := mustResolve(t, newConfigWithHost(host), config.CLIFlags{APIKey: "flag-key"})
 	if creds.APIKey != "flag-key" {
 		t.Fatalf("APIKey = %q, want flag-key", creds.APIKey)
 	}
@@ -42,7 +53,7 @@ func TestResolveCredentials_GlobalEnvVar(t *testing.T) {
 	t.Setenv("PYRE_API_KEY", "global-env-key")
 	t.Setenv("PYRE_FW_EXAMPLE_COM_API_KEY", "host-env-key")
 
-	creds := auth.ResolveCredentials(newConfigWithHost(host), config.CLIFlags{})
+	creds := mustResolve(t, newConfigWithHost(host), config.CLIFlags{})
 	if creds.APIKey != "global-env-key" {
 		t.Fatalf("APIKey = %q, want global-env-key", creds.APIKey)
 	}
@@ -55,7 +66,7 @@ func TestResolveCredentials_HostEnvVarFallback(t *testing.T) {
 	t.Setenv("PYRE_API_KEY", "")
 	t.Setenv("PYRE_FW1_EXAMPLE_COM_API_KEY", "host-env-key")
 
-	creds := auth.ResolveCredentials(newConfigWithHost(host), config.CLIFlags{})
+	creds := mustResolve(t, newConfigWithHost(host), config.CLIFlags{})
 	if creds.APIKey != "host-env-key" {
 		t.Fatalf("APIKey = %q, want host-env-key", creds.APIKey)
 	}
@@ -71,7 +82,7 @@ func TestResolveCredentials_NoKeyPromptsForPassword(t *testing.T) {
 	t.Setenv("PYRE_API_KEY", "")
 	t.Setenv("PYRE_FW3_EXAMPLE_COM_API_KEY", "")
 
-	creds := auth.ResolveCredentials(newConfigWithHost(host), config.CLIFlags{})
+	creds := mustResolve(t, newConfigWithHost(host), config.CLIFlags{})
 	if creds.APIKey != "" {
 		t.Errorf("APIKey = %q, want empty", creds.APIKey)
 	}
@@ -121,5 +132,18 @@ func TestConnection_ClearsCredentialsOnRemove(t *testing.T) {
 
 	if got := session.GetActiveConnection(); got != nil {
 		t.Errorf("GetActiveConnection after RemoveConnection = %+v, want nil", got)
+	}
+}
+
+// TestResolveCredentials_RejectsMalformedHost asserts that a host arriving
+// via CLI flag that would change the request URL shape is rejected before
+// any URL is built from it.
+func TestResolveCredentials_RejectsMalformedHost(t *testing.T) {
+	_, err := auth.ResolveCredentials(&config.Config{}, config.CLIFlags{Host: "evil.example/api"})
+	if err == nil {
+		t.Fatal("expected error for malformed --host, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid host") {
+		t.Errorf("err = %v, want to mention 'invalid host'", err)
 	}
 }
