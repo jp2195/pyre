@@ -37,6 +37,8 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: write
+      id-token: write      # cosign keyless OIDC + attestation signing
+      attestations: write  # actions/attest-build-provenance
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -52,6 +54,9 @@ jobs:
       - name: Install syft (for SBOM generation)
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
 
+      - name: Install cosign (for keyless signing)
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@1a80836c5c9d9e5755a25cb59ec6f45a3b5f41a8 # v7.2.1
         env:
@@ -61,3 +66,11 @@ jobs:
           distribution: goreleaser
           version: "~> v2"
           args: release --clean
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
