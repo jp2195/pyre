@@ -335,3 +335,18 @@ func TestRequest_OversizedResponse_ReturnsExplicitError(t *testing.T) {
 		t.Errorf("err = %v, want to mention '50MB'", reqErr)
 	}
 }
+
+func TestNewTransport_Exported(t *testing.T) {
+	// NewTransport is exported so the keygen flow in internal/auth can share
+	// the same hardened TLS construction as the main client.
+	tr, err := NewTransport(ClientOptions{Insecure: true})
+	if err != nil {
+		t.Fatalf("NewTransport: %v", err)
+	}
+	if !tr.TLSClientConfig.InsecureSkipVerify {
+		t.Error("expected InsecureSkipVerify with Insecure option")
+	}
+	if tr.TLSClientConfig.MinVersion != tls.VersionTLS12 {
+		t.Errorf("MinVersion = %d, want TLS 1.2", tr.TLSClientConfig.MinVersion)
+	}
+}
