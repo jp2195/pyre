@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -298,5 +299,39 @@ func TestRequest_DoctypeRejected_NotPanic(t *testing.T) {
 	if !strings.Contains(strings.ToLower(err.Error()), "doctype") &&
 		!strings.Contains(strings.ToLower(err.Error()), "directive") {
 		t.Errorf("err = %v, want to mention doctype/directive", err)
+	}
+}
+
+func TestRequest_OversizedResponse_ReturnsExplicitError(t *testing.T) {
+	// Stream just over maxResponseSize of padding. Pre-fix this truncates
+	// silently and fails as an XML parse error; post-fix it must name the
+	// size limit explicitly.
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		chunk := bytes.Repeat([]byte(" "), 1024*1024)
+		for range maxResponseSize/len(chunk) + 1 {
+			if _, err := w.Write(chunk); err != nil {
+				return // client hung up after hitting its limit
+			}
+		}
+	}))
+	defer srv.Close()
+
+	host := strings.TrimPrefix(srv.URL, "https://")
+	c, err := NewClient(host, "K", ClientOptions{Insecure: true})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	defer func() { _ = c.Close() }()
+
+	_, reqErr := c.request(context.Background(), opParams(), "")
+	if reqErr == nil {
+		t.Fatal("expected error for oversized response, got nil")
+	}
+	if !strings.Contains(reqErr.Error(), "exceeds") {
+		t.Errorf("err = %v, want to mention 'exceeds'", reqErr)
+	}
+	if !strings.Contains(reqErr.Error(), "50MB") {
+		t.Errorf("err = %v, want to mention '50MB'", reqErr)
 	}
 }

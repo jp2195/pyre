@@ -137,7 +137,8 @@ func (s *Session) RemoveConnection(host string) {
 	defer s.mu.Unlock()
 	// Zero credential fields before dropping the reference so the secret
 	// stops being reachable from any surviving *Connection pointer a
-	// caller might still hold. The keychain keeps the persistent copy.
+	// caller might still hold. Credentials are never persisted anywhere,
+	// so this in-memory copy is the only one.
 	if conn, ok := s.Connections[host]; ok {
 		conn.APIKey = ""
 		if conn.Config != nil {

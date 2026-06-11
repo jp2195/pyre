@@ -193,10 +193,17 @@ func (c *Client) request(ctx context.Context, params url.Values, target string) 
 	}
 	defer func() { _ = resp.Body.Close() }() //nolint:errcheck // best effort cleanup
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize))
+	// Read one byte past the cap so an at-limit response is distinguishable
+	// from an over-limit one, and report the latter explicitly instead of
+	// letting truncated XML surface as a confusing parse error.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize+1))
 	if err != nil {
 		log.Printf("[API Error] reading response: %v", err)
 		return nil, fmt.Errorf("reading response: %w", err)
+	}
+	if len(body) > maxResponseSize {
+		log.Printf("[API Error] response exceeded %d byte limit", maxResponseSize)
+		return nil, fmt.Errorf("response exceeds %dMB limit", maxResponseSize/(1024*1024))
 	}
 
 	var xmlResp XMLResponse

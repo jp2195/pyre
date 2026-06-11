@@ -72,9 +72,7 @@ func (m LogsModel) HasData() bool {
 
 func (m LogsModel) SetSystemLogs(logs []models.SystemLogEntry, err error) LogsModel {
 	m.systemLogs = logs
-	if err != nil {
-		m.Err = err
-	}
+	m.Err = err
 	m.Loading = false
 	m.lastRefresh = time.Now()
 	m.applyFilter()
@@ -84,9 +82,7 @@ func (m LogsModel) SetSystemLogs(logs []models.SystemLogEntry, err error) LogsMo
 
 func (m LogsModel) SetTrafficLogs(logs []models.TrafficLogEntry, err error) LogsModel {
 	m.trafficLogs = logs
-	if err != nil {
-		m.Err = err
-	}
+	m.Err = err
 	m.Loading = false
 	m.lastRefresh = time.Now()
 	m.applyFilter()
@@ -96,9 +92,7 @@ func (m LogsModel) SetTrafficLogs(logs []models.TrafficLogEntry, err error) Logs
 
 func (m LogsModel) SetThreatLogs(logs []models.ThreatLogEntry, err error) LogsModel {
 	m.threatLogs = logs
-	if err != nil {
-		m.Err = err
-	}
+	m.Err = err
 	m.Loading = false
 	m.lastRefresh = time.Now()
 	m.applyFilter()

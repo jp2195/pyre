@@ -34,17 +34,8 @@ func NewGPUsersModel() GPUsersModel {
 
 func (m GPUsersModel) SetSize(width, height int) GPUsersModel {
 	m.TableBase = m.TableBase.SetSize(width, height)
-
-	count := len(m.filtered)
-	if m.Cursor >= count && count > 0 {
-		m.Cursor = count - 1
-	}
-
-	visibleRows := m.visibleRows()
-	if visibleRows > 0 && m.Cursor >= m.Offset+visibleRows {
-		m.Offset = m.Cursor - visibleRows + 1
-	}
-
+	m.EnsureCursorValid(len(m.filtered))
+	m.EnsureVisible(m.visibleRows())
 	return m
 }
 

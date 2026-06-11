@@ -32,7 +32,7 @@ go fix ./...                  # Apply modernizers (safe, behavior-preserving)
 - Generic `fetchCmd[T any]()` helper in `commands.go` reduces fetch boilerplate
 - Generic `fetchRulesFromPaths[T any]()` in `api/policies.go` for XPath rule fetching
 - `saveConfig()` / `saveState()` return `tea.Cmd` (avoid goroutine race conditions)
-- `setError()` is a pointer receiver that sets `m.err` and returns auto-dismiss tick Cmd
+- `setError()` is a value receiver that returns an updated Model with `m.err` set plus an auto-dismiss tick Cmd
 - Navigation uses table-driven `navTargets` map and `viewToNavbar` for reverse lookup
 - Format helpers shared in `views/format_helpers.go`
 - **Bubble Tea v2 View composition**: only the top-level `tui.Model.View()` returns `tea.View`; every sub-view model returns `string`. The top-level composes sub-view strings and sets program options (alt-screen, mouse mode, window title, cursor) on the returned `tea.View` rather than on `tea.NewProgram`.

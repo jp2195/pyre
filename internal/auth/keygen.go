@@ -31,6 +31,11 @@ type keygenResponse struct {
 	} `xml:"msg"`
 }
 
+// maxKeygenResponseSize caps the keygen response read. Real keygen responses
+// are well under 4KB; 1MB leaves generous headroom while preventing an
+// unverified endpoint from streaming an unbounded body during login.
+const maxKeygenResponseSize = 1 << 20
+
 func GenerateAPIKey(ctx context.Context, host, username, password string, insecure bool) (*KeygenResult, error) {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
@@ -62,7 +67,7 @@ func GenerateAPIKey(ctx context.Context, host, username, password string, insecu
 	}
 	defer func() { _ = resp.Body.Close() }() //nolint:errcheck // best effort cleanup
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxKeygenResponseSize))
 	if err != nil {
 		return nil, fmt.Errorf("reading keygen response: %w", err)
 	}

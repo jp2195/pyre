@@ -2,6 +2,9 @@ package auth_test
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -77,5 +80,25 @@ func TestGenerateAPIKey_UnreachableHost(t *testing.T) {
 
 	if err == nil {
 		t.Error("expected error for unreachable host")
+	}
+}
+
+func TestGenerateAPIKey_OversizedResponseRejected(t *testing.T) {
+	// 2MB XML comment before the valid response: an unbounded read would
+	// parse this successfully; the 1MB cap truncates mid-comment and the
+	// XML decoder must surface an error instead of returning a key.
+	padding := strings.Repeat(" ", 2*1024*1024)
+	body := "<!--" + padding + `--><response status="success"><result><key>LUFRPT-big==</key></result></response>`
+
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	host := strings.TrimPrefix(srv.URL, "https://")
+	_, err := auth.GenerateAPIKey(context.Background(), host, "admin", "admin", true)
+	if err == nil {
+		t.Fatal("expected error for oversized keygen response, got nil")
 	}
 }
