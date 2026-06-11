@@ -64,16 +64,22 @@ func NewRoutesModel() RoutesModel {
 func (m RoutesModel) SetSize(width, height int) RoutesModel {
 	m.TableBase = m.TableBase.SetSize(width, height)
 
-	// Clamp route cursor
-	count := len(m.filtered)
-	if m.Cursor >= count && count > 0 {
-		m.Cursor = count - 1
-	}
+	m.EnsureCursorValid(len(m.filtered))
+	visible := m.visibleRows()
+	m.EnsureVisible(visible)
 
-	// Clamp neighbor cursor
+	// The Neighbors tab keeps its own cursor outside TableBase; apply the
+	// same clamp-then-scroll discipline to it.
 	neighborCount := len(m.bgpNeighbors) + len(m.ospfNeighbors)
 	if m.neighborCursor >= neighborCount && neighborCount > 0 {
 		m.neighborCursor = neighborCount - 1
+	}
+	m.neighborCursor = max(m.neighborCursor, 0)
+	if m.neighborCursor < m.neighborOffset {
+		m.neighborOffset = m.neighborCursor
+	}
+	if m.neighborCursor >= m.neighborOffset+visible {
+		m.neighborOffset = m.neighborCursor - visible + 1
 	}
 
 	return m
