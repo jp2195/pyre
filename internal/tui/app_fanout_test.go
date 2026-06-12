@@ -11,7 +11,7 @@ package tui
 //     field; Loading and SpinnerFrame are NOT directly accessible from this
 //     package. Resize width/height are similarly inaccessible. These views are
 //     tested indirectly via View() output regression checks.
-//     GPUsersModel and IPSecTunnelsModel follow the same wrapped pattern as of M6.
+//     GPUsersModel, IPSecTunnelsModel, and InterfacesModel follow the same wrapped pattern as of M6.
 //   - ObjectsModel stores width/height in unexported fields; tested via
 //     View() output (the zero-width guard or loading state).
 //   - NavbarModel stores width in an unexported field; resize propagation is
@@ -71,7 +71,6 @@ func TestFanout_Resize_ContentHeightViews(t *testing.T) {
 		w, h int
 	}{
 		{"sessions", nm.sessions.Width, nm.sessions.Height},
-		{"interfaces", nm.interfaces.Width, nm.interfaces.Height},
 		{"routes", nm.routes.Width, nm.routes.Height},
 		{"logs", nm.logs.Width, nm.logs.Height},
 	} {
@@ -166,7 +165,6 @@ func TestFanout_SpinnerTick_PropagatesFrame(t *testing.T) {
 		frame string
 	}{
 		{"sessions", nm.sessions.SpinnerFrame},
-		{"interfaces", nm.interfaces.SpinnerFrame},
 		{"routes", nm.routes.SpinnerFrame},
 		{"logs", nm.logs.SpinnerFrame},
 	} {
@@ -175,7 +173,7 @@ func TestFanout_SpinnerTick_PropagatesFrame(t *testing.T) {
 		}
 	}
 
-	// policies, natPolicies, gpUsers, and ipsecTunnels store SpinnerFrame in unexported list.SpinnerFrame.
+	// policies, natPolicies, gpUsers, ipsecTunnels, and interfaces store SpinnerFrame in unexported list.SpinnerFrame.
 	// Verify that the top-level spinner produced a non-empty frame (the call-path
 	// to SetSpinnerFrame on those models is covered by compilation alone).
 	wantFrame := nm.spinner.View()
@@ -205,7 +203,6 @@ func TestFanout_SpinnerTick_AllFramesSame(t *testing.T) {
 		name  string
 		frame string
 	}{
-		{"interfaces", nm.interfaces.SpinnerFrame},
 		{"routes", nm.routes.SpinnerFrame},
 		{"logs", nm.logs.SpinnerFrame},
 		{"dashboard", nm.dashboard.SpinnerFrame},
@@ -237,7 +234,6 @@ func TestFanout_Refresh_SetsLoadingOnCurrentView(t *testing.T) {
 	}
 	checks := []check{
 		{ViewSessions, func(nm Model) bool { return nm.sessions.Loading }},
-		{ViewInterfaces, func(nm Model) bool { return nm.interfaces.Loading }},
 		{ViewRoutes, func(nm Model) bool { return nm.routes.Loading }},
 		{ViewLogs, func(nm Model) bool { return nm.logs.Loading }},
 	}
@@ -253,7 +249,7 @@ func TestFanout_Refresh_SetsLoadingOnCurrentView(t *testing.T) {
 }
 
 // TestFanout_Refresh_SetsLoadingOnPolicies verifies that pressing 'r' while on
-// the Policies, NATPolicies, GPUsers, or IPSecTunnels view calls SetLoading(true). Since Loading is
+// the Policies, NATPolicies, GPUsers, IPSecTunnels, or Interfaces view calls SetLoading(true). Since Loading is
 // inside the unexported list field, we verify via the View() output: when
 // Loading==true and no data has been loaded, View() renders the loading message.
 func TestFanout_Refresh_SetsLoadingOnPolicies(t *testing.T) {
@@ -267,6 +263,7 @@ func TestFanout_Refresh_SetsLoadingOnPolicies(t *testing.T) {
 		{ViewNATPolicies, "natPolicies"},
 		{ViewGPUsers, "gpUsers"},
 		{ViewIPSecTunnels, "ipsecTunnels"},
+		{ViewInterfaces, "interfaces"},
 	} {
 		m := newTestModel(t, tc.view)
 		// Dispatch a resize first so View() doesn't short-circuit on zero width.
@@ -286,6 +283,8 @@ func TestFanout_Refresh_SetsLoadingOnPolicies(t *testing.T) {
 			got = nm.gpUsers.View()
 		case ViewIPSecTunnels:
 			got = nm.ipsecTunnels.View()
+		case ViewInterfaces:
+			got = nm.interfaces.View()
 		}
 		// When Loading=true (and no items loaded), View() renders the loading
 		// inline string (e.g. "Loading policies..." or "Loading NAT rules...").
@@ -325,9 +324,6 @@ func TestFanout_Refresh_NonRefreshableViewsIgnored(t *testing.T) {
 		nm := updated.(Model)
 		if nm.sessions.Loading {
 			t.Errorf("view %v: sessions.Loading unexpectedly true after refresh", view)
-		}
-		if nm.interfaces.Loading {
-			t.Errorf("view %v: interfaces.Loading unexpectedly true after refresh", view)
 		}
 		if nm.routes.Loading {
 			t.Errorf("view %v: routes.Loading unexpectedly true after refresh", view)
