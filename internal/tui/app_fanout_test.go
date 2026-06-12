@@ -11,7 +11,7 @@ package tui
 //     field; Loading and SpinnerFrame are NOT directly accessible from this
 //     package. Resize width/height are similarly inaccessible. These views are
 //     tested indirectly via View() output regression checks.
-//     GPUsersModel follows the same wrapped pattern as of M6.
+//     GPUsersModel and IPSecTunnelsModel follow the same wrapped pattern as of M6.
 //   - ObjectsModel stores width/height in unexported fields; tested via
 //     View() output (the zero-width guard or loading state).
 //   - NavbarModel stores width in an unexported field; resize propagation is
@@ -73,7 +73,6 @@ func TestFanout_Resize_ContentHeightViews(t *testing.T) {
 		{"sessions", nm.sessions.Width, nm.sessions.Height},
 		{"interfaces", nm.interfaces.Width, nm.interfaces.Height},
 		{"routes", nm.routes.Width, nm.routes.Height},
-		{"ipsecTunnels", nm.ipsecTunnels.Width, nm.ipsecTunnels.Height},
 		{"logs", nm.logs.Width, nm.logs.Height},
 	} {
 		if tc.w != wantW {
@@ -169,7 +168,6 @@ func TestFanout_SpinnerTick_PropagatesFrame(t *testing.T) {
 		{"sessions", nm.sessions.SpinnerFrame},
 		{"interfaces", nm.interfaces.SpinnerFrame},
 		{"routes", nm.routes.SpinnerFrame},
-		{"ipsecTunnels", nm.ipsecTunnels.SpinnerFrame},
 		{"logs", nm.logs.SpinnerFrame},
 	} {
 		if tc.frame == "" {
@@ -177,7 +175,7 @@ func TestFanout_SpinnerTick_PropagatesFrame(t *testing.T) {
 		}
 	}
 
-	// policies, natPolicies, and gpUsers store SpinnerFrame in unexported list.SpinnerFrame.
+	// policies, natPolicies, gpUsers, and ipsecTunnels store SpinnerFrame in unexported list.SpinnerFrame.
 	// Verify that the top-level spinner produced a non-empty frame (the call-path
 	// to SetSpinnerFrame on those models is covered by compilation alone).
 	wantFrame := nm.spinner.View()
@@ -209,7 +207,6 @@ func TestFanout_SpinnerTick_AllFramesSame(t *testing.T) {
 	}{
 		{"interfaces", nm.interfaces.SpinnerFrame},
 		{"routes", nm.routes.SpinnerFrame},
-		{"ipsecTunnels", nm.ipsecTunnels.SpinnerFrame},
 		{"logs", nm.logs.SpinnerFrame},
 		{"dashboard", nm.dashboard.SpinnerFrame},
 		{"networkDashboard", nm.networkDashboard.SpinnerFrame},
@@ -242,7 +239,6 @@ func TestFanout_Refresh_SetsLoadingOnCurrentView(t *testing.T) {
 		{ViewSessions, func(nm Model) bool { return nm.sessions.Loading }},
 		{ViewInterfaces, func(nm Model) bool { return nm.interfaces.Loading }},
 		{ViewRoutes, func(nm Model) bool { return nm.routes.Loading }},
-		{ViewIPSecTunnels, func(nm Model) bool { return nm.ipsecTunnels.Loading }},
 		{ViewLogs, func(nm Model) bool { return nm.logs.Loading }},
 	}
 
@@ -257,7 +253,7 @@ func TestFanout_Refresh_SetsLoadingOnCurrentView(t *testing.T) {
 }
 
 // TestFanout_Refresh_SetsLoadingOnPolicies verifies that pressing 'r' while on
-// the Policies, NATPolicies, or GPUsers view calls SetLoading(true). Since Loading is
+// the Policies, NATPolicies, GPUsers, or IPSecTunnels view calls SetLoading(true). Since Loading is
 // inside the unexported list field, we verify via the View() output: when
 // Loading==true and no data has been loaded, View() renders the loading message.
 func TestFanout_Refresh_SetsLoadingOnPolicies(t *testing.T) {
@@ -270,6 +266,7 @@ func TestFanout_Refresh_SetsLoadingOnPolicies(t *testing.T) {
 		{ViewPolicies, "policies"},
 		{ViewNATPolicies, "natPolicies"},
 		{ViewGPUsers, "gpUsers"},
+		{ViewIPSecTunnels, "ipsecTunnels"},
 	} {
 		m := newTestModel(t, tc.view)
 		// Dispatch a resize first so View() doesn't short-circuit on zero width.
@@ -287,6 +284,8 @@ func TestFanout_Refresh_SetsLoadingOnPolicies(t *testing.T) {
 			got = nm.natPolicies.View()
 		case ViewGPUsers:
 			got = nm.gpUsers.View()
+		case ViewIPSecTunnels:
+			got = nm.ipsecTunnels.View()
 		}
 		// When Loading=true (and no items loaded), View() renders the loading
 		// inline string (e.g. "Loading policies..." or "Loading NAT rules...").

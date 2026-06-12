@@ -1,9 +1,7 @@
 package views
 
 import (
-	"cmp"
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -14,264 +12,105 @@ import (
 	"github.com/jp2195/pyre/internal/tui/theme"
 )
 
-type IPSecSortField int
-
-const (
-	IPSecSortName IPSecSortField = iota
-	IPSecSortGateway
-	IPSecSortState
-	IPSecSortTraffic
-)
-
 type IPSecTunnelsModel struct {
-	TableBase
-	tunnels  []models.IPSecTunnel
-	filtered []models.IPSecTunnel
-	sortBy   IPSecSortField
+	list RuleListModel[models.IPSecTunnel]
 }
 
 func NewIPSecTunnelsModel() IPSecTunnelsModel {
-	return IPSecTunnelsModel{
-		TableBase: NewTableBase("Filter tunnels..."),
+	config := RuleListConfig[models.IPSecTunnel]{
+		Title:             "IPSec Tunnels",
+		ItemNoun:          "tunnels",
+		LoadingMsg:        "Loading IPSec tunnels...",
+		EmptyMsg:          "No IPSec tunnels found",
+		FilterPlaceholder: "Filter tunnels...",
+		SortLabels:        []string{"Name", "Gateway", "State", "Traffic"},
+		DefaultSortAsc:    func(idx int) bool { return idx == 0 || idx == 1 },
+		MatchFilter:       matchIPSecTunnel,
+		CompareItems:      compareIPSecTunnel,
+		FormatHeaderRow:   formatIPSecHeader,
+		FormatRow:         formatTunnelRow,
+		RenderDetail:      renderIPSecDetail,
+		StyleRow:          styleTunnelRow,
 	}
+	return IPSecTunnelsModel{list: NewRuleListModel(config)}
 }
 
 func (m IPSecTunnelsModel) SetSize(width, height int) IPSecTunnelsModel {
-	m.TableBase = m.TableBase.SetSize(width, height)
-	m.EnsureCursorValid(len(m.filtered))
-	if visibleRows := m.visibleRows(); visibleRows > 0 {
-		m.EnsureVisible(visibleRows)
-	}
+	m.list = m.list.SetSize(width, height)
 	return m
 }
 
 func (m IPSecTunnelsModel) SetLoading(loading bool) IPSecTunnelsModel {
-	m.TableBase = m.TableBase.SetLoading(loading)
+	m.list = m.list.SetLoading(loading)
 	return m
 }
 
 // SetSpinnerFrame updates the current spinner animation frame.
 func (m IPSecTunnelsModel) SetSpinnerFrame(frame string) IPSecTunnelsModel {
-	m.TableBase = m.TableBase.SetSpinnerFrame(frame)
+	m.list.SpinnerFrame = frame
 	return m
 }
 
 // HasData returns true if tunnel data has been loaded.
 func (m IPSecTunnelsModel) HasData() bool {
-	return m.tunnels != nil
+	return m.list.HasData()
 }
 
 func (m IPSecTunnelsModel) SetTunnels(tunnels []models.IPSecTunnel, err error) IPSecTunnelsModel {
-	m.tunnels = tunnels
-	m.Err = err
-	m.Loading = false
-	m.Cursor = 0
-	m.Offset = 0
-	m.applyFilter()
+	m.list = m.list.SetItems(tunnels, err)
 	return m
 }
 
-func (m *IPSecTunnelsModel) applyFilter() {
-	if m.FilterValue() == "" {
-		m.filtered = make([]models.IPSecTunnel, len(m.tunnels))
-		copy(m.filtered, m.tunnels)
-	} else {
-		query := strings.ToLower(m.FilterValue())
-		m.filtered = nil
-
-		for _, t := range m.tunnels {
-			if strings.Contains(strings.ToLower(t.Name), query) ||
-				strings.Contains(strings.ToLower(t.Gateway), query) ||
-				strings.Contains(strings.ToLower(t.State), query) ||
-				strings.Contains(strings.ToLower(t.Protocol), query) ||
-				strings.Contains(strings.ToLower(t.Encryption), query) {
-				m.filtered = append(m.filtered, t)
-			}
-		}
-	}
-	m.applySort()
-}
-
-func (m *IPSecTunnelsModel) applySort() {
-	slices.SortFunc(m.filtered, func(a, b models.IPSecTunnel) int {
-		var c int
-		switch m.sortBy {
-		case IPSecSortGateway:
-			c = cmp.Compare(a.Gateway, b.Gateway)
-		case IPSecSortState:
-			c = cmp.Compare(a.State, b.State)
-		case IPSecSortTraffic:
-			c = cmp.Compare(a.BytesIn+a.BytesOut, b.BytesIn+b.BytesOut)
-		default: // IPSecSortName
-			c = cmp.Compare(a.Name, b.Name)
-		}
-		if !m.SortAsc {
-			c = -c
-		}
-		return c
-	})
-}
-
-func (m *IPSecTunnelsModel) cycleSort() {
-	m.sortBy = (m.sortBy + 1) % 4
-	m.SortAsc = m.sortBy == IPSecSortName || m.sortBy == IPSecSortGateway
-	m.applySort()
-}
-
-func (m IPSecTunnelsModel) sortLabel() string {
-	dir := "↓"
-	if m.SortAsc {
-		dir = "↑"
-	}
-	switch m.sortBy {
-	case IPSecSortGateway:
-		return fmt.Sprintf("Gateway %s", dir)
-	case IPSecSortState:
-		return fmt.Sprintf("State %s", dir)
-	case IPSecSortTraffic:
-		return fmt.Sprintf("Traffic %s", dir)
-	default:
-		return fmt.Sprintf("Name %s", dir)
-	}
-}
-
 func (m IPSecTunnelsModel) Update(msg tea.Msg) (IPSecTunnelsModel, tea.Cmd) {
-	if m.FilterMode {
-		return m.updateFilter(msg)
-	}
-
-	switch msg := msg.(type) {
-	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "esc":
-			if m.HandleCollapseIfExpanded() {
-				return m, nil
-			}
-			if m.HandleClearFilter() {
-				m.applyFilter()
-			}
-			return m, nil
-		case "s":
-			m.cycleSort()
-			m.Cursor = 0
-			m.Offset = 0
-			return m, nil
-		}
-
-		visible := m.visibleRows()
-		base, handled, cmd := m.HandleNavigation(msg, len(m.filtered), visible)
-		if handled {
-			m.TableBase = base
-			return m, cmd
-		}
-	}
-
-	return m, nil
-}
-
-func (m IPSecTunnelsModel) updateFilter(msg tea.Msg) (IPSecTunnelsModel, tea.Cmd) {
-	base, exited, cmd := m.HandleFilterMode(msg)
-	m.TableBase = base
-	if exited {
-		m.applyFilter()
-	}
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
 	return m, cmd
 }
 
-func (m IPSecTunnelsModel) visibleRows() int {
-	return m.VisibleRows(8, 14)
-}
-
 func (m IPSecTunnelsModel) View() string {
-	if m.Width == 0 {
-		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
-	}
-
-	titleStyle := ViewTitleStyle.MarginBottom(1)
-	panelStyle := ViewPanelStyle.Width(m.Width - 4)
-
-	var b strings.Builder
-	title := "IPSec Tunnels"
-	sortInfo := BannerInfoStyle.Render(fmt.Sprintf(" [%d tunnels | Sort: %s | s: change | /: filter | enter: details]", len(m.filtered), m.sortLabel()))
-	b.WriteString(titleStyle.Render(title) + sortInfo)
-	b.WriteString("\n")
-
-	if m.FilterMode {
-		b.WriteString(FilterBorderStyle.Render(m.Filter.View()))
-		b.WriteString("\n\n")
-	} else if m.IsFiltered() {
-		filterInfo := FilterActiveStyle.Render(fmt.Sprintf("Filtered: \"%s\"", m.FilterValue()))
-		clearHint := FilterClearHintStyle.Render(" (esc to clear)")
-		b.WriteString(filterInfo + clearHint)
-		b.WriteString("\n\n")
-	}
-
-	if m.Err != nil {
-		b.WriteString(ErrorMsgStyle.Render("Error: " + m.Err.Error()))
-		return panelStyle.Render(b.String())
-	}
-
-	if m.Loading || m.tunnels == nil {
-		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading IPSec tunnels..."))
-		return panelStyle.Render(b.String())
-	}
-
-	if len(m.filtered) == 0 {
-		b.WriteString(EmptyMsgStyle.Render("No IPSec tunnels found"))
-		return panelStyle.Render(b.String())
-	}
-
-	b.WriteString(m.renderTable())
-
-	if m.Expanded && m.Cursor < len(m.filtered) {
-		b.WriteString("\n")
-		b.WriteString(m.renderDetail(m.filtered[m.Cursor]))
-	}
-
-	return panelStyle.Render(b.String())
+	return m.list.View()
 }
 
-func (m IPSecTunnelsModel) renderTable() string {
-	headerStyle := DetailLabelStyle.Bold(true)
-	selectedStyle := TableRowSelectedStyle.Bold(true)
-	dimStyle := DetailDimStyle
+// --- Type-specific functions ---
 
-	availableWidth := m.Width - 12
-
-	var b strings.Builder
-
-	header := m.formatHeaderRow(availableWidth)
-	b.WriteString(headerStyle.Render(header))
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(strings.Repeat("-", min(availableWidth, len(header)+10))))
-	b.WriteString("\n")
-
-	visibleRows := m.visibleRows()
-	end := min(m.Offset+visibleRows, len(m.filtered))
-
-	for i := m.Offset; i < end; i++ {
-		t := m.filtered[i]
-		isSelected := i == m.Cursor
-
-		row := m.formatTunnelRow(t, availableWidth)
-
-		if isSelected {
-			b.WriteString(selectedStyle.Render(row))
-		} else {
-			b.WriteString(m.stateStyledRow(row, t.State))
-		}
-		b.WriteString("\n")
-	}
-
-	if len(m.filtered) > visibleRows {
-		scrollInfo := fmt.Sprintf("  Showing %d-%d of %d", m.Offset+1, end, len(m.filtered))
-		b.WriteString(dimStyle.Render(scrollInfo))
-	}
-
-	return b.String()
+func matchIPSecTunnel(t models.IPSecTunnel, query string) bool {
+	return strings.Contains(strings.ToLower(t.Name), query) ||
+		strings.Contains(strings.ToLower(t.Gateway), query) ||
+		strings.Contains(strings.ToLower(t.State), query) ||
+		strings.Contains(strings.ToLower(t.Protocol), query) ||
+		strings.Contains(strings.ToLower(t.Encryption), query)
 }
 
-func (m IPSecTunnelsModel) formatHeaderRow(width int) string {
+func compareIPSecTunnel(a, b models.IPSecTunnel, sortIdx int) bool {
+	switch sortIdx {
+	case 1: // Gateway
+		return a.Gateway < b.Gateway
+	case 2: // State
+		return a.State < b.State
+	case 3: // Traffic
+		return a.BytesIn+a.BytesOut < b.BytesIn+b.BytesOut
+	default: // Name
+		return a.Name < b.Name
+	}
+}
+
+// styleTunnelRow colors a non-selected row by tunnel state.
+func styleTunnelRow(t models.IPSecTunnel, width int) string {
+	row := formatTunnelRow(t, width)
+	c := theme.Colors()
+	switch t.State {
+	case "up":
+		return lipgloss.NewStyle().Foreground(c.Success).Render(row)
+	case "init":
+		return lipgloss.NewStyle().Foreground(c.Warning).Render(row)
+	case "down":
+		return lipgloss.NewStyle().Foreground(c.Error).Render(row)
+	default:
+		return DetailValueStyle.Render(row)
+	}
+}
+
+func formatIPSecHeader(width int) string {
 	if width >= 120 {
 		return fmt.Sprintf("%-4s %-20s %-18s %-6s %-8s %-10s %-10s %-10s %-10s",
 			"", "Name", "Gateway", "State", "Proto", "Encrypt", "In", "Out", "Uptime")
@@ -283,7 +122,7 @@ func (m IPSecTunnelsModel) formatHeaderRow(width int) string {
 		"", "Name", "Gateway", "State", "Traffic")
 }
 
-func (m IPSecTunnelsModel) formatTunnelRow(t models.IPSecTunnel, width int) string {
+func formatTunnelRow(t models.IPSecTunnel, width int) string {
 	stateIcon := stateIndicator(t.State)
 	totalTraffic := formatBytes(t.BytesIn + t.BytesOut)
 
@@ -327,23 +166,9 @@ func stateIndicator(state string) string {
 	}
 }
 
-func (m IPSecTunnelsModel) stateStyledRow(row, state string) string {
+func renderIPSecDetail(t models.IPSecTunnel, width int) string {
 	c := theme.Colors()
-	switch state {
-	case "up":
-		return lipgloss.NewStyle().Foreground(c.Success).Render(row)
-	case "init":
-		return lipgloss.NewStyle().Foreground(c.Warning).Render(row)
-	case "down":
-		return lipgloss.NewStyle().Foreground(c.Error).Render(row)
-	default:
-		return DetailValueStyle.Render(row)
-	}
-}
-
-func (m IPSecTunnelsModel) renderDetail(t models.IPSecTunnel) string {
-	c := theme.Colors()
-	dr := NewDetailRenderer(m.Width, 18)
+	dr := NewDetailRenderer(width, 18)
 
 	// Title with state indicator
 	var stateStyle lipgloss.Style
