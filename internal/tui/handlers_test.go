@@ -39,7 +39,7 @@ func TestDevicePicker_DKeyIgnoredOnStandalone(t *testing.T) {
 	// fall-through won't happen and detailLoading stays false — giving us a
 	// positive assertion that 'd' reached the view.
 	m.sessions = m.sessions.SetSessions([]models.Session{{ID: 42, Application: "ssh"}}, nil)
-	m.sessions.Expanded = true
+	m.sessions = m.sessions.SetExpanded(true)
 
 	if m.sessions.IsDetailLoading() {
 		t.Fatalf("precondition: detail should not be loading before dispatch")

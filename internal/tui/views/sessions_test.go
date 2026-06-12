@@ -13,14 +13,14 @@ import (
 func TestNewSessionsModel(t *testing.T) {
 	m := NewSessionsModel()
 
-	if m.Cursor != 0 {
-		t.Errorf("expected Cursor=0, got %d", m.Cursor)
+	if m.list.Cursor != 0 {
+		t.Errorf("expected Cursor=0, got %d", m.list.Cursor)
 	}
-	if m.FilterMode {
+	if m.list.FilterMode {
 		t.Error("expected FilterMode=false")
 	}
-	if m.sortBy != SessionSortID {
-		t.Errorf("expected default sort by ID, got %d", m.sortBy)
+	if m.list.sortBy != 0 {
+		t.Errorf("expected default sort by ID, got %d", m.list.sortBy)
 	}
 }
 
@@ -28,11 +28,11 @@ func TestSessionsModel_SetSize(t *testing.T) {
 	m := NewSessionsModel()
 	m = m.SetSize(100, 50)
 
-	if m.Width != 100 {
-		t.Errorf("expected Width=100, got %d", m.Width)
+	if m.list.Width != 100 {
+		t.Errorf("expected Width=100, got %d", m.list.Width)
 	}
-	if m.Height != 50 {
-		t.Errorf("expected Height=50, got %d", m.Height)
+	if m.list.Height != 50 {
+		t.Errorf("expected Height=50, got %d", m.list.Height)
 	}
 }
 
@@ -40,12 +40,12 @@ func TestSessionsModel_SetLoading(t *testing.T) {
 	m := NewSessionsModel()
 
 	m = m.SetLoading(true)
-	if !m.Loading {
+	if !m.list.Loading {
 		t.Error("expected Loading=true")
 	}
 
 	m = m.SetLoading(false)
-	if m.Loading {
+	if m.list.Loading {
 		t.Error("expected Loading=false")
 	}
 }
@@ -60,13 +60,13 @@ func TestSessionsModel_SetSessions(t *testing.T) {
 
 	m = m.SetSessions(sessions, nil)
 
-	if len(m.sessions) != 2 {
-		t.Errorf("expected 2 sessions, got %d", len(m.sessions))
+	if len(m.list.Items()) != 2 {
+		t.Errorf("expected 2 sessions, got %d", len(m.list.Items()))
 	}
-	if m.Loading {
+	if m.list.Loading {
 		t.Error("expected Loading=false after SetSessions")
 	}
-	if m.Cursor != 0 {
+	if m.list.Cursor != 0 {
 		t.Error("expected Cursor to reset to 0")
 	}
 }
@@ -76,7 +76,7 @@ func TestSessionsModel_SetSessions_WithError(t *testing.T) {
 
 	m = m.SetSessions(nil, errTest)
 
-	if m.Err != errTest {
+	if m.list.Err != errTest {
 		t.Error("expected error to be set")
 	}
 }
@@ -94,24 +94,24 @@ func TestSessionsModel_Filtering(t *testing.T) {
 	m = m.SetSessions(sessions, nil)
 
 	// Initially all sessions should be visible
-	if len(m.filtered) != 3 {
-		t.Errorf("expected 3 filtered sessions, got %d", len(m.filtered))
+	if len(m.list.Filtered()) != 3 {
+		t.Errorf("expected 3 filtered sessions, got %d", len(m.list.Filtered()))
 	}
 
 	// Apply filter
-	m.Filter.SetValue("ssl")
-	m.applyFilter()
+	m.list.Filter.SetValue("ssl")
+	m.list.applyFilter()
 
-	if len(m.filtered) != 1 {
-		t.Errorf("expected 1 filtered session for 'ssl', got %d", len(m.filtered))
+	if len(m.list.Filtered()) != 1 {
+		t.Errorf("expected 1 filtered session for 'ssl', got %d", len(m.list.Filtered()))
 	}
 
 	// Clear filter
-	m.Filter.SetValue("")
-	m.applyFilter()
+	m.list.Filter.SetValue("")
+	m.list.applyFilter()
 
-	if len(m.filtered) != 3 {
-		t.Errorf("expected 3 filtered sessions after clear, got %d", len(m.filtered))
+	if len(m.list.Filtered()) != 3 {
+		t.Errorf("expected 3 filtered sessions after clear, got %d", len(m.list.Filtered()))
 	}
 }
 
@@ -127,32 +127,32 @@ func TestSessionsModel_Sorting(t *testing.T) {
 	m = m.SetSessions(sessions, nil)
 
 	// Default sort by ID descending (SortAsc defaults to false)
-	if m.filtered[0].ID != 3 {
-		t.Errorf("expected first session to have ID 3 with default descending sort, got %d", m.filtered[0].ID)
+	if m.list.Filtered()[0].ID != 3 {
+		t.Errorf("expected first session to have ID 3 with default descending sort, got %d", m.list.Filtered()[0].ID)
 	}
 
 	// Cycle to bytes sort
-	m.cycleSort()
-	if m.sortBy != SessionSortBytes {
-		t.Errorf("expected sort by Bytes, got %d", m.sortBy)
+	m.list.cycleSort()
+	if m.list.sortBy != 1 {
+		t.Errorf("expected sort by Bytes, got %d", m.list.sortBy)
 	}
 
 	// Cycle to age sort
-	m.cycleSort()
-	if m.sortBy != SessionSortAge {
-		t.Errorf("expected sort by Age, got %d", m.sortBy)
+	m.list.cycleSort()
+	if m.list.sortBy != 2 {
+		t.Errorf("expected sort by Age, got %d", m.list.sortBy)
 	}
 
 	// Cycle to application sort
-	m.cycleSort()
-	if m.sortBy != SessionSortApplication {
-		t.Errorf("expected sort by Application, got %d", m.sortBy)
+	m.list.cycleSort()
+	if m.list.sortBy != 3 {
+		t.Errorf("expected sort by Application, got %d", m.list.sortBy)
 	}
 
 	// Cycle back to ID
-	m.cycleSort()
-	if m.sortBy != SessionSortID {
-		t.Errorf("expected sort by ID, got %d", m.sortBy)
+	m.list.cycleSort()
+	if m.list.sortBy != 0 {
+		t.Errorf("expected sort by ID, got %d", m.list.sortBy)
 	}
 }
 
@@ -160,28 +160,28 @@ func TestSessionsModel_SortLabel(t *testing.T) {
 	m := NewSessionsModel()
 
 	// ID sort
-	label := m.sortLabel()
+	label := m.list.sortLabel()
 	if label == "" {
 		t.Error("expected non-empty sort label")
 	}
 
 	// Bytes sort
-	m.sortBy = SessionSortBytes
-	label = m.sortLabel()
+	m.list.sortBy = 1
+	label = m.list.sortLabel()
 	if label == "" {
 		t.Error("expected non-empty sort label for bytes")
 	}
 
 	// Age sort
-	m.sortBy = SessionSortAge
-	label = m.sortLabel()
+	m.list.sortBy = 2
+	label = m.list.sortLabel()
 	if label == "" {
 		t.Error("expected non-empty sort label for age")
 	}
 
 	// Application sort
-	m.sortBy = SessionSortApplication
-	label = m.sortLabel()
+	m.list.sortBy = 3
+	label = m.list.sortLabel()
 	if label == "" {
 		t.Error("expected non-empty sort label for application")
 	}
@@ -200,20 +200,20 @@ func TestSessionsModel_Update_Navigation(t *testing.T) {
 
 	// Move down
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	if m.Cursor != 1 {
-		t.Errorf("expected Cursor=1 after j, got %d", m.Cursor)
+	if m.list.Cursor != 1 {
+		t.Errorf("expected Cursor=1 after j, got %d", m.list.Cursor)
 	}
 
 	// Move up
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
-	if m.Cursor != 0 {
-		t.Errorf("expected Cursor=0 after k, got %d", m.Cursor)
+	if m.list.Cursor != 0 {
+		t.Errorf("expected Cursor=0 after k, got %d", m.list.Cursor)
 	}
 
 	// Sort key
 	m, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
-	if m.sortBy != SessionSortBytes {
-		t.Errorf("expected sort to change after s, got %d", m.sortBy)
+	if m.list.sortBy != 1 {
+		t.Errorf("expected sort to change after s, got %d", m.list.sortBy)
 	}
 }
 
@@ -246,21 +246,6 @@ func TestSessionsModel_View_ZeroWidth(t *testing.T) {
 	view := m.View()
 	if !strings.Contains(view, "Loading...") {
 		t.Errorf("expected view to contain 'Loading...' with zero width, got %q", view)
-	}
-}
-
-func TestSessionSortField_Constants(t *testing.T) {
-	if SessionSortID != 0 {
-		t.Errorf("expected SessionSortID=0, got %d", SessionSortID)
-	}
-	if SessionSortBytes != 1 {
-		t.Errorf("expected SessionSortBytes=1, got %d", SessionSortBytes)
-	}
-	if SessionSortAge != 2 {
-		t.Errorf("expected SessionSortAge=2, got %d", SessionSortAge)
-	}
-	if SessionSortApplication != 3 {
-		t.Errorf("expected SessionSortApplication=3, got %d", SessionSortApplication)
 	}
 }
 
