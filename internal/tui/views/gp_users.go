@@ -52,6 +52,11 @@ func (m GPUsersModel) HasData() bool {
 	return m.list.HasData()
 }
 
+// IsFilterMode returns true while the filter text input is focused.
+func (m GPUsersModel) IsFilterMode() bool {
+	return m.list.IsFilterMode()
+}
+
 func (m GPUsersModel) SetUsers(users []models.GlobalProtectUser, err error) GPUsersModel {
 	m.list = m.list.SetItems(users, err)
 	return m

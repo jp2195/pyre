@@ -64,6 +64,11 @@ func (m RuleListModel[T]) HasData() bool {
 	return m.items != nil
 }
 
+// IsFilterMode returns true while the filter text input is focused.
+func (m RuleListModel[T]) IsFilterMode() bool {
+	return m.FilterMode
+}
+
 // SetItems replaces the item list, resets cursor, and re-applies filter/sort.
 func (m RuleListModel[T]) SetItems(items []T, err error) RuleListModel[T] {
 	m.items = items

@@ -56,6 +56,11 @@ func (m IPSecTunnelsModel) HasData() bool {
 	return m.list.HasData()
 }
 
+// IsFilterMode returns true while the filter text input is focused.
+func (m IPSecTunnelsModel) IsFilterMode() bool {
+	return m.list.IsFilterMode()
+}
+
 func (m IPSecTunnelsModel) SetTunnels(tunnels []models.IPSecTunnel, err error) IPSecTunnelsModel {
 	m.list = m.list.SetItems(tunnels, err)
 	return m

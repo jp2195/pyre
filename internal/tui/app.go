@@ -229,9 +229,10 @@ func (m Model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleCommandPaletteKeys(msg)
 	}
 
-	// If logs view is in filter mode, pass keys through to the view
-	// (except ctrl+c for emergency quit)
-	if m.currentView == ViewLogs && m.logs.IsFilterMode() {
+	// If the current view's filter input is focused, route keys to the
+	// view (except ctrl+c for emergency quit) so global bindings like
+	// q/r/1-3 don't fire while the user is typing a filter.
+	if m.currentViewFiltering() {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}

@@ -91,6 +91,11 @@ func (m ObjectsModel) HasData() bool {
 	return m.addressTab.addresses != nil || m.serviceTab.services != nil
 }
 
+// IsFilterMode returns true while either tab's filter input is focused.
+func (m ObjectsModel) IsFilterMode() bool {
+	return m.addressTab.FilterMode || m.serviceTab.FilterMode
+}
+
 // SetSize propagates dimensions to both sub-tabs.
 func (m ObjectsModel) SetSize(width, height int) ObjectsModel {
 	m.width, m.height = width, height

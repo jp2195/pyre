@@ -46,6 +46,11 @@ func (m PoliciesModel) HasData() bool {
 	return m.list.HasData()
 }
 
+// IsFilterMode returns true while the filter text input is focused.
+func (m PoliciesModel) IsFilterMode() bool {
+	return m.list.IsFilterMode()
+}
+
 func (m PoliciesModel) SetPolicies(policies []models.SecurityRule, err error) PoliciesModel {
 	m.list = m.list.SetItems(policies, err)
 	return m

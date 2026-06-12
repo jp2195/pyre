@@ -46,6 +46,11 @@ func (m NATPoliciesModel) HasData() bool {
 	return m.list.HasData()
 }
 
+// IsFilterMode returns true while the filter text input is focused.
+func (m NATPoliciesModel) IsFilterMode() bool {
+	return m.list.IsFilterMode()
+}
+
 func (m NATPoliciesModel) SetRules(rules []models.NATRule, err error) NATPoliciesModel {
 	m.list = m.list.SetItems(rules, err)
 	return m

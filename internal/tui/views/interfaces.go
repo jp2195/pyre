@@ -61,6 +61,11 @@ func (m InterfacesModel) HasData() bool {
 	return m.list.HasData()
 }
 
+// IsFilterMode returns true while the filter text input is focused.
+func (m InterfacesModel) IsFilterMode() bool {
+	return m.list.IsFilterMode()
+}
+
 func (m InterfacesModel) SetInterfaces(interfaces []models.Interface, err error) InterfacesModel {
 	m.list = m.list.SetItems(interfaces, err)
 	return m

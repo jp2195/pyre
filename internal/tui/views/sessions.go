@@ -66,6 +66,11 @@ func (m SessionsModel) HasData() bool {
 	return m.list.HasData()
 }
 
+// IsFilterMode returns true while the filter text input is focused.
+func (m SessionsModel) IsFilterMode() bool {
+	return m.list.IsFilterMode()
+}
+
 func (m SessionsModel) SetSessions(sessions []models.Session, err error) SessionsModel {
 	m.list = m.list.SetItems(sessions, err)
 	m.detail = nil // Clear detail when sessions refresh
