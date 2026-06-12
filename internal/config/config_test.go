@@ -18,10 +18,6 @@ func TestDefaultConfig(t *testing.T) {
 		t.Error("expected Connections map to be initialized")
 	}
 
-	if cfg.Settings.SessionPageSize != 50 {
-		t.Errorf("expected SessionPageSize 50, got %d", cfg.Settings.SessionPageSize)
-	}
-
 	if cfg.Settings.Theme != "default" {
 		t.Errorf("expected Theme 'default', got %q", cfg.Settings.Theme)
 	}
@@ -124,8 +120,8 @@ func TestLoad_NoConfigFile(t *testing.T) {
 		t.Fatal("expected non-nil config")
 	}
 	// Should return default config
-	if cfg.Settings.SessionPageSize != 50 {
-		t.Errorf("expected default SessionPageSize 50, got %d", cfg.Settings.SessionPageSize)
+	if cfg.Settings.Theme != "default" {
+		t.Errorf("expected default Theme 'default', got %q", cfg.Settings.Theme)
 	}
 }
 
@@ -141,7 +137,6 @@ connections:
   10.0.0.1:
     insecure: true
 settings:
-  session_page_size: 100
   theme: dark
 `
 	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
@@ -169,9 +164,6 @@ settings:
 		t.Error("expected Insecure to be true")
 	}
 
-	if cfg.Settings.SessionPageSize != 100 {
-		t.Errorf("expected SessionPageSize 100, got %d", cfg.Settings.SessionPageSize)
-	}
 	if cfg.Settings.Theme != "dark" {
 		t.Errorf("expected Theme 'dark', got %q", cfg.Settings.Theme)
 	}
@@ -304,7 +296,7 @@ func TestConfig_NilConnectionsAfterLoad(t *testing.T) {
 	// Config with no connections section
 	configContent := `
 settings:
-  session_page_size: 100
+  theme: dark
 `
 	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		t.Fatalf("failed to write test config: %v", err)
@@ -364,13 +356,9 @@ func TestCLIFlags_AllFields(t *testing.T) {
 
 func TestSettings_AllFields(t *testing.T) {
 	settings := Settings{
-		SessionPageSize: 100,
-		Theme:           "dark",
+		Theme: "dark",
 	}
 
-	if settings.SessionPageSize != 100 {
-		t.Errorf("expected SessionPageSize 100, got %d", settings.SessionPageSize)
-	}
 	if settings.Theme != "dark" {
 		t.Errorf("expected Theme 'dark', got %q", settings.Theme)
 	}

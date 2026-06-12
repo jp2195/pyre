@@ -33,7 +33,6 @@ connections:
 
 # Global UI settings
 settings:
-  session_page_size: 50
   theme: catppuccin
 ```
 
@@ -54,10 +53,9 @@ rather than silently falling back to system roots.
 
 ## Global settings
 
-| Option              | Type   | Default     | Description                          |
-|---------------------|--------|-------------|--------------------------------------|
-| `session_page_size` | int    | 50          | Sessions per page                    |
-| `theme`             | string | `dark`      | Color theme (see below)              |
+| Option   | Type   | Default | Description                 |
+|----------|--------|---------|------------------------------|
+| `theme`  | string | `dark`  | Color theme (see below)     |
 
 Themes: `dark`, `light`, `nord`, `dracula`, `solarized`, `gruvbox`,
 `tokyonight`, `catppuccin`, `onedark`, `monokai`. Unrecognized names
