@@ -116,12 +116,26 @@ func (m RoutesModel) SetRoutes(routes []models.RouteEntry, err error) RoutesMode
 func (m RoutesModel) SetBGPNeighbors(neighbors []models.BGPNeighbor, err error) RoutesModel {
 	m.bgpNeighbors = neighbors
 	m.bgpErr = err
-	return m
+	return m.clampNeighborView()
 }
 
 func (m RoutesModel) SetOSPFNeighbors(neighbors []models.OSPFNeighbor, err error) RoutesModel {
 	m.ospfNeighbors = neighbors
 	m.ospfErr = err
+	return m.clampNeighborView()
+}
+
+// clampNeighborView keeps the Neighbors-tab cursor and offset inside the
+// current combined neighbor list after a data refresh; SetSize handles
+// the resize path with the same discipline.
+func (m RoutesModel) clampNeighborView() RoutesModel {
+	count := len(m.bgpNeighbors) + len(m.ospfNeighbors)
+	if count == 0 {
+		m.neighborCursor, m.neighborOffset = 0, 0
+		return m
+	}
+	m.neighborCursor = min(m.neighborCursor, count-1)
+	m.neighborOffset = min(m.neighborOffset, m.neighborCursor)
 	return m
 }
 

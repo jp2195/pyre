@@ -282,3 +282,38 @@ func TestRoutes_ViewZeroWidth(t *testing.T) {
 		t.Errorf("expected zero-width fallback 'Loading...', got %q", out)
 	}
 }
+
+// TestRoutes_NeighborRefreshClampsCursor guards the shrink-refresh case:
+// with the cursor advanced, a refresh returning fewer neighbors must not
+// strand cursor/offset past the new list (which rendered an empty tab).
+func TestRoutes_NeighborRefreshClampsCursor(t *testing.T) {
+	InitStyles()
+	m := NewRoutesModel()
+	m = m.SetSize(120, 30)
+	m = m.SetBGPNeighbors([]models.BGPNeighbor{
+		{PeerAddress: "203.0.113.1"}, {PeerAddress: "203.0.113.2"}, {PeerAddress: "203.0.113.3"},
+	}, nil)
+	m = pressRoutes(m, "]")
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'G', Text: "G"}) // cursor -> 2
+
+	// Refresh returns a single neighbor.
+	m = m.SetBGPNeighbors([]models.BGPNeighbor{{PeerAddress: "198.51.100.9"}}, nil)
+
+	if m.neighborCursor > 0 {
+		t.Errorf("neighborCursor = %d after shrink, want clamped to 0", m.neighborCursor)
+	}
+	if m.neighborOffset > m.neighborCursor {
+		t.Errorf("neighborOffset = %d > cursor %d after shrink", m.neighborOffset, m.neighborCursor)
+	}
+	if out := m.View(); !strings.Contains(out, "198.51.100.9") {
+		t.Errorf("expected remaining neighbor rendered after shrink:\n%s", out)
+	}
+
+	// Shrink to zero must also be safe.
+	m = m.SetBGPNeighbors(nil, nil)
+	m = m.SetOSPFNeighbors(nil, nil)
+	_ = m.View() // must not panic
+	if m.neighborCursor != 0 || m.neighborOffset != 0 {
+		t.Errorf("cursor/offset = %d/%d with no neighbors, want 0/0", m.neighborCursor, m.neighborOffset)
+	}
+}
