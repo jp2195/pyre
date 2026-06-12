@@ -62,35 +62,26 @@ func (m LogsModel) renderSystemTable() string {
 		"Time", "Sev", "Type", "Description")
 	b.WriteString(TableHeaderStyle.Render(header) + "\n")
 
-	visibleRows := m.visibleRows()
-	end := min(m.Offset+visibleRows, len(m.filteredSystem))
-
-	for i := m.Offset; i < end; i++ {
-		log := m.filteredSystem[i]
-		isSelected := i == m.Cursor
-
+	b.WriteString(renderLogRows(m, m.filteredSystem, func(log models.SystemLogEntry, selected bool) string {
 		timeStr := log.Time.Format("2006-01-02 15:04:05")
 		sevAbbrev := abbreviateSeverity(log.Severity)
 		desc := truncate(log.Description, m.Width-46)
 
-		if isSelected {
+		if selected {
 			row := fmt.Sprintf("%-19s %-4s %-18s %s",
 				timeStr,
 				sevAbbrev,
 				truncate(log.Type, 18),
 				desc)
-			b.WriteString(TableRowSelectedStyle.Render(row) + "\n")
-		} else {
-			// Build row with colored severity indicator
-			sevStyle := SeverityStyle(log.Severity)
-
-			row := DetailLabelStyle.Render(fmt.Sprintf("%-19s", timeStr)) + " " +
-				sevStyle.Render(fmt.Sprintf("%-4s", sevAbbrev)) + " " +
-				StatusMutedStyle.Render(fmt.Sprintf("%-18s", truncate(log.Type, 18))) + " " +
-				DetailValueStyle.Render(desc)
-			b.WriteString(row + "\n")
+			return TableRowSelectedStyle.Render(row)
 		}
-	}
+		// Build row with colored severity indicator
+		sevStyle := SeverityStyle(log.Severity)
+		return DetailLabelStyle.Render(fmt.Sprintf("%-19s", timeStr)) + " " +
+			sevStyle.Render(fmt.Sprintf("%-4s", sevAbbrev)) + " " +
+			StatusMutedStyle.Render(fmt.Sprintf("%-18s", truncate(log.Type, 18))) + " " +
+			DetailValueStyle.Render(desc)
+	}))
 
 	return b.String()
 }

@@ -68,13 +68,7 @@ func (m LogsModel) renderTrafficTable() string {
 		"Time", "Action", "Source", "Dest", "App", "Rule", "Bytes")
 	b.WriteString(TableHeaderStyle.Render(header) + "\n")
 
-	visibleRows := m.visibleRows()
-	end := min(m.Offset+visibleRows, len(m.filteredTraffic))
-
-	for i := m.Offset; i < end; i++ {
-		log := m.filteredTraffic[i]
-		isSelected := i == m.Cursor
-
+	b.WriteString(renderLogRows(m, m.filteredTraffic, func(log models.TrafficLogEntry, selected bool) string {
 		timeStr := log.Time.Format("2006-01-02 15:04:05")
 
 		row := fmt.Sprintf("%-19s %-7s %-15s %-15s %-12s %-15s %-10s",
@@ -86,14 +80,12 @@ func (m LogsModel) renderTrafficTable() string {
 			truncate(log.Rule, 15),
 			formatBytes(log.Bytes))
 
-		if isSelected {
-			b.WriteString(TableRowSelectedStyle.Render(row) + "\n")
-		} else {
-			// Color code by action
-			row = colorByAction(row, log.Action)
-			b.WriteString(row + "\n")
+		if selected {
+			return TableRowSelectedStyle.Render(row)
 		}
-	}
+		// Color code by action
+		return colorByAction(row, log.Action)
+	}))
 
 	return b.String()
 }

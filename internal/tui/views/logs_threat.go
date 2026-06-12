@@ -70,13 +70,7 @@ func (m LogsModel) renderThreatTable() string {
 		"Time", "Severity", "Threat", "Source", "Action", "Category")
 	b.WriteString(TableHeaderStyle.Render(header) + "\n")
 
-	visibleRows := m.visibleRows()
-	end := min(m.Offset+visibleRows, len(m.filteredThreat))
-
-	for i := m.Offset; i < end; i++ {
-		log := m.filteredThreat[i]
-		isSelected := i == m.Cursor
-
+	b.WriteString(renderLogRows(m, m.filteredThreat, func(log models.ThreatLogEntry, selected bool) string {
 		timeStr := log.Time.Format("2006-01-02 15:04:05")
 
 		row := fmt.Sprintf("%-19s %-9s %-20s %-15s %-7s %-15s",
@@ -87,14 +81,12 @@ func (m LogsModel) renderThreatTable() string {
 			truncate(log.Action, 7),
 			truncate(log.ThreatCategory, 15))
 
-		if isSelected {
-			b.WriteString(TableRowSelectedStyle.Render(row) + "\n")
-		} else {
-			// Color code by severity
-			row = colorBySeverity(row, log.Severity)
-			b.WriteString(row + "\n")
+		if selected {
+			return TableRowSelectedStyle.Render(row)
 		}
-	}
+		// Color code by severity
+		return colorBySeverity(row, log.Severity)
+	}))
 
 	return b.String()
 }
