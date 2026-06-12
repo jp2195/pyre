@@ -1,9 +1,7 @@
 package views
 
 import (
-	"cmp"
 	"fmt"
-	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -11,272 +9,101 @@ import (
 	"github.com/jp2195/pyre/internal/models"
 )
 
-type GPSortField int
-
-const (
-	GPSortUsername GPSortField = iota
-	GPSortGateway
-	GPSortLoginTime
-	GPSortDuration
-)
-
 type GPUsersModel struct {
-	TableBase
-	users    []models.GlobalProtectUser
-	filtered []models.GlobalProtectUser
-	sortBy   GPSortField
+	list RuleListModel[models.GlobalProtectUser]
+	// Width, Height, SpinnerFrame, and Loading mirror the corresponding
+	// TableBase fields so that the tui package's fanout tests can read them
+	// without reaching into the unexported list field.
+	Width        int
+	Height       int
+	SpinnerFrame string
+	Loading      bool
 }
 
 func NewGPUsersModel() GPUsersModel {
-	return GPUsersModel{
-		TableBase: NewTableBase("Filter users..."),
+	config := RuleListConfig[models.GlobalProtectUser]{
+		Title:             "GlobalProtect Users",
+		ItemNoun:          "users",
+		LoadingMsg:        "Loading GlobalProtect users...",
+		EmptyMsg:          "No GlobalProtect users found",
+		FilterPlaceholder: "Filter users...",
+		SortLabels:        []string{"Username", "Gateway", "Login Time", "Duration"},
+		DefaultSortAsc:    func(idx int) bool { return idx == 0 || idx == 1 },
+		MatchFilter:       matchGPUser,
+		CompareItems:      compareGPUser,
+		FormatHeaderRow:   formatGPUserHeader,
+		FormatRow:         formatGPUserRow,
+		RenderDetail:      renderGPUserDetail,
 	}
+	return GPUsersModel{list: NewRuleListModel(config)}
 }
 
 func (m GPUsersModel) SetSize(width, height int) GPUsersModel {
-	m.TableBase = m.TableBase.SetSize(width, height)
-	m.EnsureCursorValid(len(m.filtered))
-	m.EnsureVisible(m.visibleRows())
+	m.list = m.list.SetSize(width, height)
+	m.Width = m.list.Width
+	m.Height = m.list.Height
 	return m
 }
 
 func (m GPUsersModel) SetLoading(loading bool) GPUsersModel {
-	m.TableBase = m.TableBase.SetLoading(loading)
+	m.list = m.list.SetLoading(loading)
+	m.Loading = loading
 	return m
 }
 
 // SetSpinnerFrame updates the current spinner animation frame.
 func (m GPUsersModel) SetSpinnerFrame(frame string) GPUsersModel {
-	m.TableBase = m.TableBase.SetSpinnerFrame(frame)
+	m.list.SpinnerFrame = frame
+	m.SpinnerFrame = frame
 	return m
 }
 
 // HasData returns true if user data has been loaded.
 func (m GPUsersModel) HasData() bool {
-	return m.users != nil
+	return m.list.HasData()
 }
 
 func (m GPUsersModel) SetUsers(users []models.GlobalProtectUser, err error) GPUsersModel {
-	m.users = users
-	m.Err = err
-	m.Loading = false
-	m.Cursor = 0
-	m.Offset = 0
-	m.applyFilter()
+	m.list = m.list.SetItems(users, err)
 	return m
 }
 
-func (m *GPUsersModel) applyFilter() {
-	if m.FilterValue() == "" {
-		m.filtered = make([]models.GlobalProtectUser, len(m.users))
-		copy(m.filtered, m.users)
-	} else {
-		query := strings.ToLower(m.FilterValue())
-		m.filtered = nil
-
-		for _, u := range m.users {
-			if strings.Contains(strings.ToLower(u.Username), query) ||
-				strings.Contains(strings.ToLower(u.Domain), query) ||
-				strings.Contains(strings.ToLower(u.Computer), query) ||
-				strings.Contains(strings.ToLower(u.Gateway), query) ||
-				strings.Contains(strings.ToLower(u.ClientIP), query) ||
-				strings.Contains(strings.ToLower(u.VirtualIP), query) ||
-				strings.Contains(strings.ToLower(u.SourceRegion), query) {
-				m.filtered = append(m.filtered, u)
-			}
-		}
-	}
-	m.applySort()
-}
-
-func (m *GPUsersModel) applySort() {
-	slices.SortFunc(m.filtered, func(a, b models.GlobalProtectUser) int {
-		var c int
-		switch m.sortBy {
-		case GPSortGateway:
-			c = cmp.Compare(a.Gateway, b.Gateway)
-		case GPSortLoginTime:
-			c = a.LoginTime.Compare(b.LoginTime)
-		case GPSortDuration:
-			c = cmp.Compare(a.Duration, b.Duration)
-		default: // GPSortUsername
-			c = cmp.Compare(a.Username, b.Username)
-		}
-		if !m.SortAsc {
-			c = -c
-		}
-		return c
-	})
-}
-
-func (m *GPUsersModel) cycleSort() {
-	m.sortBy = (m.sortBy + 1) % 4
-	m.SortAsc = m.sortBy == GPSortUsername || m.sortBy == GPSortGateway
-	m.applySort()
-}
-
-func (m GPUsersModel) sortLabel() string {
-	dir := "↓"
-	if m.SortAsc {
-		dir = "↑"
-	}
-	switch m.sortBy {
-	case GPSortGateway:
-		return fmt.Sprintf("Gateway %s", dir)
-	case GPSortLoginTime:
-		return fmt.Sprintf("Login Time %s", dir)
-	case GPSortDuration:
-		return fmt.Sprintf("Duration %s", dir)
-	default:
-		return fmt.Sprintf("Username %s", dir)
-	}
-}
-
 func (m GPUsersModel) Update(msg tea.Msg) (GPUsersModel, tea.Cmd) {
-	if m.FilterMode {
-		return m.updateFilter(msg)
-	}
-
-	switch msg := msg.(type) {
-	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "esc":
-			if m.HandleCollapseIfExpanded() {
-				return m, nil
-			}
-			if m.HandleClearFilter() {
-				m.applyFilter()
-			}
-			return m, nil
-		case "s":
-			m.cycleSort()
-			m.Cursor = 0
-			m.Offset = 0
-			return m, nil
-		}
-
-		visible := m.visibleRows()
-		base, handled, cmd := m.HandleNavigation(msg, len(m.filtered), visible)
-		if handled {
-			m.TableBase = base
-			return m, cmd
-		}
-	}
-
-	return m, nil
-}
-
-func (m GPUsersModel) updateFilter(msg tea.Msg) (GPUsersModel, tea.Cmd) {
-	base, exited, cmd := m.HandleFilterMode(msg)
-	m.TableBase = base
-	if exited {
-		m.applyFilter()
-	}
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
 	return m, cmd
 }
 
-func (m GPUsersModel) visibleRows() int {
-	rows := m.Height - 8
-	if m.Expanded {
-		rows -= 14
-	}
-	if rows < 1 {
-		rows = 1
-	}
-	return rows
-}
-
 func (m GPUsersModel) View() string {
-	if m.Width == 0 {
-		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
-	}
-
-	titleStyle := ViewTitleStyle.MarginBottom(1)
-	panelStyle := ViewPanelStyle.Width(m.Width - 4)
-
-	var b strings.Builder
-	title := "GlobalProtect Users"
-	sortInfo := BannerInfoStyle.Render(fmt.Sprintf(" [%d users | Sort: %s | s: change | /: filter | enter: details]", len(m.filtered), m.sortLabel()))
-	b.WriteString(titleStyle.Render(title) + sortInfo)
-	b.WriteString("\n")
-
-	if m.FilterMode {
-		b.WriteString(FilterBorderStyle.Render(m.Filter.View()))
-		b.WriteString("\n\n")
-	} else if m.IsFiltered() {
-		filterInfo := FilterActiveStyle.Render(fmt.Sprintf("Filtered: \"%s\"", m.FilterValue()))
-		clearHint := FilterClearHintStyle.Render(" (esc to clear)")
-		b.WriteString(filterInfo + clearHint)
-		b.WriteString("\n\n")
-	}
-
-	if m.Err != nil {
-		b.WriteString(ErrorMsgStyle.Render("Error: " + m.Err.Error()))
-		return panelStyle.Render(b.String())
-	}
-
-	if m.Loading || m.users == nil {
-		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading GlobalProtect users..."))
-		return panelStyle.Render(b.String())
-	}
-
-	if len(m.filtered) == 0 {
-		b.WriteString(EmptyMsgStyle.Render("No GlobalProtect users found"))
-		return panelStyle.Render(b.String())
-	}
-
-	b.WriteString(m.renderTable())
-
-	if m.Expanded && m.Cursor < len(m.filtered) {
-		b.WriteString("\n")
-		b.WriteString(m.renderDetail(m.filtered[m.Cursor]))
-	}
-
-	return panelStyle.Render(b.String())
+	return m.list.View()
 }
 
-func (m GPUsersModel) renderTable() string {
-	headerStyle := DetailLabelStyle.Bold(true)
-	selectedStyle := TableRowSelectedStyle.Bold(true)
-	normalStyle := DetailValueStyle
-	dimStyle := DetailDimStyle
+// --- Type-specific functions ---
 
-	availableWidth := m.Width - 12
-
-	var b strings.Builder
-
-	header := m.formatHeaderRow(availableWidth)
-	b.WriteString(headerStyle.Render(header))
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(strings.Repeat("-", min(availableWidth, len(header)+10))))
-	b.WriteString("\n")
-
-	visibleRows := m.visibleRows()
-	end := min(m.Offset+visibleRows, len(m.filtered))
-
-	for i := m.Offset; i < end; i++ {
-		u := m.filtered[i]
-		isSelected := i == m.Cursor
-
-		row := m.formatUserRow(u, availableWidth)
-
-		if isSelected {
-			b.WriteString(selectedStyle.Render(row))
-		} else {
-			b.WriteString(normalStyle.Render(row))
-		}
-		b.WriteString("\n")
-	}
-
-	if len(m.filtered) > visibleRows {
-		scrollInfo := fmt.Sprintf("  Showing %d-%d of %d", m.Offset+1, end, len(m.filtered))
-		b.WriteString(dimStyle.Render(scrollInfo))
-	}
-
-	return b.String()
+func matchGPUser(u models.GlobalProtectUser, query string) bool {
+	return strings.Contains(strings.ToLower(u.Username), query) ||
+		strings.Contains(strings.ToLower(u.Domain), query) ||
+		strings.Contains(strings.ToLower(u.Computer), query) ||
+		strings.Contains(strings.ToLower(u.Gateway), query) ||
+		strings.Contains(strings.ToLower(u.ClientIP), query) ||
+		strings.Contains(strings.ToLower(u.VirtualIP), query) ||
+		strings.Contains(strings.ToLower(u.SourceRegion), query)
 }
 
-func (m GPUsersModel) formatHeaderRow(width int) string {
+func compareGPUser(a, b models.GlobalProtectUser, sortIdx int) bool {
+	switch sortIdx {
+	case 1: // Gateway
+		return a.Gateway < b.Gateway
+	case 2: // Login Time
+		return a.LoginTime.Before(b.LoginTime)
+	case 3: // Duration
+		return a.Duration < b.Duration
+	default: // Username
+		return a.Username < b.Username
+	}
+}
+
+func formatGPUserHeader(width int) string {
 	if width >= 140 {
 		return fmt.Sprintf("%-18s %-15s %-15s %-15s %-15s %-10s %-12s %-10s",
 			"Username", "Domain", "Gateway", "Virtual IP", "Client IP", "Duration", "Region", "Traffic")
@@ -288,7 +115,7 @@ func (m GPUsersModel) formatHeaderRow(width int) string {
 		"Username", "Gateway", "Virtual IP", "Duration")
 }
 
-func (m GPUsersModel) formatUserRow(u models.GlobalProtectUser, width int) string {
+func formatGPUserRow(u models.GlobalProtectUser, width int) string {
 	duration := u.Duration
 	if duration == "" && !u.LoginTime.IsZero() {
 		duration = formatTimeAgo(u.LoginTime)
@@ -321,8 +148,8 @@ func (m GPUsersModel) formatUserRow(u models.GlobalProtectUser, width int) strin
 		truncateEllipsis(duration, 10))
 }
 
-func (m GPUsersModel) renderDetail(u models.GlobalProtectUser) string {
-	dr := NewDetailRenderer(m.Width, 18)
+func renderGPUserDetail(u models.GlobalProtectUser, width int) string {
+	dr := NewDetailRenderer(width, 18)
 	dr.Title(u.Username)
 	dr.Newline()
 
