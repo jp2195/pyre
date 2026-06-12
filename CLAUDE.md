@@ -34,7 +34,7 @@ go fix ./...                  # Apply modernizers (safe, behavior-preserving)
 - Generic `fetchRulesFromPaths[T any]()` in `api/policies.go` for XPath rule fetching
 - `saveConfig()` / `saveState()` return `tea.Cmd` (avoid goroutine race conditions)
 - `setError()` is a value receiver that returns an updated Model with `m.err` set plus an auto-dismiss tick Cmd
-- Navigation uses table-driven `navTargets` map and `viewToNavbar` for reverse lookup
+- Navigation has a single source of truth: the ordered `navDefs` table in `tui/navigation.go` derives the navbar groups (`navbarGroups()`), `navTargets`, and `viewToNavbar`. Adding a nav item = one `navDefs` entry; `views.NewNavbarModel(groups)` takes the groups as a parameter.
 - Format helpers shared in `views/format_helpers.go`
 - **Bubble Tea v2 View composition**: only the top-level `tui.Model.View()` returns `tea.View`; every sub-view model returns `string`. The top-level composes sub-view strings and sets program options (alt-screen, mouse mode, window title, cursor) on the returned `tea.View` rather than on `tea.NewProgram`.
 - Use `tea.KeyPressMsg` in key handler type switches (not `tea.KeyMsg`, which in v2 is the union interface of press and release). Construct test messages as `tea.KeyPressMsg{Code: tea.KeyDown}` or `tea.KeyPressMsg{Code: 'j', Text: "j"}` — `Runes`/`Type` from v1 no longer exist.
