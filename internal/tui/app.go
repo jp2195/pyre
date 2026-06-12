@@ -127,7 +127,7 @@ func NewModel(cfg *config.Config, state *config.State, creds *auth.Credentials, 
 	}
 
 	// Initialize all view models
-	m.navbar = views.NewNavbarModel()
+	m.navbar = views.NewNavbarModel(navbarGroups())
 	m.connectionHub = views.NewConnectionHubModel().SetConnections(cfg, state)
 	m.connectionForm = views.NewQuickConnectForm()
 	m.login = views.NewLoginModel(creds)
