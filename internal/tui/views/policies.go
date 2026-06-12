@@ -16,6 +16,7 @@ type PoliciesModel struct {
 func NewPoliciesModel() PoliciesModel {
 	config := RuleListConfig[models.SecurityRule]{
 		Title:             "Security Policies",
+		ItemNoun:          "rules",
 		LoadingMsg:        "Loading policies...",
 		EmptyMsg:          "No policies found",
 		FilterPlaceholder: "Filter rules...",

@@ -16,6 +16,7 @@ type NATPoliciesModel struct {
 func NewNATPoliciesModel() NATPoliciesModel {
 	config := RuleListConfig[models.NATRule]{
 		Title:             "NAT Policies",
+		ItemNoun:          "rules",
 		LoadingMsg:        "Loading NAT rules...",
 		EmptyMsg:          "No NAT rules found",
 		FilterPlaceholder: "Filter NAT rules...",

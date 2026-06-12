@@ -11,6 +11,7 @@ import (
 // RuleListConfig defines the type-specific behavior for a RuleListModel.
 type RuleListConfig[T any] struct {
 	Title             string
+	ItemNoun          string                          // Noun for the banner count, e.g. "rules", "users"; empty defaults to "rules"
 	LoadingMsg        string
 	EmptyMsg          string
 	FilterPlaceholder string
@@ -21,11 +22,13 @@ type RuleListConfig[T any] struct {
 	FormatHeaderRow   func(width int) string          // Renders the table header for available width
 	FormatRow         func(item T, width int) string  // Renders a single row
 	RenderDetail      func(item T, width int) string  // Renders the detail panel
-	IsDisabled        func(item T) bool               // Returns true if item should render as disabled
+	IsDisabled        func(item T) bool               // Optional: returns true if item should render as disabled
+	StyleRow          func(item T, width int) string  // Optional: renders a non-selected row with custom styling (replaces FormatRow + normal/disabled styling)
 }
 
 // RuleListModel provides a generic, filterable, sortable list with detail expansion.
-// It is used by PoliciesModel and NATPoliciesModel to eliminate structural duplication.
+// It is the shared engine behind the policies, NAT, interfaces, IPSec tunnels,
+// GlobalProtect users, and sessions views.
 type RuleListModel[T any] struct {
 	TableBase
 	config   RuleListConfig[T]
@@ -163,6 +166,10 @@ func (m RuleListModel[T]) Update(msg tea.Msg) (RuleListModel[T], tea.Cmd) {
 			m.Cursor = 0
 			m.Offset = 0
 			return m, nil
+		case "S":
+			m.SortAsc = !m.SortAsc
+			m.applySort()
+			return m, nil
 		}
 
 		// Delegate to TableBase for common navigation
@@ -197,7 +204,11 @@ func (m RuleListModel[T]) View() string {
 
 	var b strings.Builder
 	title := m.config.Title
-	sortInfo := BannerInfoStyle.Render(fmt.Sprintf(" [%d rules | Sort: %s | s: change | /: filter | enter: details]", len(m.filtered), m.sortLabel()))
+	noun := m.config.ItemNoun
+	if noun == "" {
+		noun = "rules"
+	}
+	sortInfo := BannerInfoStyle.Render(fmt.Sprintf(" [%d %s | Sort: %s | s: change | /: filter | enter: details]", len(m.filtered), noun, m.sortLabel()))
 	b.WriteString(titleStyle.Render(title) + sortInfo)
 	b.WriteString("\n")
 
@@ -265,7 +276,9 @@ func (m RuleListModel[T]) renderTable() string {
 
 		if isSelected {
 			b.WriteString(selectedStyle.Render(row))
-		} else if m.config.IsDisabled(item) {
+		} else if m.config.StyleRow != nil {
+			b.WriteString(m.config.StyleRow(item, availableWidth))
+		} else if m.config.IsDisabled != nil && m.config.IsDisabled(item) {
 			b.WriteString(disabledStyle.Render(row))
 		} else {
 			b.WriteString(normalStyle.Render(row))
