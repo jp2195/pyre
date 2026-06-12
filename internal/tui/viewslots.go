@@ -14,9 +14,13 @@ package tui
 // Adding a new view means adding exactly one entry here.
 
 type viewSlot struct {
-	resize     func(m *Model, w, h, contentH int)
-	spinner    func(m *Model, frame string)
-	loading    func(m *Model, v bool)
+	resize  func(m *Model, w, h, contentH int)
+	spinner func(m *Model, frame string)
+	loading func(m *Model, v bool)
+	// refreshFor is the ViewState that triggers a refresh for this slot; 0 when the
+	// slot is not refreshable.
+	// NOTE: the zero value collides with ViewConnectionHub (= 0); this is only safe
+	// because no slot sets loading without an explicit refreshFor. Set both or neither.
 	refreshFor ViewState
 }
 
