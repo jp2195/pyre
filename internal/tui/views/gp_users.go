@@ -11,13 +11,6 @@ import (
 
 type GPUsersModel struct {
 	list RuleListModel[models.GlobalProtectUser]
-	// Width, Height, SpinnerFrame, and Loading mirror the corresponding
-	// TableBase fields so that the tui package's fanout tests can read them
-	// without reaching into the unexported list field.
-	Width        int
-	Height       int
-	SpinnerFrame string
-	Loading      bool
 }
 
 func NewGPUsersModel() GPUsersModel {
@@ -40,21 +33,17 @@ func NewGPUsersModel() GPUsersModel {
 
 func (m GPUsersModel) SetSize(width, height int) GPUsersModel {
 	m.list = m.list.SetSize(width, height)
-	m.Width = m.list.Width
-	m.Height = m.list.Height
 	return m
 }
 
 func (m GPUsersModel) SetLoading(loading bool) GPUsersModel {
 	m.list = m.list.SetLoading(loading)
-	m.Loading = loading
 	return m
 }
 
 // SetSpinnerFrame updates the current spinner animation frame.
 func (m GPUsersModel) SetSpinnerFrame(frame string) GPUsersModel {
 	m.list.SpinnerFrame = frame
-	m.SpinnerFrame = frame
 	return m
 }
 
