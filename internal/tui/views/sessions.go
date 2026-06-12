@@ -1,8 +1,9 @@
 package views
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -137,22 +138,22 @@ func (m *SessionsModel) applyFilter() {
 }
 
 func (m *SessionsModel) applySort() {
-	sort.Slice(m.filtered, func(i, j int) bool {
-		var less bool
+	slices.SortFunc(m.filtered, func(a, b models.Session) int {
+		var c int
 		switch m.sortBy {
 		case SessionSortBytes:
-			less = (m.filtered[i].BytesIn + m.filtered[i].BytesOut) < (m.filtered[j].BytesIn + m.filtered[j].BytesOut)
+			c = cmp.Compare(a.BytesIn+a.BytesOut, b.BytesIn+b.BytesOut)
 		case SessionSortAge:
-			less = m.filtered[i].StartTime.Before(m.filtered[j].StartTime)
+			c = a.StartTime.Compare(b.StartTime)
 		case SessionSortApplication:
-			less = m.filtered[i].Application < m.filtered[j].Application
+			c = cmp.Compare(a.Application, b.Application)
 		default: // SessionSortID
-			less = m.filtered[i].ID < m.filtered[j].ID
+			c = cmp.Compare(a.ID, b.ID)
 		}
-		if m.SortAsc {
-			return less
+		if !m.SortAsc {
+			c = -c
 		}
-		return !less
+		return c
 	})
 }
 

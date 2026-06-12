@@ -2,7 +2,7 @@ package views
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -101,12 +101,18 @@ func (m *RuleListModel[T]) applyFilter() {
 func (m *RuleListModel[T]) applySort() {
 	sortBy := m.sortBy
 	asc := m.SortAsc
-	sort.Slice(m.filtered, func(i, j int) bool {
-		less := m.config.CompareItems(m.filtered[i], m.filtered[j], sortBy)
-		if asc {
-			return less
+	slices.SortFunc(m.filtered, func(a, b T) int {
+		var c int
+		switch {
+		case m.config.CompareItems(a, b, sortBy):
+			c = -1
+		case m.config.CompareItems(b, a, sortBy):
+			c = 1
 		}
-		return !less
+		if !asc {
+			c = -c
+		}
+		return c
 	})
 }
 

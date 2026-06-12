@@ -1,8 +1,9 @@
 package views
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -31,18 +32,18 @@ func filterSystemLogs(logs []models.SystemLogEntry, query string) []models.Syste
 
 // sortSystemLogs sorts the slice in place by the given field.
 func sortSystemLogs(logs []models.SystemLogEntry, sortBy LogSortField, asc bool) {
-	sort.Slice(logs, func(i, j int) bool {
-		var less bool
+	slices.SortFunc(logs, func(a, b models.SystemLogEntry) int {
+		var c int
 		switch sortBy {
 		case LogSortSeverity:
-			less = severityRank(logs[i].Severity) < severityRank(logs[j].Severity)
+			c = cmp.Compare(severityRank(a.Severity), severityRank(b.Severity))
 		default: // LogSortTime
-			less = logs[i].Time.Before(logs[j].Time)
+			c = a.Time.Compare(b.Time)
 		}
 		if !asc {
-			return !less
+			c = -c
 		}
-		return less
+		return c
 	})
 }
 

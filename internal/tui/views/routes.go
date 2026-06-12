@@ -1,8 +1,9 @@
 package views
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -155,22 +156,22 @@ func (m *RoutesModel) applyFilter() {
 }
 
 func (m *RoutesModel) sortRoutes() {
-	sort.SliceStable(m.filtered, func(i, j int) bool {
-		var less bool
+	slices.SortStableFunc(m.filtered, func(a, b models.RouteEntry) int {
+		var c int
 		switch m.sortBy {
 		case RouteSortProtocol:
-			less = m.filtered[i].Protocol < m.filtered[j].Protocol
+			c = cmp.Compare(a.Protocol, b.Protocol)
 		case RouteSortNexthop:
-			less = m.filtered[i].Nexthop < m.filtered[j].Nexthop
+			c = cmp.Compare(a.Nexthop, b.Nexthop)
 		case RouteSortInterface:
-			less = m.filtered[i].Interface < m.filtered[j].Interface
+			c = cmp.Compare(a.Interface, b.Interface)
 		default: // RouteSortDestination
-			less = m.filtered[i].Destination < m.filtered[j].Destination
+			c = cmp.Compare(a.Destination, b.Destination)
 		}
 		if !m.SortAsc {
-			return !less
+			c = -c
 		}
-		return less
+		return c
 	})
 }
 

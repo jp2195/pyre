@@ -1,8 +1,9 @@
 package views
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -89,22 +90,22 @@ func (m *GPUsersModel) applyFilter() {
 }
 
 func (m *GPUsersModel) applySort() {
-	sort.Slice(m.filtered, func(i, j int) bool {
-		var less bool
+	slices.SortFunc(m.filtered, func(a, b models.GlobalProtectUser) int {
+		var c int
 		switch m.sortBy {
 		case GPSortGateway:
-			less = m.filtered[i].Gateway < m.filtered[j].Gateway
+			c = cmp.Compare(a.Gateway, b.Gateway)
 		case GPSortLoginTime:
-			less = m.filtered[i].LoginTime.Before(m.filtered[j].LoginTime)
+			c = a.LoginTime.Compare(b.LoginTime)
 		case GPSortDuration:
-			less = m.filtered[i].Duration < m.filtered[j].Duration
+			c = cmp.Compare(a.Duration, b.Duration)
 		default: // GPSortUsername
-			less = m.filtered[i].Username < m.filtered[j].Username
+			c = cmp.Compare(a.Username, b.Username)
 		}
-		if m.SortAsc {
-			return less
+		if !m.SortAsc {
+			c = -c
 		}
-		return !less
+		return c
 	})
 }
 

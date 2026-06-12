@@ -1,8 +1,9 @@
 package views
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -117,28 +118,32 @@ func (m *InterfacesModel) applyFilter() {
 }
 
 func (m *InterfacesModel) applySort() {
-	sort.Slice(m.filtered, func(i, j int) bool {
-		var less bool
+	slices.SortFunc(m.filtered, func(a, b models.Interface) int {
+		var c int
 		switch m.sortBy {
 		case InterfaceSortZone:
-			less = m.filtered[i].Zone < m.filtered[j].Zone
+			c = cmp.Compare(a.Zone, b.Zone)
 		case InterfaceSortState:
-			iUp := m.filtered[i].State == "up"
-			jUp := m.filtered[j].State == "up"
-			if iUp != jUp {
-				less = iUp
+			aUp := a.State == "up"
+			bUp := b.State == "up"
+			if aUp != bUp {
+				if aUp {
+					c = -1
+				} else {
+					c = 1
+				}
 			} else {
-				less = m.filtered[i].Name < m.filtered[j].Name
+				c = cmp.Compare(a.Name, b.Name)
 			}
 		case InterfaceSortIP:
-			less = m.filtered[i].IP < m.filtered[j].IP
+			c = cmp.Compare(a.IP, b.IP)
 		default:
-			less = m.filtered[i].Name < m.filtered[j].Name
+			c = cmp.Compare(a.Name, b.Name)
 		}
 		if !m.SortAsc {
-			less = !less
+			c = -c
 		}
-		return less
+		return c
 	})
 }
 

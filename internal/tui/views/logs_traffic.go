@@ -1,8 +1,9 @@
 package views
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -35,20 +36,20 @@ func filterTrafficLogs(logs []models.TrafficLogEntry, query string) []models.Tra
 
 // sortTrafficLogs sorts the slice in place by the given field.
 func sortTrafficLogs(logs []models.TrafficLogEntry, sortBy LogSortField, asc bool) {
-	sort.Slice(logs, func(i, j int) bool {
-		var less bool
+	slices.SortFunc(logs, func(a, b models.TrafficLogEntry) int {
+		var c int
 		switch sortBy {
 		case LogSortSource:
-			less = logs[i].SourceIP < logs[j].SourceIP
+			c = cmp.Compare(a.SourceIP, b.SourceIP)
 		case LogSortAction:
-			less = logs[i].Action < logs[j].Action
+			c = cmp.Compare(a.Action, b.Action)
 		default: // LogSortTime
-			less = logs[i].Time.Before(logs[j].Time)
+			c = a.Time.Compare(b.Time)
 		}
 		if !asc {
-			return !less
+			c = -c
 		}
-		return less
+		return c
 	})
 }
 

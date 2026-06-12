@@ -1,8 +1,9 @@
 package views
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -92,24 +93,22 @@ func (m *IPSecTunnelsModel) applyFilter() {
 }
 
 func (m *IPSecTunnelsModel) applySort() {
-	sort.Slice(m.filtered, func(i, j int) bool {
-		var less bool
+	slices.SortFunc(m.filtered, func(a, b models.IPSecTunnel) int {
+		var c int
 		switch m.sortBy {
 		case IPSecSortGateway:
-			less = m.filtered[i].Gateway < m.filtered[j].Gateway
+			c = cmp.Compare(a.Gateway, b.Gateway)
 		case IPSecSortState:
-			less = m.filtered[i].State < m.filtered[j].State
+			c = cmp.Compare(a.State, b.State)
 		case IPSecSortTraffic:
-			totalI := m.filtered[i].BytesIn + m.filtered[i].BytesOut
-			totalJ := m.filtered[j].BytesIn + m.filtered[j].BytesOut
-			less = totalI < totalJ
+			c = cmp.Compare(a.BytesIn+a.BytesOut, b.BytesIn+b.BytesOut)
 		default: // IPSecSortName
-			less = m.filtered[i].Name < m.filtered[j].Name
+			c = cmp.Compare(a.Name, b.Name)
 		}
-		if m.SortAsc {
-			return less
+		if !m.SortAsc {
+			c = -c
 		}
-		return !less
+		return c
 	})
 }
 
