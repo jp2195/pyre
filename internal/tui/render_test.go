@@ -63,6 +63,7 @@ func TestCurrentViewName_AllViews(t *testing.T) {
 		{ViewIPSecTunnels, views.DashboardMain, "Analyze/IPSec"},
 		{ViewGPUsers, views.DashboardMain, "Analyze/GP Users"},
 		{ViewLogs, views.DashboardMain, "Analyze/Logs"},
+		{ViewObjects, views.DashboardMain, "Analyze/Objects"},
 		{ViewPicker, views.DashboardMain, "Connections"},
 		{ViewDevicePicker, views.DashboardMain, "Connections/Devices"},
 		{ViewCommandPalette, views.DashboardMain, "Commands"},
@@ -70,7 +71,6 @@ func TestCurrentViewName_AllViews(t *testing.T) {
 		{ViewConnectionHub, views.DashboardMain, ""},
 		{ViewConnectionForm, views.DashboardMain, ""},
 		{ViewLogin, views.DashboardMain, ""},
-		{ViewObjects, views.DashboardMain, ""},
 	}
 	for _, tc := range cases {
 		m := newTestModel(t, tc.view)
