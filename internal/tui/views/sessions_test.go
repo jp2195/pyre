@@ -249,6 +249,14 @@ func TestSessionsModel_View_ZeroWidth(t *testing.T) {
 	}
 }
 
+func TestSessionsModel_SetSpinnerFrame_ReachesList(t *testing.T) {
+	m := NewSessionsModel()
+	m = m.SetSpinnerFrame("◢")
+	if m.list.SpinnerFrame != "◢" {
+		t.Errorf("list.SpinnerFrame = %q, want ◢", m.list.SpinnerFrame)
+	}
+}
+
 // Error for testing
 var errTest = &testError{}
 

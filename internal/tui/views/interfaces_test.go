@@ -260,3 +260,11 @@ func TestInterfacesModel_SetSize_ClampsCursor(t *testing.T) {
 		t.Errorf("cursor %d should be less than filtered count %d after resize", m.list.Cursor, len(m.list.Filtered()))
 	}
 }
+
+func TestInterfacesModel_SetSpinnerFrame_ReachesList(t *testing.T) {
+	m := NewInterfacesModel()
+	m = m.SetSpinnerFrame("◢")
+	if m.list.SpinnerFrame != "◢" {
+		t.Errorf("list.SpinnerFrame = %q, want ◢", m.list.SpinnerFrame)
+	}
+}
