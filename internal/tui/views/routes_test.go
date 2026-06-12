@@ -160,6 +160,9 @@ func TestRoutes_ProtocolFilterKeys(t *testing.T) {
 	if !strings.Contains(out, "3 routes") {
 		t.Errorf("expected all routes after 'a':\n%s", out)
 	}
+	if strings.Contains(out, "of 3 routes") || strings.Contains(out, "(filter:") {
+		t.Errorf("expected filter fully cleared after 'a':\n%s", out)
+	}
 }
 
 func TestRoutes_DefaultSortDestinationAscending(t *testing.T) {
@@ -169,7 +172,12 @@ func TestRoutes_DefaultSortDestinationAscending(t *testing.T) {
 	m = m.SetRoutes(routesFixtureNew(), nil)
 
 	out := m.View()
-	// "0.0.0.0/0" sorts before "10.1.0.0/16" with SortAsc=true.
+	// "0.0.0.0/0" sorts before "10.1.0.0/16" with SortAsc=true. Guard
+	// presence first: a missing route would make Index return -1 and
+	// pass the ordering check vacuously.
+	if !strings.Contains(out, "0.0.0.0/0") || !strings.Contains(out, "10.1.0.0/16") {
+		t.Fatalf("expected both routes in output:\n%s", out)
+	}
 	if strings.Index(out, "0.0.0.0/0") > strings.Index(out, "10.1.0.0/16") {
 		t.Errorf("expected default route first (destination ascending):\n%s", out)
 	}
@@ -204,8 +212,9 @@ func TestRoutes_TabSwitchToNeighbors(t *testing.T) {
 
 	// "[" switches back.
 	m = pressRoutes(m, "[")
-	if out := m.View(); !strings.Contains(out, "3 routes") {
-		t.Errorf("expected routes tab after switching back:\n%s", out)
+	out = m.View()
+	if !strings.Contains(out, "3 routes") || strings.Contains(out, "of 3 routes") {
+		t.Errorf("expected unfiltered routes tab after switching back:\n%s", out)
 	}
 }
 
