@@ -454,4 +454,3 @@ func colorBySeverity(row, severity string) string {
 func colorByAction(row, action string) string {
 	return ActionStyle(action).Render(row)
 }
-
