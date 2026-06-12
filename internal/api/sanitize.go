@@ -1,6 +1,9 @@
 package api
 
-import "strings"
+import (
+	"reflect"
+	"strings"
+)
 
 // SanitizeForDisplay strips ANSI escape sequences and C0 control characters
 // from server-supplied strings before they are surfaced as Go errors.
@@ -105,4 +108,42 @@ func SanitizeForDisplay(s string) string {
 		}
 	}
 	return strings.TrimSpace(b.String())
+}
+
+// sanitizeAllStrings applies SanitizeForDisplay to every settable string
+// field reachable from v — recursively through pointers, structs, slices,
+// and arrays. Fetchers call it on parsed models so the API package stays
+// the single choke point for untrusted display data (see SanitizeForDisplay).
+//
+// Unexported fields and non-string kinds are skipped. time.Time and other
+// opaque structs are safe: their fields are unexported and therefore not
+// settable.
+func sanitizeAllStrings(v any) {
+	sanitizeValue(reflect.ValueOf(v))
+}
+
+func sanitizeValue(v reflect.Value) {
+	switch v.Kind() {
+	case reflect.Pointer:
+		// Models contain no interface, map, or chan fields; if one ever
+		// appears, add its kind here deliberately (IsNil panics on
+		// non-nullable kinds, so don't blanket-extend this case).
+		if !v.IsNil() {
+			sanitizeValue(v.Elem())
+		}
+	case reflect.Struct:
+		for i := range v.NumField() {
+			if f := v.Field(i); f.CanSet() {
+				sanitizeValue(f)
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		for i := range v.Len() {
+			sanitizeValue(v.Index(i))
+		}
+	case reflect.String:
+		if v.CanSet() {
+			v.SetString(SanitizeForDisplay(v.String()))
+		}
+	}
 }
