@@ -27,8 +27,8 @@ type RuleListConfig[T any] struct {
 }
 
 // RuleListModel provides a generic, filterable, sortable list with detail expansion.
-// It is the shared engine behind the policies, NAT, interfaces, IPSec tunnels,
-// GlobalProtect users, and sessions views.
+// Table-style views embed it via thin wrappers that supply a RuleListConfig
+// (see PoliciesModel for the canonical example).
 type RuleListModel[T any] struct {
 	TableBase
 	config   RuleListConfig[T]
@@ -208,7 +208,7 @@ func (m RuleListModel[T]) View() string {
 	if noun == "" {
 		noun = "rules"
 	}
-	sortInfo := BannerInfoStyle.Render(fmt.Sprintf(" [%d %s | Sort: %s | s: change | /: filter | enter: details]", len(m.filtered), noun, m.sortLabel()))
+	sortInfo := BannerInfoStyle.Render(fmt.Sprintf(" [%d %s | Sort: %s | s: change | S: dir | /: filter | enter: details]", len(m.filtered), noun, m.sortLabel()))
 	b.WriteString(titleStyle.Render(title) + sortInfo)
 	b.WriteString("\n")
 
