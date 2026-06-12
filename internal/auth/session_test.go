@@ -203,15 +203,9 @@ func TestResolveCredentials_EnvVars(t *testing.T) {
 	cfg := config.DefaultConfig()
 	flags := config.CLIFlags{}
 
-	// Set environment variables
-	os.Setenv("PYRE_HOST", "env-host")
-	os.Setenv("PYRE_API_KEY", "env-api-key")
-	os.Setenv("PYRE_INSECURE", "true")
-	defer func() {
-		os.Unsetenv("PYRE_HOST")
-		os.Unsetenv("PYRE_API_KEY")
-		os.Unsetenv("PYRE_INSECURE")
-	}()
+	t.Setenv("PYRE_HOST", "env-host")
+	t.Setenv("PYRE_API_KEY", "env-api-key")
+	t.Setenv("PYRE_INSECURE", "true")
 
 	creds, err := ResolveCredentials(cfg, flags)
 	if err != nil {
