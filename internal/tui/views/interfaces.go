@@ -393,16 +393,16 @@ func (m InterfacesModel) formatInterfaceRow(iface models.Interface, width int) s
 
 	if width >= 120 {
 		return fmt.Sprintf("%-16s %-10s %-12s %-18s %-17s %-12s",
-			truncateStr(name, 16), truncateStr(ifType, 10),
-			truncateStr(zone, 12), truncateStr(ip, 18), truncateStr(mac, 17),
-			truncateStr(vr, 12))
+			truncateEllipsis(name, 16), truncateEllipsis(ifType, 10),
+			truncateEllipsis(zone, 12), truncateEllipsis(ip, 18), truncateEllipsis(mac, 17),
+			truncateEllipsis(vr, 12))
 	} else if width >= 90 {
 		return fmt.Sprintf("%-14s %-8s %-10s %-16s %-12s",
-			truncateStr(name, 14), truncateStr(ifType, 8),
-			truncateStr(zone, 10), truncateStr(ip, 16), truncateStr(vr, 12))
+			truncateEllipsis(name, 14), truncateEllipsis(ifType, 8),
+			truncateEllipsis(zone, 10), truncateEllipsis(ip, 16), truncateEllipsis(vr, 12))
 	}
 	return fmt.Sprintf("%-14s %-10s %-16s",
-		truncateStr(name, 14), truncateStr(zone, 10), truncateStr(ip, 16))
+		truncateEllipsis(name, 14), truncateEllipsis(zone, 10), truncateEllipsis(ip, 16))
 }
 
 func (m InterfacesModel) renderDetailPanel(iface models.Interface) string {

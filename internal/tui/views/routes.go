@@ -452,18 +452,18 @@ func (m RoutesModel) formatRouteRow(route models.RouteEntry, width int) string {
 
 	if width >= 100 {
 		return fmt.Sprintf("%-6s %-22s %-18s %-14s %-6s %-12s",
-			proto, truncateStr(route.Destination, 22),
-			truncateStr(nexthop, 18), truncateStr(route.Interface, 14),
-			metric, truncateStr(route.VirtualRouter, 12))
+			proto, truncateEllipsis(route.Destination, 22),
+			truncateEllipsis(nexthop, 18), truncateEllipsis(route.Interface, 14),
+			metric, truncateEllipsis(route.VirtualRouter, 12))
 	} else if width >= 70 {
 		return fmt.Sprintf("%-6s %-20s %-16s %-12s %-6s",
-			proto, truncateStr(route.Destination, 20),
-			truncateStr(nexthop, 16), truncateStr(route.Interface, 12),
+			proto, truncateEllipsis(route.Destination, 20),
+			truncateEllipsis(nexthop, 16), truncateEllipsis(route.Interface, 12),
 			metric)
 	}
 	return fmt.Sprintf("%-6s %-18s %-16s",
-		proto, truncateStr(route.Destination, 18),
-		truncateStr(nexthop, 16))
+		proto, truncateEllipsis(route.Destination, 18),
+		truncateEllipsis(nexthop, 16))
 }
 
 func (m RoutesModel) renderNeighborsTab() string {
@@ -601,17 +601,17 @@ func (m RoutesModel) formatNeighborHeaderRow(width int) string {
 func (m RoutesModel) formatNeighborRow(nType, peer, state, asArea, prefix, uptime, vr string, width int) string {
 	if width >= 100 {
 		return fmt.Sprintf("%-5s %-16s %-12s %-10s %-8s %-12s %-12s",
-			nType, truncateStr(peer, 16), truncateStr(state, 12),
-			truncateStr(asArea, 10), prefix, truncateStr(uptime, 12),
-			truncateStr(vr, 12))
+			nType, truncateEllipsis(peer, 16), truncateEllipsis(state, 12),
+			truncateEllipsis(asArea, 10), prefix, truncateEllipsis(uptime, 12),
+			truncateEllipsis(vr, 12))
 	} else if width >= 70 {
 		return fmt.Sprintf("%-5s %-16s %-12s %-10s %-8s %-12s",
-			nType, truncateStr(peer, 16), truncateStr(state, 12),
-			truncateStr(asArea, 10), prefix, truncateStr(uptime, 12))
+			nType, truncateEllipsis(peer, 16), truncateEllipsis(state, 12),
+			truncateEllipsis(asArea, 10), prefix, truncateEllipsis(uptime, 12))
 	}
 	return fmt.Sprintf("%-5s %-16s %-12s %-10s",
-		nType, truncateStr(peer, 16), truncateStr(state, 12),
-		truncateStr(asArea, 10))
+		nType, truncateEllipsis(peer, 16), truncateEllipsis(state, 12),
+		truncateEllipsis(asArea, 10))
 }
 
 // IsFilterMode returns true if the filter input is active

@@ -131,21 +131,21 @@ func formatSecurityRow(p models.SecurityRule, width int) string {
 
 	if width >= 150 {
 		return fmt.Sprintf("%-4d %-5s %-24s %-8s %-20s %-18s %-16s %-10s %-10s",
-			p.Position, base, truncateStr(name, 24), action,
-			truncateStr(zones, 20), truncateStr(apps, 18),
-			truncateStr(services, 16), hits, lastHit)
+			p.Position, base, truncateEllipsis(name, 24), action,
+			truncateEllipsis(zones, 20), truncateEllipsis(apps, 18),
+			truncateEllipsis(services, 16), hits, lastHit)
 	} else if width >= 120 {
 		return fmt.Sprintf("%-4d %-5s %-20s %-8s %-18s %-14s %-10s %-10s",
-			p.Position, base, truncateStr(name, 20), action,
-			truncateStr(zones, 18), truncateStr(apps, 14), hits, lastHit)
+			p.Position, base, truncateEllipsis(name, 20), action,
+			truncateEllipsis(zones, 18), truncateEllipsis(apps, 14), hits, lastHit)
 	} else if width >= 100 {
 		return fmt.Sprintf("%-4d %-5s %-16s %-7s %-14s %-10s %-8s",
-			p.Position, base, truncateStr(name, 16), truncateStr(action, 7),
-			truncateStr(zones, 14), truncateStr(apps, 10), hits)
+			p.Position, base, truncateEllipsis(name, 16), truncateEllipsis(action, 7),
+			truncateEllipsis(zones, 14), truncateEllipsis(apps, 10), hits)
 	}
 	return fmt.Sprintf("%-4d %-16s %-7s %-14s %-8s",
-		p.Position, truncateStr(name, 16), truncateStr(action, 7),
-		truncateStr(zones, 14), hits)
+		p.Position, truncateEllipsis(name, 16), truncateEllipsis(action, 7),
+		truncateEllipsis(zones, 14), hits)
 }
 
 func renderSecurityDetail(p models.SecurityRule, width int) string {
