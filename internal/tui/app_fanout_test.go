@@ -177,7 +177,7 @@ func TestFanout_SpinnerTick_PropagatesFrame(t *testing.T) {
 		}
 	}
 
-	// policies and natPolicies store SpinnerFrame in unexported list.SpinnerFrame.
+	// policies, natPolicies, and gpUsers store SpinnerFrame in unexported list.SpinnerFrame.
 	// Verify that the top-level spinner produced a non-empty frame (the call-path
 	// to SetSpinnerFrame on those models is covered by compilation alone).
 	wantFrame := nm.spinner.View()

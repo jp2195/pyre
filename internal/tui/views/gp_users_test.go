@@ -40,3 +40,11 @@ func TestGPUsersModel_SetSize_ScrollsOffsetDownToCursor(t *testing.T) {
 		t.Errorf("Offset = %d, want <= Cursor (%d) so the cursor row is visible", m.list.Offset, m.list.Cursor)
 	}
 }
+
+func TestGPUsersModel_SetSpinnerFrame_ReachesList(t *testing.T) {
+	m := NewGPUsersModel()
+	m = m.SetSpinnerFrame("◢")
+	if m.list.SpinnerFrame != "◢" {
+		t.Errorf("list.SpinnerFrame = %q, want ◢", m.list.SpinnerFrame)
+	}
+}
