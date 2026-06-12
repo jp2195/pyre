@@ -62,7 +62,7 @@ func (m LogsModel) renderSystemTable() string {
 		"Time", "Sev", "Type", "Description")
 	b.WriteString(TableHeaderStyle.Render(header) + "\n")
 
-	b.WriteString(renderLogRows(m, m.filteredSystem, func(log models.SystemLogEntry, selected bool) string {
+	b.WriteString(renderLogRows(m.Offset, m.Cursor, m.visibleRows(), m.filteredSystem, func(log models.SystemLogEntry, selected bool) string {
 		timeStr := log.Time.Format("2006-01-02 15:04:05")
 		sevAbbrev := abbreviateSeverity(log.Severity)
 		desc := truncate(log.Description, m.Width-46)

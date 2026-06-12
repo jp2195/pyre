@@ -70,7 +70,7 @@ func (m LogsModel) renderThreatTable() string {
 		"Time", "Severity", "Threat", "Source", "Action", "Category")
 	b.WriteString(TableHeaderStyle.Render(header) + "\n")
 
-	b.WriteString(renderLogRows(m, m.filteredThreat, func(log models.ThreatLogEntry, selected bool) string {
+	b.WriteString(renderLogRows(m.Offset, m.Cursor, m.visibleRows(), m.filteredThreat, func(log models.ThreatLogEntry, selected bool) string {
 		timeStr := log.Time.Format("2006-01-02 15:04:05")
 
 		row := fmt.Sprintf("%-19s %-9s %-20s %-15s %-7s %-15s",

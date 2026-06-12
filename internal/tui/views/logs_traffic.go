@@ -68,7 +68,7 @@ func (m LogsModel) renderTrafficTable() string {
 		"Time", "Action", "Source", "Dest", "App", "Rule", "Bytes")
 	b.WriteString(TableHeaderStyle.Render(header) + "\n")
 
-	b.WriteString(renderLogRows(m, m.filteredTraffic, func(log models.TrafficLogEntry, selected bool) string {
+	b.WriteString(renderLogRows(m.Offset, m.Cursor, m.visibleRows(), m.filteredTraffic, func(log models.TrafficLogEntry, selected bool) string {
 		timeStr := log.Time.Format("2006-01-02 15:04:05")
 
 		row := fmt.Sprintf("%-19s %-7s %-15s %-15s %-12s %-15s %-10s",

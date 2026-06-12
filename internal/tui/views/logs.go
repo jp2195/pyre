@@ -412,15 +412,14 @@ func (m LogsModel) renderHelp() string {
 
 // --- Shared helpers used by log type files ---
 
-// renderLogRows renders the visible window of a filtered log slice using the
-// shared cursor/offset state. renderRow renders one entry; each log type
-// supplies its own row formatting and selected/normal styling.
-func renderLogRows[T any](m LogsModel, items []T, renderRow func(item T, selected bool) string) string {
+// renderLogRows renders the visible window of a filtered log slice. renderRow
+// is called for each visible item and must return the fully styled row string
+// for both selected and normal states.
+func renderLogRows[T any](offset, cursor, visibleRows int, items []T, renderRow func(item T, selected bool) string) string {
 	var b strings.Builder
-	visibleRows := m.visibleRows()
-	end := min(m.Offset+visibleRows, len(items))
-	for i := m.Offset; i < end; i++ {
-		b.WriteString(renderRow(items[i], i == m.Cursor) + "\n")
+	end := min(offset+visibleRows, len(items))
+	for i := offset; i < end; i++ {
+		b.WriteString(renderRow(items[i], i == cursor) + "\n")
 	}
 	return b.String()
 }

@@ -349,6 +349,8 @@ func TestLogsModel_View_SystemRowContent(t *testing.T) {
 	}, nil)
 
 	out := m.View()
+	// CRIT and INFO are the abbreviated forms produced by abbreviateSeverity;
+	// this asserts abbreviation is applied in the rendered output.
 	for _, want := range []string{"fan failure imminent", "admin login ok", "CRIT", "INFO"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in system log view:\n%s", want, out)
