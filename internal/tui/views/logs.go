@@ -455,27 +455,3 @@ func colorByAction(row, action string) string {
 	return ActionStyle(action).Render(row)
 }
 
-// wrapText wraps text to the specified width.
-func wrapText(text string, width int) []string {
-	if width <= 0 {
-		return []string{text}
-	}
-
-	var lines []string
-	words := strings.Fields(text)
-	if len(words) == 0 {
-		return []string{}
-	}
-
-	currentLine := words[0]
-	for _, word := range words[1:] {
-		if len(currentLine)+1+len(word) <= width {
-			currentLine += " " + word
-		} else {
-			lines = append(lines, currentLine)
-			currentLine = word
-		}
-	}
-	lines = append(lines, currentLine)
-	return lines
-}
