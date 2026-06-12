@@ -3,6 +3,7 @@ package views
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -25,10 +26,15 @@ func TestIPSec_Behavior_FilterKeystrokesNarrowRows(t *testing.T) {
 		{Name: "branch-west", Gateway: "2.2.2.2", State: "down"},
 	}, nil)
 
+	out := m.View()
+	if !strings.Contains(out, "branch-east") || !strings.Contains(out, "branch-west") {
+		t.Fatalf("expected both tunnels initially:\n%s", out)
+	}
+
 	m = pressIPSec(m, "/east")
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
-	out := m.View()
+	out = m.View()
 	if !strings.Contains(out, "branch-east") {
 		t.Errorf("expected branch-east after filter:\n%s", out)
 	}
@@ -99,6 +105,9 @@ func TestIPSec_Behavior_RenderEmitsValidUTF8(t *testing.T) {
 	}, nil)
 
 	out := m.View()
+	if !utf8.ValidString(out) {
+		t.Fatalf("View() output contains invalid UTF-8:\n%s", out)
+	}
 	for _, name := range []string{"t-up", "t-init", "t-down"} {
 		if !strings.Contains(out, name) {
 			t.Errorf("expected %q in output:\n%s", name, out)
