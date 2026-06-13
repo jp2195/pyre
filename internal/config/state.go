@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -38,6 +39,15 @@ func LoadState() (*State, error) {
 	statePath, err := StatePath()
 	if err != nil {
 		return state, nil
+	}
+
+	// Warn if the state file is readable by group/other, mirroring the
+	// equivalent check on ~/.pyre.yaml in Load().
+	if info, statErr := os.Stat(statePath); statErr == nil {
+		if info.Mode().Perm()&0o077 != 0 {
+			log.Printf("warning: %s has permissive mode %#o; run `chmod 600 %s`",
+				statePath, info.Mode().Perm(), statePath)
+		}
 	}
 
 	data, err := os.ReadFile(statePath) // #nosec G304 -- Path is constructed from user's home directory
