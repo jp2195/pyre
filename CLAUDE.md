@@ -69,14 +69,24 @@ regression-guards the yaml tag.
 
 ## Debugging
 
-Set `PYRE_DEBUG=1` (or `PYRE_DEBUG=true`) to enable per-request API trace
-logging in `internal/api/client.go`. The trace lines include request type,
-action, xpath, target serial, op command bodies, response status/timing, and
-a preview of the response body. It is off by default because these fields
-may contain PAN-OS config paths and command bodies that are useful to a
-debugger but noisy (and potentially sensitive) in production sessions.
-Error-path `log.Printf` calls always fire regardless of `PYRE_DEBUG` so
-unexpected failures are never swallowed.
+Two independent debug knobs:
+
+- `--debug` flag (or `DEBUG` env var) routes Go's standard logger to
+  `~/.pyre/logs/debug.log` via `tea.LogToFile` (`cmd/pyre/main.go`). Without
+  it the logger is set to `io.Discard` so stray `log.Printf` output can't
+  corrupt the TUI.
+- `PYRE_DEBUG=1` (or `PYRE_DEBUG=true`) turns on per-request API trace logging
+  in `internal/api/client.go` (`debugf`): request type, action, xpath, target
+  serial, op command bodies, response status/timing, and a response preview.
+  Off by default — these fields may contain PAN-OS config paths and command
+  bodies (sensitive).
+
+The two compose: `PYRE_DEBUG` traces are written through the standard logger,
+so they only land in a file when `--debug`/`DEBUG` is **also** set (otherwise
+the logger is `io.Discard` and the traces go nowhere). Error-path `log.Printf`
+calls always fire regardless of `PYRE_DEBUG`, so unexpected failures are never
+swallowed — though they too are discarded unless `--debug`/`DEBUG` points the
+logger at a file.
 
 ## Dependencies
 
@@ -87,58 +97,21 @@ unexpected failures are never swallowed.
 
 ## Go 1.26 (Current Version)
 
-`go.mod` is pinned to `go 1.26.4` (stdlib CVE patch release). The 1.26.x
-series has shipped three security patches so far: 1.26.2 fixed
-`crypto/tls` / `crypto/x509` issues from 1.26.0–1.26.1; 1.26.3 fixed
-GO-2026-4971 (`net.Dial` / `LookupPort` NUL-byte panic on Windows) and
-GO-2026-4918 (HTTP/2 transport infinite loop in `golang.org/x/net`);
-1.26.4 fixed GO-2026-5039 (unescaped inputs in `net/textproto` errors)
-and GO-2026-5037 (inefficient hostname parsing in `crypto/x509`) — both
-flagged by govulncheck against this codebase's keygen and TLS paths.
-CI pins `go-version: '1.26.4'`. Key features relevant to this project:
+`go.mod` is pinned to `go 1.26.4`; CI pins `go-version: '1.26.4'` (the six
+`go-version` lines across `.github/workflows/` plus `go.mod` move together).
+The 1.26.x series has shipped three stdlib CVE patches:
 
-### Language Changes
-- **Enhanced `new()` builtin**: `new` now accepts an expression as initial value - `new(expr)` allocates and initializes in one step. Useful for pointer fields: `Age: new(yearsSince(born))`
-- **Self-referential generic types**: Generic types may now refer to themselves in their own type parameter list
+- **1.26.2** — `crypto/tls` / `crypto/x509` issues from 1.26.0–1.26.1.
+- **1.26.3** — GO-2026-4971 (`net.Dial` / `LookupPort` NUL-byte panic on
+  Windows), GO-2026-4918 (HTTP/2 infinite loop in `golang.org/x/net`).
+- **1.26.4** — GO-2026-5039 (`net/textproto` error escaping) and GO-2026-5037
+  (`crypto/x509` hostname parsing); both reached this codebase's keygen and
+  TLS paths and were caught by `govulncheck`.
 
-### Runtime & Performance
-- **Green Tea GC (default)**: 10-40% lower GC overhead. Disable with `GOEXPERIMENT=nogreenteagc`
-- **~30% faster cgo calls**
-- **Better small object allocation**: Up to 30% cost reduction; more slice backing stores allocated on stack
-- **Randomized heap base address** on 64-bit platforms (security hardening)
+When a new patch lands, bump `go.mod` + the CI pins together and re-run
+`govulncheck ./...`.
 
-### Toolchain
-- **`go fix` revamped**: Now a modernizer framework built on analysis framework (same as `go vet`). Run `go fix ./...` to apply safe modernizations. Run `go fix -diff ./...` to preview changes
-- **`go mod init`** with Go 1.26 toolchain creates `go.mod` with `go 1.25.0`
-- **`cmd/doc` removed**: Use `go doc` instead
-
-### Standard Library Highlights
-- **`errors.AsType[T]()`**: Generic, type-safe replacement for `errors.As`
-- **`io.ReadAll`**: ~2x faster, ~50% less memory
-- **`bytes.Buffer.Peek(n)`**: Returns next n bytes without advancing
-- **`log/slog.NewMultiHandler`**: Invoke multiple slog handlers
-- **`net.Dialer` typed methods**: `DialIP`, `DialTCP`, `DialUDP`, `DialUnix` with context
-- **`net/netip.Prefix.Compare`**: Compare two prefixes
-- **`reflect` iterators**: `Type.Fields()`, `Type.Methods()`, `Value.Fields()`, `Value.Methods()`
-- **`testing.T.ArtifactDir()`**: Persistent artifact directory for tests
-- **`B.Loop()` allows inlining**: Benchmark functions can now be inlined
-- **`crypto/hpke`**: Hybrid Public Key Encryption (RFC 9180)
-- **`crypto/tls`**: Post-quantum hybrid key exchanges enabled by default
-
-### Experimental Features
-- **Goroutine leak profiling**: `GOEXPERIMENT=goroutineleakprofile` enables `goroutineleak` profile type
-- **`simd/archsimd`**: `GOEXPERIMENT=simd` enables architecture-specific SIMD operations (amd64)
-- **`runtime/secret`**: `GOEXPERIMENT=runtimesecret` enables secure erasure of crypto temporaries
-
-### Deprecations / Breaking Changes
-- `crypto/ecdsa` `PublicKey`/`PrivateKey` `big.Int` fields deprecated
-- `crypto/rsa` PKCS #1 v1.5 encryption deprecated (`EncryptPKCS1v15`, `DecryptPKCS1v15`)
-- `net/http/httputil.ReverseProxy.Director` deprecated (use `Rewrite`)
-- `net/url.Parse` now rejects malformed URLs with colons in host
-- `image/jpeg` encoder/decoder rewritten (may produce different bit-for-bit output)
-- Go 1.26 is the **last release supporting macOS 12 Monterey** (Go 1.27 requires macOS 13+)
-- `windows/arm` (32-bit) port removed
-
-### GODEBUG settings being removed in Go 1.27
-- `tlsunsafeekm`, `tlsrsakex`, `tls10server`, `tls3des`, `x509keypairleaf`
-- `gotypesalias`, `asynctimerchan`
+**1.26 idioms this project uses:** the ones in Code Style above (`for range N`,
+`for i := range N`, `max()`/`min()`, `wg.Go`), plus `reflect` `Value.Fields()`
+iteration (`internal/api/sanitize.go`) and `go fix ./...` modernizers
+(`go fix -diff ./...` to preview).
