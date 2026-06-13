@@ -69,13 +69,22 @@ compromised firewall or a man-in-the-middle (especially relevant when
 
 ## Request/response logging
 
-Per-request trace logging is **off by default**. Enable it with
-`PYRE_DEBUG=1` (or `PYRE_DEBUG=true`). Error-path logs always fire.
-When debug is on, traces include xpath, target serial, op-command
-bodies, and response-body previews — useful for troubleshooting, noisy
-in production. Server-supplied error strings are sanitized
-(`api.SanitizeForDisplay`) before display, stripping ANSI CSI / OSC /
-DCS sequences and C0 / DEL control chars.
+pyre has two independent debug mechanisms:
+
+- **`--debug` / `DEBUG` env var** — routes the standard Go logger to
+  `~/.pyre/logs/debug.log`. Without this, all `log.Printf` output is
+  discarded so it never reaches the terminal or any file.
+
+- **`PYRE_DEBUG=1` (or `PYRE_DEBUG=true`)** — enables per-request API
+  trace logging: xpath, target serial, op-command bodies, response
+  status/timing, and response-body previews. Traces are written via
+  `log.Printf`, so they only reach the log file when `--debug` / `DEBUG`
+  is **also** set. Neither mechanism is on by default.
+
+Error-path `log.Printf` calls always fire regardless of `PYRE_DEBUG`,
+so unexpected failures are never silently swallowed. Server-supplied
+error strings are sanitized (`api.SanitizeForDisplay`) before display,
+stripping ANSI CSI / OSC / DCS sequences and C0 / DEL control chars.
 
 ## Dependencies
 
@@ -83,7 +92,7 @@ Direct:
 - `charm.land/bubbletea/v2` — TUI framework
 - `charm.land/bubbles/v2` — TUI components
 - `charm.land/lipgloss/v2` — styling
-- `go.yaml.in/yaml/v4` — YAML parsing (pinned to rc.4 pending stable v4)
+- `go.yaml.in/yaml/v4` — YAML parsing (pinned to `v4.0.0-rc.5` pending stable v4)
 
 CI runs `govulncheck ./...` on every push and weekly. Dependency pins
 are managed by Renovate.

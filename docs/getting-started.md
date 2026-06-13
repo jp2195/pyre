@@ -77,7 +77,8 @@ Footer shows the keys that apply right now — when in doubt, look down.
 **2. Three numbered groups, hit a number to jump.**
 
 - `1` Monitor — dashboards (system health, network, security, VPN)
-- `2` Analyze — list views (policies, sessions, objects, logs, …)
+- `2` Analyze — list views (policies, NAT, objects, sessions, interfaces,
+  routes, IPSec tunnels, GP users, logs)
 - `3` Tools — config dashboard
 
 Press the same number again, or `Tab`, to cycle through sub-views in
@@ -100,8 +101,8 @@ muscle memory as VS Code's command palette.
 **5. Two modal pickers.**
 
 - `:` opens the connection picker — switch between saved firewalls.
-- `D` opens the device picker — switch between managed devices when
-  you're connected to a Panorama. (On a standalone firewall, `D` falls
+- `d` opens the device picker — switch between managed devices when
+  you're connected to a Panorama. (On a standalone firewall, `d` falls
   through to the view's own handlers.)
 
 **6. `?` toggles help.** `q` or `Ctrl+C` quits.

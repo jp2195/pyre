@@ -53,13 +53,14 @@ rather than silently falling back to system roots.
 
 ## Global settings
 
-| Option   | Type   | Default | Description                 |
-|----------|--------|---------|------------------------------|
-| `theme`  | string | `dark`  | Color theme (see below)     |
+| Option   | Type   | Default     | Description                 |
+|----------|--------|-------------|------------------------------|
+| `theme`  | string | `default`   | Color theme (see below)     |
 
+The literal value `"default"` resolves to the dark theme at runtime.
 Themes: `dark`, `light`, `nord`, `dracula`, `solarized`, `gruvbox`,
 `tokyonight`, `catppuccin`, `onedark`, `monokai`. Unrecognized names
-fall back to `dark`.
+(including an empty or absent `theme:` key) fall back to `dark`.
 
 ## Credentials
 
@@ -68,7 +69,8 @@ pyre resolves an API key for a host in this order (first hit wins):
 1. `--api-key` CLI flag
 2. `PYRE_API_KEY` env var (global)
 3. `PYRE_<HOST>_API_KEY` env var (host-scoped; `<HOST>` is the host
-   uppercased with `.` and `-` replaced by `_`)
+   uppercased with `.`, `-`, and `:` replaced by `_`; any `:port`
+   suffix is stripped first, including bracketed IPv6 forms)
 4. Interactive login — pyre prompts for username + password, runs
    keygen against the firewall, and uses the returned key for the
    current session. The key is **not** saved.
@@ -85,13 +87,14 @@ startup warning.
 
 ## Environment variables
 
-| Variable                | Purpose                                           |
-|-------------------------|---------------------------------------------------|
-| `PYRE_HOST`             | Default host when no `--host` / `-c` is given     |
-| `PYRE_API_KEY`          | API key (applies to any host)                     |
-| `PYRE_<HOST>_API_KEY`   | Host-scoped API key                               |
-| `PYRE_INSECURE`         | `true` to skip TLS verification                   |
-| `PYRE_DEBUG`            | `1` or `true` to enable per-request API logging   |
+| Variable                | Purpose                                                     |
+|-------------------------|-------------------------------------------------------------|
+| `PYRE_HOST`             | Default host when no `--host` / `-c` is given               |
+| `PYRE_API_KEY`          | API key (applies to any host)                               |
+| `PYRE_<HOST>_API_KEY`   | Host-scoped API key                                         |
+| `PYRE_INSECURE`         | `true` to skip TLS verification                             |
+| `PYRE_DEBUG`            | `1` or `true` to enable per-request API trace logging       |
+| `DEBUG`                 | Non-empty to enable debug file logging (same as `--debug`)  |
 
 `PYRE_DEBUG` is off by default because traces include xpath, op-command
 bodies, and response previews that are useful for debugging but noisy
@@ -99,14 +102,38 @@ in normal use.
 
 ## CLI flags
 
-| Flag         | Purpose                                         |
-|--------------|-------------------------------------------------|
-| `--host`     | Firewall hostname or IP                         |
-| `--user`     | Username for interactive login                  |
-| `--api-key`  | API key                                         |
-| `--insecure` | Skip TLS verification                           |
-| `--config`   | Path to config file (default `~/.pyre.yaml`)    |
-| `-c`         | Connect to a saved connection by host/IP        |
+| Flag         | Purpose                                                        |
+|--------------|----------------------------------------------------------------|
+| `--host`     | Firewall hostname or IP                                        |
+| `--user`     | Username for interactive login                                 |
+| `--api-key`  | API key                                                        |
+| `--insecure` | Skip TLS verification                                          |
+| `--config`   | Path to config file (default `~/.pyre.yaml`)                   |
+| `-c`         | Connect to a saved connection by host/IP                       |
+| `--debug`    | Route the standard logger to `~/.pyre/logs/debug.log`          |
+
+## Debug logging
+
+pyre has two independent debug mechanisms:
+
+- **`--debug` / `DEBUG` env var** — routes the standard Go logger to
+  `~/.pyre/logs/debug.log`. All `log.Printf` calls (including API
+  error-path messages) are written there. Without this flag the logger
+  is discarded, keeping the TUI clean.
+
+- **`PYRE_DEBUG=1` (or `true`)** — enables per-request API trace
+  logging: request type, action, xpath, target serial, op-command
+  bodies, response status/timing, and a response-body preview. Traces
+  are written via `log.Printf`, so they only appear in the debug log
+  file when `--debug` / `DEBUG` is **also** set. Setting `PYRE_DEBUG=1`
+  alone discards the trace output.
+
+To capture full API traces in a file, set both:
+
+```bash
+DEBUG=1 PYRE_DEBUG=1 pyre ...
+# log written to ~/.pyre/logs/debug.log
+```
 
 ## Precedence
 
@@ -127,3 +154,7 @@ Keys: see [keybindings.md](keybindings.md#connection-hub-launch-screen).
 
 pyre writes `~/.pyre/state.json` with last-connected time and user.
 Managed automatically; editing it isn't supported.
+
+`~/.pyre/state.json` is expected to be `0600`. Permissive modes
+(group- or world-readable) trigger a startup warning, the same as
+`~/.pyre.yaml`.
