@@ -1,5 +1,11 @@
 name: Labeler
 
+# SECURITY: this uses pull_request_target, which runs with the base repo's
+# write token even for fork PRs. It is safe ONLY because it never checks out
+# or executes PR code — actions/labeler reads the label config from the base
+# branch and applies labels via the API. DO NOT add an actions/checkout of the
+# PR head here, and do not run untrusted PR content; either would expose the
+# write token to attacker-controlled code.
 on:
   pull_request_target:
     types: [opened, synchronize]
