@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/jp2195/pyre/compare/v1.4.0...v1.5.0) (2026-06-13)
+
+
+### Features
+
+* security hardening, view-engine consolidation, and test coverage ([#32](https://github.com/jp2195/pyre/issues/32)) ([b6b204e](https://github.com/jp2195/pyre/commit/b6b204e74c8cc1236b470f349b98754fd62e8d72))
+
 ## [1.4.0](https://github.com/jp2195/pyre/compare/v1.3.0...v1.4.0) (2026-05-22)
 
 
