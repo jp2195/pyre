@@ -163,3 +163,20 @@ func TestGenerateAPIKey_BadCABundle_FailsClosed(t *testing.T) {
 		t.Errorf("err = %v, want to mention the CA bundle", err)
 	}
 }
+
+func TestGenerateAPIKey_RejectsDoctypeResponse(t *testing.T) {
+	// A server that responds with a DOCTYPE directive must be rejected;
+	// bare xml.Unmarshal tolerates DOCTYPE, but the hardened decoder does not.
+	body := `<!DOCTYPE response [<!ENTITY x "boom">]><response status="success"><result><key>k</key></result></response>`
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	host := strings.TrimPrefix(srv.URL, "https://")
+	_, err := auth.GenerateAPIKey(context.Background(), host, "admin", "admin", api.ClientOptions{Insecure: true})
+	if err == nil {
+		t.Fatal("expected error for DOCTYPE in keygen response, got nil")
+	}
+}

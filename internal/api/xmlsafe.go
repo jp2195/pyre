@@ -41,6 +41,13 @@ func decodeXML(r io.Reader, v any) error {
 	}
 }
 
+// DecodeXML is the exported form of decodeXML for sibling packages that
+// parse PAN-OS XML outside the Client request path (keygen). It enforces
+// the same hardening: XML directives (DOCTYPE) are rejected.
+func DecodeXML(r io.Reader, v any) error {
+	return decodeXML(r, v)
+}
+
 func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s

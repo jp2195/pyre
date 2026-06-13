@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"encoding/xml"
 	"errors"
@@ -74,7 +75,7 @@ func GenerateAPIKey(ctx context.Context, host, username, password string, opts a
 	}
 
 	var xmlResp keygenResponse
-	if err := xml.Unmarshal(body, &xmlResp); err != nil {
+	if err := api.DecodeXML(bytes.NewReader(body), &xmlResp); err != nil {
 		return nil, fmt.Errorf("parsing keygen response: %w", err)
 	}
 
