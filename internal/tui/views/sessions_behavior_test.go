@@ -24,7 +24,7 @@ func TestSessions_Behavior_DKeyEmitsFetchDetailCmd(t *testing.T) {
 
 	// Default sort: ID descending, so cursor 0 = session 202.
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter}) // expand detail
-	m, cmd := m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	if cmd == nil {
 		t.Fatal("expected a command from d keypress with detail expanded")
 	}

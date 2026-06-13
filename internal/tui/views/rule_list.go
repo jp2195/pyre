@@ -11,7 +11,7 @@ import (
 // RuleListConfig defines the type-specific behavior for a RuleListModel.
 type RuleListConfig[T any] struct {
 	Title             string
-	ItemNoun          string                          // Noun for the banner count, e.g. "rules", "users"; empty defaults to "rules"
+	ItemNoun          string // Noun for the banner count, e.g. "rules", "users"; empty defaults to "rules"
 	LoadingMsg        string
 	EmptyMsg          string
 	FilterPlaceholder string
