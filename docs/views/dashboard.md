@@ -68,9 +68,6 @@ threat data; right: policy analysis).
 - **Most-Hit Rules** — top 8 security rules by hit count; name, action,
   and hit count.
 
-Note: there is no "top applications" panel and no disabled-rule-count
-metric in this dashboard.
-
 ## VPN
 
 IPSec and GlobalProtect status. Laid out in two columns (left: IPSec;
@@ -84,8 +81,6 @@ right: GlobalProtect).
   more than one gateway exists.
 - **GlobalProtect Users** — per-user list (up to 12): username, virtual
   IP, and duration or login-time-ago.
-
-Note: there is no "recent connects" field in the GlobalProtect panels.
 
 ## Config (Tools group, key `3`)
 
