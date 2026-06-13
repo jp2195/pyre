@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/jp2195/pyre/compare/v1.5.0...v1.5.1) (2026-06-13)
+
+
+### Bug Fixes
+
+* **release:** emit cosign Sigstore bundle instead of legacy sig/pem ([#34](https://github.com/jp2195/pyre/issues/34)) ([1bc859b](https://github.com/jp2195/pyre/commit/1bc859b5f9b6bc17abb1c7d217b595484c496cea))
+
 ## [1.5.0](https://github.com/jp2195/pyre/compare/v1.4.0...v1.5.0) (2026-06-13)
 
 
