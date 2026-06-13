@@ -1,48 +1,54 @@
-# Security Policies
+# Policies View
 
-Security rulebase browser. Monitor group (`2`).
+Security rules fetched from all configured rulebases. Uses the
+[standard view chrome](README.md#standard-view-chrome).
 
 ## Columns
 
-| Column        | Description                                   |
-|---------------|-----------------------------------------------|
-| `#`           | Position in the rulebase                      |
-| Name          | Rule name                                     |
-| Action        | Allow / Deny / Drop / Reset                   |
-| From          | Source zone(s)                                |
-| To            | Destination zone(s)                           |
-| Source        | Source addresses / groups                     |
-| Destination   | Destination addresses / groups                |
-| Application   | Matched applications                          |
-| Service       | Port / protocol                               |
-| Hits          | Hit count                                     |
-| Last Hit      | When the rule last matched                    |
+All breakpoints include `#` (position) and `Base` (pre/post rulebase
+abbreviation). A `•` suffix on the name indicates the rule has tags.
 
-- Disabled rules render with strikethrough.
-- Zero-hit rules are highlighted.
+| Breakpoint | Columns |
+|------------|---------|
+| ≥ 150 | `#`, `Base`, `Name`, `Action`, `Source → Dest Zone`, `Application`, `Service`, `Hits`, `Last Hit` |
+| ≥ 120 | `#`, `Base`, `Name`, `Action`, `Zones`, `Application`, `Hits`, `Last Hit` |
+| ≥ 100 | `#`, `Base`, `Name`, `Action`, `Zones`, `App`, `Hits` |
+| < 100 | `#`, `Name`, `Action`, `Zones`, `Hits` |
 
-## Filter (`/`)
+At ≥ 150, zones are split into separate `Source → Dest Zone`. At narrower
+widths they are merged into a single `Zones` column. `Base` and `Service`
+are dropped at the two narrowest breakpoints.
 
-Matches against rule name, zone names, application names, tag names.
-Case-insensitive substring match. Examples: `web`, `trust`, `deny`.
+## Sort fields
 
-## Sort (`s` to cycle, `S` to reverse)
+Cycled with `s`; direction toggled with `S`.
 
-Position → Name → Hits → Last Hit.
+| Index | Label | Default direction |
+|-------|-------|-------------------|
+| 0 | Position | ascending |
+| 1 | Name | ascending |
+| 2 | Hits | descending |
+| 3 | Last Hit | descending |
 
-## Detail (`Enter`)
+## Filter scope
 
-Expands to show: full source / destination address lists, all
-applications, security profiles, log settings, description, tags,
-rule UUID.
+Matches (case-insensitive substring) against: name, description,
+rulebase, tags, source zones, destination zones, source addresses,
+destination addresses, applications, services.
 
-## Standard keys
+## Detail panel (`enter`)
 
-Navigation, filter, sort, refresh — see
-[keybindings.md](../keybindings.md).
+- **Title / subtitle** — rule name (with `(disabled)` if applicable),
+  position, and rulebase label.
+- **Tags** — tag list (if any).
+- **Description** — rule description (if set).
+- **Traffic Match** — Source Zones, Source Addr (with negate flag),
+  Source Users (if not "any"), Dest Zones, Dest Addr (with negate flag).
+- **Application/Service** — Applications, Services, URL Categories
+  (if not "any").
+- **Action & Profiles** — Action (styled by allow/deny/drop), Profile
+  Group or individual AV/Vuln/Spyware/URL/WildFire profile names,
+  Logging (start/end + forwarding profile name).
+- **Usage Statistics** — Hit Count, Last Hit, First Hit (if non-zero).
 
-## Tips
-
-- Sort by Hits to find zero-hit rules (cleanup candidates).
-- Sort by Last Hit to find rules that haven't matched recently.
-- `G` jumps to the bottom — often where catch-all rules live.
+Note: there is no Rule UUID field in the detail panel.

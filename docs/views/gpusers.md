@@ -1,44 +1,44 @@
-# GP Users
+# GP Users View
 
-GlobalProtect connected users. Analyze group (`2`).
+GlobalProtect connected users. Uses the
+[standard view chrome](README.md#standard-view-chrome).
 
 ## Columns
 
-| Column      | Description                              |
-|-------------|------------------------------------------|
-| Username    | Logged-in user                           |
-| Computer    | Client hostname                          |
-| Client IP   | Public source IP                         |
-| Virtual IP  | Tunnel address assigned by the gateway   |
-| Gateway     | GP gateway the user connected through    |
-| Login Time  | Tunnel establishment timestamp           |
-| Duration    | Time since login                         |
-| Region      | Source region from User-ID / GeoIP       |
+| Breakpoint | Columns |
+|------------|---------|
+| ≥ 140 | `Username`, `Domain`, `Gateway`, `Virtual IP`, `Client IP`, `Duration`, `Region`, `Traffic` |
+| ≥ 100 | `Username`, `Gateway`, `Virtual IP`, `Client IP`, `Duration`, `Traffic` |
+| < 100 | `Username`, `Gateway`, `Virtual IP`, `Duration` |
 
-## Filter (`/`)
+`Domain` and `Region` appear only at ≥ 140. `Traffic` (bytes in + out)
+appears at ≥ 100. `Computer` is only in the detail panel — it is not a
+column at any width.
 
-Substring match across user, domain, computer, gateway, client IP,
-virtual IP, and source region.
+## Sort fields
 
-## Sort (`s` cycle)
+Cycled with `s`; direction toggled with `S`.
 
-Username → Gateway → Login Time → Duration.
+| Index | Label | Default direction |
+|-------|-------|-------------------|
+| 0 | Username | ascending |
+| 1 | Gateway | ascending |
+| 2 | Login Time | descending |
+| 3 | Duration | descending |
 
-## Detail (`Enter`)
+## Filter scope
 
-Full session details for the selected user: HIP report summary
-(when enabled), gateway, tunnel encapsulation, virtual + public IPs,
-client OS / app version, login time and duration.
+Matches (case-insensitive substring) against: username, domain,
+computer, gateway, client IP, virtual IP, source region.
 
-## Standard keys
+## Detail panel (`enter`)
 
-See [keybindings.md](../keybindings.md).
+- **User Information** — Domain (if set), Computer (if set), Client
+  Version (if set).
+- **Connection** — Gateway, Virtual IP, Public IP (client IP), Source
+  Region (if set).
+- **Session** — Login Time (if available), Duration (if set).
+- **Traffic** (if any bytes > 0) — Bytes In, Bytes Out.
 
-## Tips
-
-- Sort by Duration descending to see the longest-running sessions —
-  often a sign of forgotten clients you can ask to reconnect.
-- Filter by gateway name to see who is on each pool — useful when
-  redistributing load.
-- HIP-only fields populate when host-information policies are active
-  on the gateway.
+Note: there are no HIP report or tunnel-encapsulation fields in the
+detail panel.
