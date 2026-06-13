@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.2](https://github.com/jp2195/pyre/compare/v1.5.1...v1.5.2) (2026-06-13)
+
+
+### Documentation
+
+* tidy dashboard notes and trigger the v1.5.2 release ([#37](https://github.com/jp2195/pyre/issues/37)) ([36c3033](https://github.com/jp2195/pyre/commit/36c3033e0e38d24f8c14400a902a852e3dfc6482))
+
 ## [1.5.1](https://github.com/jp2195/pyre/compare/v1.5.0...v1.5.1) (2026-06-13)
 
 
