@@ -35,19 +35,20 @@ sboms:
     documents:
       - "${artifact}.spdx.json"
 
-# Sign the checksum file with cosign keyless (GitHub OIDC). Verifiers check
-# checksums.txt.sig/.pem against the workflow identity, then verify archives
-# against the signed checksums — one signature covers every artifact.
+# Sign the checksum file with cosign keyless (GitHub OIDC). cosign writes a
+# single Sigstore bundle (checksums.txt.bundle) carrying the signature,
+# certificate, and transparency-log entry. Verifiers check the bundle against
+# the workflow identity, then verify archives against the signed checksums —
+# one signature covers every artifact. (Legacy .sig/.pem output was retired
+# when cosign defaulted sign-blob to the new bundle format.)
 signs:
   - cmd: cosign
     artifacts: checksum
-    signature: '${artifact}.sig'
-    certificate: '${artifact}.pem'
+    signature: '${artifact}.bundle'
     output: true
     args:
       - sign-blob
-      - '--output-signature=${signature}'
-      - '--output-certificate=${certificate}'
+      - '--bundle=${signature}'
       - '--yes'
       - '${artifact}'
 

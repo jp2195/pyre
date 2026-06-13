@@ -69,14 +69,14 @@ go install github.com/jp2195/pyre/cmd/pyre@latest
 Every release is checksummed, signed, and attested at build time:
 
 - `checksums.txt` — SHA-256 checksums covering every archive.
-- `checksums.txt.sig` / `checksums.txt.pem` — [Sigstore cosign](https://docs.sigstore.dev/) keyless signature, tied to this repo's release workflow identity.
+- `checksums.txt.bundle` — [Sigstore cosign](https://docs.sigstore.dev/) keyless signature bundle (signature, certificate, and transparency-log entry in one file), tied to this repo's release workflow identity.
 - GitHub build provenance (SLSA) — ties each archive to the exact Actions run that built it.
 
 ```bash
-# 1. Verify the checksum file's signature (requires cosign 2.x)
+# 1. Verify the checksum file's signature (requires cosign 2.6+ for the
+#    Sigstore bundle format)
 cosign verify-blob \
-  --certificate checksums.txt.pem \
-  --signature checksums.txt.sig \
+  --bundle checksums.txt.bundle \
   --certificate-identity-regexp 'https://github.com/jp2195/pyre/.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   checksums.txt
