@@ -64,7 +64,9 @@ jobs:
           GORELEASER_CURRENT_TAG: ${{ needs.release-please.outputs.tag_name }}
         with:
           distribution: goreleaser
-          version: "~> v2"
+          # Pinned distribution version (the action itself is SHA-pinned
+          # above). Review when Renovate bumps the action, or quarterly.
+          version: "v2.16.0"
           args: release --clean
 
       - name: Attest build provenance
