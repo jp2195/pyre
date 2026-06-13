@@ -1,58 +1,84 @@
-# Routes
+# Routes View
 
-Routing table + BGP / OSPF neighbor state. Analyze group (`2`).
-
-## Display
-
-| Column         | Description                              |
-|----------------|------------------------------------------|
-| Destination    | CIDR or `0.0.0.0/0` for default route    |
-| Next Hop       | Gateway address or interface             |
-| Interface      | Egress interface                         |
-| Protocol       | `static`, `bgp`, `ospf`, `connect`, …    |
-| Virtual Router | Owning VR                                |
-| Age            | When the route was installed             |
-| Metric         | Protocol-specific cost                   |
-
-Each row is colored by protocol family so static / dynamic routes are
-distinguishable at a glance.
+Routing table and BGP/OSPF neighbor state. Analyze group (`2`).
 
 ## Tabs
 
-The view is organised as Routes (default), BGP, OSPF — flipping
-between them keeps the cursor in place per tab.
+Two tabs, switched with `[` or `]`:
 
-## Filter (`/`)
+| Tab | Content |
+|-----|---------|
+| **Routes** | Filtered routing table |
+| **Neighbors** | BGP peers and OSPF neighbors combined |
 
-Substring match across destination, next hop, interface, protocol,
-and virtual router. Filter is per-tab and survives tab switches.
+There is no sort-cycling key and no per-row detail panel on either tab.
+`enter` toggles an `Expanded` flag that renders nothing visible.
 
-There are also protocol filter shortcuts (single-key fast filters) on
-the Routes tab that limit the table to a single protocol.
+## Routes tab
 
-## Sort (`s` cycle)
+### Columns
 
-Destination → Protocol → Next Hop → Interface.
+| Breakpoint | Columns |
+|------------|---------|
+| ≥ 100 | `Proto`, `Destination`, `Next Hop`, `Interface`, `Metric`, `VR` |
+| ≥ 70 | `Proto`, `Destination`, `Next Hop`, `Interface`, `Metric` |
+| < 70 | `Proto`, `Destination`, `Next Hop` |
 
-## Detail (`Enter`)
+`Proto` is a single-letter code: `C` = connected, `S` = static, `L` =
+local, `B` = BGP, `O` = OSPF. Full protocol names are abbreviated in
+display only; they are stored and filtered by their full name. There is
+no Age column.
 
-For static / dynamic routes: full route attributes (preference,
-flags, BFD, source).
+### Filter
 
-For BGP neighbors: peer AS, hold/keepalive timers, prefixes
-sent/received, last error.
+Text filter (`/`) matches against destination, next hop, interface,
+protocol, and virtual router.
 
-For OSPF neighbors: area, state, DR / BDR, dead time, retransmit
-queues.
+### Protocol filter shortcuts (Routes tab only)
 
-## Standard keys
+| Key | Filter |
+|-----|--------|
+| `a` | All protocols (clear filter) |
+| `c` | connected |
+| `s` | static |
+| `b` | bgp |
+| `o` | ospf |
 
-See [keybindings.md](../keybindings.md).
+The active protocol filter is shown in the summary line and in the help
+text at the bottom.
 
-## Tips
+### Help line
 
-- Sort by Protocol to group the routing table by source.
-- The neighbor tabs are the fastest way to confirm a BGP peering is
-  Established without opening the GUI.
-- Combine `/` with a destination CIDR fragment to verify a specific
-  prefix is in the FIB.
+```
+[/] switch  /filter  a/c/s/b/o protocol [<active>]  r refresh
+```
+
+## Neighbors tab
+
+A single combined list of BGP peers and OSPF neighbors, each with a
+`Type` column identifying which protocol it belongs to.
+
+### Columns
+
+| Breakpoint | Columns |
+|------------|---------|
+| ≥ 100 | `Type`, `Peer/Neighbor`, `State`, `AS/Area`, `Prefixes`, `Uptime`, `VR` |
+| ≥ 70 | `Type`, `Peer/Neighbor`, `State`, `AS/Area`, `Prefixes`, `Uptime` |
+| < 70 | `Type`, `Peer/Neighbor`, `State`, `AS/Area` |
+
+- BGP rows: `Type` = `BGP`, `AS/Area` = `AS<number>`, `Prefixes` =
+  received prefix count, `Uptime` = session uptime.
+- OSPF rows: `Type` = `OSPF`, `AS/Area` = area ID, `Prefixes` = `-`,
+  `Uptime` = dead-time remaining.
+
+### Help line
+
+```
+[/] switch  r refresh
+```
+
+## Navigation
+
+`j`/`k`/`g`/`G`/`pgdown`/`pgup` work on both tabs. The routes tab also
+supports the text filter (`/`). There is no detail panel (`enter` has no
+visible effect).

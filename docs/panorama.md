@@ -17,14 +17,13 @@ When you connect, pyre automatically detects Panorama and loads the list of mana
 
 ## Device Picker
 
-Once connected to Panorama, press `D` to open the device picker. This shows all managed firewalls with:
+Once connected to Panorama, press `d` to open the device picker. This shows all managed firewalls with:
 
 | Column | Description |
 |--------|-------------|
-| Hostname | Device hostname |
-| Serial | Serial number |
+| Hostname | Device hostname (falls back to serial if blank) |
 | Model | Hardware model (PA-3260, VM-100, etc.) |
-| HA State | Active, Passive, or Standalone |
+| HA State | Active, Passive, Suspended, or blank for standalone |
 | Connected | Whether Panorama can reach the device |
 | IP Address | Management IP |
 
@@ -106,6 +105,21 @@ The Panorama API key needs appropriate permissions:
 - Configuration read access for policies
 
 The same permissions needed on standalone firewalls apply when proxying through Panorama.
+
+## Limitations
+
+### vsys1 only
+
+Object and policy XPaths in pyre are hardcoded to `vsys1`. When you
+target a multi-vsys firewall through Panorama, only the `vsys1` data
+is visible. Additional vsys support is not yet implemented.
+
+### Device picker is Panorama-only
+
+The `d` key only opens the device picker when the active connection is
+a Panorama (`type: panorama` in config or auto-detected). On a
+standalone firewall, `d` falls through to the current view's own
+key handlers.
 
 ## Troubleshooting
 

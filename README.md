@@ -42,7 +42,8 @@ for network engineers who want answers fast.
   same views, scoped per device
 - **Multi-firewall** — connection hub + quick picker (`:`)
 - **Command palette** — `Ctrl+P` fuzzy-jumps to any view
-- **10 themes** — nord, dracula, catppuccin, gruvbox, …
+- **10 themes** — dark, light, nord, dracula, solarized, gruvbox,
+  tokyonight, catppuccin, onedark, monokai (see [docs/configuration.md](docs/configuration.md#global-settings))
 
 ## Install
 

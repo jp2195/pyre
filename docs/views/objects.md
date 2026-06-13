@@ -1,91 +1,74 @@
-# Objects
+# Objects View
 
-Address & service objects from the firewall's effective config.
-Analyze group (`2`).
-
-Phase 1 ships forward lookup only (browse + filter + detail). Inline
-expansion from rule views and reverse "where used" lookup will come in
-later phases.
+Address and service objects. Analyze group (`2`).
 
 ## Tabs
 
-Two sub-tabs, each with independent filter / sort / cursor / detail
-state:
+Two sub-tabs with independent filter, sort, cursor, and detail state:
 
-| Key   | Action                              |
-|-------|-------------------------------------|
-| `Tab` | Cycle Address ↔ Service             |
-| `a`   | Jump to Address tab                 |
-| `s`   | Jump to Service tab                 |
+| Key | Action |
+|-----|--------|
+| `Tab` | Cycle Address ↔ Service |
+| `a` | Jump to Address tab |
+| `s` | Jump to Service tab |
 
-The header row shows `[Address]  Service` (or vice-versa) and the
-keybinding hint.
+The header shows `[Address]  Service` or `Address  [Service]` with a
+`(a/s/Tab to switch)` hint.
 
 ## Address tab
 
-| Column | Description                                          |
-|--------|------------------------------------------------------|
-| NAME   | Object name                                          |
-| TYPE   | `netmask` / `range` / `fqdn` / `wildcard`            |
-| VALUE  | The CIDR / range / FQDN / wildcard the object holds  |
-| TAGS   | Space-separated tag list                             |
+### Columns (fixed layout)
 
-Address objects are read from both vsys1 and shared scopes and
-concatenated. On a Panorama-targeted device this returns the device's
-effective merged config.
+| Column | Description |
+|--------|-------------|
+| NAME | Object name (truncated to 24 chars) |
+| TYPE | `ip-netmask`, `ip-range`, `fqdn`, `ip-wildcard` (prefix `ip-` stripped in display; truncated to 12 chars) |
+| VALUE | CIDR / range / FQDN / wildcard (truncated to 26 chars) |
+| TAGS | Space-separated tag list |
+
+### Sort (`S` to cycle, resets to ascending each time)
+
+Name → Type → Value
+
+### Filter scope
+
+Matches against: name, type, value, description, tags.
+
+### Detail panel (`enter`)
+
+Object name, Type, Value, Description (if set), Tags (if any).
 
 ## Service tab
 
-| Column     | Description                                |
-|------------|--------------------------------------------|
-| NAME       | Object name                                |
-| PROTO      | `tcp` or `udp`                             |
-| DEST PORT  | `443`, `1024-65535`, `1433,1434`, …        |
-| SRC PORT   | Optional source-port restriction           |
-| TAGS       | Space-separated tag list                   |
+### Columns (fixed layout)
 
-Ports are preserved as strings so ranges and comma-lists survive
-without lossy parsing. Built-in PAN-OS services (`service-http`,
-`service-https`) are not included — they don't appear under `/service`.
+| Column | Description |
+|--------|-------------|
+| NAME | Object name (truncated to 24 chars) |
+| PROTO | `tcp` or `udp` (truncated to 8 chars) |
+| DEST PORT | Port, range, or comma-list (truncated to 16 chars) |
+| SRC PORT | Source-port restriction, if any (truncated to 16 chars) |
+| TAGS | Space-separated tag list |
 
-## Filter (`/`)
+### Sort (`S` to cycle, resets to ascending each time)
 
-Substring match across name, type/protocol, value/ports, description,
-and tags. Filter state is preserved per tab — switching tabs does not
-clear it.
+Name → Protocol → Dest Port
 
-## Sort (`S` to cycle)
+### Filter scope
 
-`s` is already taken for the Service-tab shortcut, so Objects uses
-capital `S` to cycle sort modes:
+Matches against: name, protocol, dest port, src port, description, tags.
 
-- Address: Name → Type → Value
-- Service: Name → Protocol → Dest Port
+### Detail panel (`enter`)
 
-Direction defaults to ascending; cycling the field also resets to
-ascending.
+Object name, Protocol, Dest Port, Src Port (if set), Description (if
+set), Tags (if any).
 
-## Detail (`Enter` / `Esc`)
+## Keys
 
-Opens the detail panel for the highlighted row. Shows the object's
-type, value, description, and tags. `Esc` closes the panel (or, if the
-panel is already closed, clears the active filter).
+`s` switches to the Service tab (not a sort key here — sort is `S`).
+`esc` collapses an open detail panel on the first press, then clears
+the active filter on a second press.
 
 ## Refresh (`r`)
 
-Refetches both tabs in parallel. Loading state shows the spinner per
-tab.
-
-## Standard keys
-
-See [keybindings.md](../keybindings.md).
-
-## Tips
-
-- Filter for a CIDR fragment (e.g. `10.0.`) to find every address
-  object overlapping a subnet.
-- Sort Address by Type to group all FQDNs together — useful for
-  hunting wildcard or legacy entries.
-- The detail panel is the source of truth for what the firewall sees.
-  If a rule references `web-servers`, open Objects → Address →
-  filter `web-servers` → Enter to confirm the resolution.
+App-level refresh re-fetches both tabs.

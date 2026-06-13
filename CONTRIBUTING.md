@@ -27,7 +27,8 @@ The `Makefile` wraps the common Go commands: `build`, `test`, `test-race`,
 - `internal/tui/` — Bubble Tea v2 application
   - `app.go` — top-level `Model` and Update dispatcher
   - `handlers.go` — key handlers
-  - `navigation.go` — table-driven nav (`navTargets` + `viewToNavbar`)
+  - `navigation.go` — table-driven nav derived from `navDefs`
+  - `viewslots.go` — resize/spinner/refresh registration table
   - `commands.go` — `tea.Cmd` factories
   - `render.go` — header/footer
   - `views/` — individual view models
@@ -43,9 +44,11 @@ The `Makefile` wraps the common Go commands: `build`, `test`, `test-race`,
   (`AltScreen`, `MouseMode`) on the returned `tea.View`.
 - Key handlers type-switch on `tea.KeyPressMsg` (v2), not `tea.KeyMsg`.
 - `saveConfig()` / `saveState()` return `tea.Cmd` to avoid goroutine races.
-- Navigation lookups use `navTargets` (key → view) and `viewToNavbar`
-  (view → key). Keep both sides in sync; `navigation_test.go` asserts the
-  bijection.
+- Navigation is table-driven from a single `navDefs` slice in
+  `navigation.go`. `navTargets` and `viewToNavbar` are derived from it
+  by `buildNavTargets` / `buildViewToNavbar`; adding a nav item means
+  adding exactly one entry to `navDefs`. `navigation_test.go` asserts
+  the bijection.
 
 ## Adding a new view
 
@@ -54,11 +57,16 @@ The `Makefile` wraps the common Go commands: `build`, `test`, `test-race`,
 2. Wire it into `internal/tui/app.go`: add a field, a `ViewState`
    constant, init in `NewModel`, dispatch cases in Update and the render
    composition in the top-level `View()`.
-3. Add an entry to `navTargets` and `viewToNavbar` in
-   `internal/tui/navigation.go`. The bijection test will flag omissions.
-4. If the view needs a dedicated keybinding, add it to
+3. Add exactly one entry to the `navDefs` table in
+   `internal/tui/navigation.go`. `navTargets` and `viewToNavbar` are
+   derived from it automatically; do not edit them directly. The
+   bijection test will flag omissions.
+4. Add one `viewSlot` entry in `internal/tui/viewslots.go` to register
+   the resize, spinner, and/or refresh callbacks for the new view.
+   The file comment explains what each field is for.
+5. If the view needs a dedicated keybinding, add it to
    `internal/tui/keys.go`.
-5. Document in `docs/views/<name>.md`.
+6. Document in `docs/views/<name>.md`.
 
 ## Testing
 
@@ -71,6 +79,10 @@ go test -cover ./...     # package-level coverage
 Tests use `httptest.NewTLSServer` (see `internal/api/client_internal_test.go`)
 for anything touching the API client. Credential tests use `t.Setenv`
 to drive the resolution order — see `internal/auth/credentials_test.go`.
+
+CI also runs security gates on every push: `govulncheck ./...`,
+`gosec ./...`, `go mod verify`, and CodeQL (`.github/workflows/security.yml`,
+`ci.yml`, `codeql.yml`). Check those workflow runs if CI fails on your PR.
 
 ## Style
 

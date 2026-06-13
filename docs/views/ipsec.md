@@ -1,43 +1,44 @@
-# IPSec Tunnels
+# IPSec Tunnels View
 
-Site-to-site IPSec tunnel status. Analyze group (`2`).
+Site-to-site IPSec tunnel status. Uses the
+[standard view chrome](README.md#standard-view-chrome).
 
 ## Columns
 
-| Column     | Description                              |
-|------------|------------------------------------------|
-| Name       | Tunnel name                              |
-| Gateway    | Peer IP / hostname                       |
-| State      | `up`, `init`, `down`                     |
-| Protocol   | Negotiated protocol (`ipsec`, `ike`)     |
-| Encryption | Negotiated cipher                        |
-| In / Out   | Byte counters per direction              |
-| Uptime     | Time in current state                    |
+A state indicator icon precedes each row: `●` = up, `~` = init,
+`○` = down. Non-selected rows are color-coded: green = up, yellow =
+init, red = down.
 
-Rows are colored by state: green = up, yellow = init, red = down.
+| Breakpoint | Columns |
+|------------|---------|
+| ≥ 120 | icon, `Name`, `Gateway`, `State`, `Proto`, `Encrypt`, `In`, `Out`, `Uptime` |
+| ≥ 90 | icon, `Name`, `Gateway`, `State`, `In`, `Out`, `Uptime` |
+| < 90 | icon, `Name`, `Gateway`, `State`, `Traffic` (combined) |
 
-## Filter (`/`)
+## Sort fields
 
-Substring match across name, gateway, state, protocol, and
-encryption.
+Cycled with `s`; direction toggled with `S`.
 
-## Sort (`s` cycle)
+| Index | Label | Default direction |
+|-------|-------|-------------------|
+| 0 | Name | ascending |
+| 1 | Gateway | ascending |
+| 2 | State | descending |
+| 3 | Traffic | descending (sum of bytes in + out) |
 
-Name → Gateway → State → Traffic (sum of in + out).
+## Filter scope
 
-## Detail (`Enter`)
+Matches (case-insensitive substring) against: name, gateway, state,
+protocol, encryption.
 
-Full IPSec / IKE state for the selected tunnel: local / remote IPs,
-authentication, encryption + integrity proposals, SA lifetime,
-in / out byte and packet counters, SPI values, last error.
+## Detail panel (`enter`)
 
-## Standard keys
+- **Title** — tunnel name and colored state label.
+- **Connection** — Gateway, Local IP (if set), Remote IP (if set).
+- **Security** — Protocol, Encryption, Authentication, Local SPI (if
+  set), Remote SPI (if set).
+- **Traffic Statistics** — Bytes In, Bytes Out, Packets In, Packets Out,
+  Uptime (if set), Errors (if > 0, shown in red).
 
-See [keybindings.md](../keybindings.md).
-
-## Tips
-
-- Sort by State to surface flapping / down tunnels first.
-- Filter `init` to catch tunnels stuck in negotiation.
-- The detail panel exposes the SA SPI values — useful when you need
-  to correlate with the peer's logs.
+Note: there are no SA lifetime, integrity proposals, or last-error fields
+in the detail panel.

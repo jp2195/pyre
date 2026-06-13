@@ -1,54 +1,50 @@
-# Interfaces
+# Interfaces View
 
-Interface status + counters. Analyze group (`2`).
+Interface status and counters. Uses the
+[standard view chrome](README.md#standard-view-chrome).
 
-## Display
+## Columns
 
-Cards showing:
+The `St` prefix column is a colored state bullet: `●` green = up,
+`○` red = down.
 
-| Field          | Description                            |
-|----------------|----------------------------------------|
-| Name           | `ethernet1/1`, `ae1`, `tunnel.1`, …    |
-| State          | Up / Down                              |
-| Zone           | Assigned security zone                 |
-| IP Address     | Configured IP                          |
-| MAC            | Hardware address                       |
-| Virtual Router | Assigned VR                            |
-| Speed / Duplex | Link speed and duplex mode             |
-| Bytes In/Out   | Traffic counters                       |
-| Packets In/Out | Packet counters                        |
-| Errors         | Error counts, when non-zero            |
+| Breakpoint | Columns |
+|------------|---------|
+| ≥ 120 | `St`, `Name`, `Type`, `Zone`, `IP`, `MAC`, `VR` |
+| ≥ 90 | `St`, `Name`, `Type`, `Zone`, `IP`, `VR` |
+| < 90 | `St`, `Name`, `Zone`, `IP` |
 
-Colors: green = up, red = down, yellow = warnings / errors.
+`MAC` and `VR` are dropped at narrower widths. `Type` is dropped at the
+narrowest breakpoint. Speed, duplex, counters, and ARP entries are in
+the detail panel — they are not columns.
 
-Covers physical, aggregate (`ae*`), VLAN (`ethernet1/1.100`),
-loopback, tunnel interfaces.
+## Sort fields
 
-## Filter (`/`)
+Cycled with `s`; direction toggled with `S`. All fields default to
+ascending.
 
-Name, zone, IP, state. Examples: `ethernet1`, `trust`, `10.0`, `down`.
+| Index | Label | Notes |
+|-------|-------|-------|
+| 0 | Name | alphabetical |
+| 1 | Zone | alphabetical |
+| 2 | State | up interfaces sort first; ties broken by name |
+| 3 | IP | lexicographic |
 
-## Sort (`s` cycle, `S` reverse)
+## Filter scope
 
-Name → Zone → State → IP.
+Matches (case-insensitive substring) against: name, zone, IP, state,
+type, virtual router.
 
-## Detail (`Enter`)
+## Detail panel (`enter`)
 
-- Configuration: full settings, netmask, zone + VR, link-state.
-- Counters: bytes/packets, error / drop breakdown, multicast /
-  broadcast stats.
-- Physical: speed/duplex negotiation, media type, hardware details.
+Two-column layout at ≥ 100 wide; single column otherwise. Sections:
 
-## Standard keys
-
-See [keybindings.md](../keybindings.md).
-
-## Tips
-
-- Filter `down` to see non-operational interfaces only.
-- Sort by State to group down interfaces.
-- Error types in the detail view:
-  - **Input errors** — receive problems (CRC, framing)
-  - **Output errors** — transmit problems
-  - **Drops** — intentional (queue full, etc.)
-  - **Collisions** — half-duplex contention
+- **Basic Information** — State (● UP / ○ DOWN), Type, Zone, Mode,
+  Vsys (if set).
+- **Network** — IP Address, MAC Address, Virtual Router, MTU (if > 0),
+  VLAN Tag (if > 0).
+- **Physical** — Speed, Duplex.
+- **Traffic Statistics** (if any counters > 0) — Bytes In/Out, Packets
+  In/Out, Errors in/out (if non-zero), Drops in/out (if non-zero).
+- **ARP Entries** (if any for this interface) — up to 5 entries showing
+  status bullet, IP, and MAC; count of additional entries shown if more.

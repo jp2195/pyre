@@ -1,53 +1,67 @@
-# Sessions
+# Sessions View
 
-Active sessions on the firewall. Analyze group (`2`).
+Active sessions on the firewall. Uses the
+[standard view chrome](README.md#standard-view-chrome).
 
 ## Columns
 
-| Column       | Description                          |
-|--------------|--------------------------------------|
-| ID           | Session ID                           |
-| Application  | Identified application               |
-| Source       | Source IP:Port                       |
-| Destination  | Destination IP:Port                  |
-| Protocol     | TCP / UDP / ICMP / …                 |
-| State        | `ACTIVE` / `INIT` / `OPENING` / …    |
-| From Zone    | Source zone                          |
-| To Zone      | Destination zone                     |
-| Age          | Session duration                     |
-| Bytes        | Total bytes                          |
+The column layout is fixed (no width breakpoints):
 
-### States
+| Column | Description |
+|--------|-------------|
+| ID | Session ID |
+| Source | Source IP (truncated to 15 chars) |
+| Destination | Destination IP (truncated to 15 chars) |
+| Port | Destination port |
+| Pro | Protocol (tcp/udp/…, truncated to 4 chars) |
+| App | Identified application (truncated to 10 chars) |
+| State | Session state (`ACTIVE`, `INIT`, `CLOSED`, etc.) |
+| Zones | `SrcZone→DstZone` combined (truncated to 15 chars) |
+| Age | Duration since session start |
+| Bytes | Total bytes in + out |
 
-- `ACTIVE` — established, passing traffic
-- `INIT` — initial handshake
-- `OPENING` — connection being established
-- `CLOSING` — terminating
-- `CLOSED` — briefly visible
-- `DISCARD` — being dropped
+In non-selected rows the `State` cell is color-coded: green = `ACTIVE`,
+yellow = `DISCARD`/`DROP`, muted = `CLOSED`/`INIT`.
 
-## Filter (`/`)
+## Sort fields
 
-Source or destination IP, application, zones, matched rule, username
-(when User-ID is active). Case-insensitive substring match.
+Cycled with `s`; direction toggled with `S`.
 
-## Sort (`s` cycle, `S` reverse)
+| Index | Label | Default direction |
+|-------|-------|-------------------|
+| 0 | ID | ascending |
+| 1 | Bytes | descending |
+| 2 | Age | descending |
+| 3 | App | ascending |
 
-ID → Bytes → Age → Application.
+## Filter scope
 
-## Detail (`d` or `Enter`)
+Matches (case-insensitive) against: application, source IP, destination
+IP, source zone, destination zone, rule name, username.
 
-Full 5-tuple, NAT translations, matched rule, byte / packet counters
-per direction, session flags, application subcategory, URL category,
-User-ID (if active).
+## Detail — two steps
 
-## Standard keys
+### Step 1: basic detail (`enter`)
 
-See [keybindings.md](../keybindings.md).
+Toggles the basic detail panel. Shows:
+- Application, Protocol, State
+- Source: `IP:port (zone)`
+- Destination: `IP:port (zone)`
+- NAT Source (if translated): `IP:port`
+- User (if User-ID is active)
+- Rule name
+- Bytes In, Bytes Out
+- Start Time, Duration
+- Hint: `[d: fetch extended details]`
 
-## Tips
+### Step 2: extended detail (`d`, only while panel is open)
 
-- Sort by Bytes descending to find heavy talkers.
-- Expand a session to see original vs translated addresses for NAT
-  troubleshooting.
-- Sessions are a point-in-time snapshot — press `r` to refresh.
+Fetches additional session data from the API and adds:
+- **NAT Details** (if applicable) — NAT Dest IP:port, NAT Rule
+- **Security** (if applicable) — URL Category, URL Rule, Decrypt Rule
+- **Traffic Statistics** — Pkts to Client, Pkts to Server, Bytes to
+  Client, Bytes to Server
+- **Timing** (if available) — Timeout, TTL, Idle time
+- **Flags** — offloaded, decrypt-mirror (if set)
+
+Note: there is no "application subcategory" field in the detail panel.

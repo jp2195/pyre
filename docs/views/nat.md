@@ -1,43 +1,54 @@
-# NAT Policies
+# NAT Policies View
 
-NAT rulebase browser. Analyze group (`2`).
+NAT rulebase browser. Uses the [standard view chrome](README.md#standard-view-chrome).
 
 ## Columns
 
-| Column            | Description                                      |
-|-------------------|--------------------------------------------------|
-| `#`               | Position                                         |
-| Name              | Rule name                                        |
-| Type              | `ipv4` / `nat64` / `nptv6`                       |
-| From / To         | Source / destination zones                       |
-| Source / Dest     | Original addresses                               |
-| Service           | Original service / port                          |
-| Src Translation   | SNAT target (or "none")                          |
-| Dst Translation   | DNAT target (or "none")                          |
-| Hits              | Hit count                                        |
+All breakpoints include `#` (position) and `Base` (pre/post rulebase
+abbreviation). A `*` suffix on the name indicates the rule has tags.
 
-- Disabled rules render with strikethrough.
+| Breakpoint | Columns |
+|------------|---------|
+| ≥ 150 | `#`, `Base`, `Name`, `Src Zone`, `Dst Zone`, `Src NAT`, `Dst NAT`, `Hits`, `Last Hit` |
+| ≥ 120 | `#`, `Base`, `Name`, `Zones`, `Service`, `Src NAT`, `Dst NAT`, `Hits` |
+| ≥ 100 | `#`, `Base`, `Name`, `Zones`, `Src NAT`, `Dst NAT`, `Hits` |
+| < 100 | `#`, `Name`, `Zones`, `Src NAT`, `Hits` |
 
-### Translation types
+`Src NAT` and `Dst NAT` show abbreviated translation types:
+- `DIPP:<pool>` — Dynamic IP and Port
+- `DIP:<pool>` — Dynamic IP
+- `Static:<addr>` — Static IP
+- `None` — no source translation
 
-- **SNAT**: dynamic IP and port (many-to-one), dynamic IP
-  (many-to-many), static IP (one-to-one).
-- **DNAT**: static to internal IP, port forwarding.
+`Dst NAT` shows `<translated-ip>:<translated-port>` or `None`.
 
-## Filter (`/`)
+## Sort fields
 
-Rule name, source / destination addresses, translation addresses,
-zones.
+Cycled with `s`; direction toggled with `S`.
 
-## Sort (`s` cycle, `S` reverse)
+| Index | Label | Default direction |
+|-------|-------|-------------------|
+| 0 | Position | ascending |
+| 1 | Name | ascending |
+| 2 | Hits | descending |
+| 3 | Last Hit | descending |
 
-Position → Name → Hits.
+## Filter scope
 
-## Detail (`Enter`)
+Matches (case-insensitive substring) against: name, description,
+rulebase, tags, source zones, destination zones, source addresses,
+destination addresses, translated source, translated destination.
 
-Complete address lists, bi-directional translation settings,
-interface-based source translation, fallback, description, tags.
+## Detail panel (`enter`)
 
-## Standard keys
+- **Title / subtitle** — rule name (with `(disabled)` if applicable),
+  position, and rulebase label.
+- **Tags** — tag list (if any).
+- **Description** — rule description (if set).
+- **Original Packet (Match)** — Source Zones, Source Addresses, Dest
+  Zones, Dest Addresses, Service, Dest Interface (if not "any").
+- **Translated Packet** — Source Translation type and translated-to
+  address; Dest Translation address and port (or "None" for each).
+- **Usage Statistics** — Hit Count, Last Hit, First Hit (if non-zero).
 
-See [keybindings.md](../keybindings.md).
+Note: there is no "fallback" field in the detail panel.
