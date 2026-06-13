@@ -18,10 +18,6 @@ func TestDefaultConfig(t *testing.T) {
 		t.Error("expected Connections map to be initialized")
 	}
 
-	if cfg.Settings.SessionPageSize != 50 {
-		t.Errorf("expected SessionPageSize 50, got %d", cfg.Settings.SessionPageSize)
-	}
-
 	if cfg.Settings.Theme != "default" {
 		t.Errorf("expected Theme 'default', got %q", cfg.Settings.Theme)
 	}
@@ -124,8 +120,8 @@ func TestLoad_NoConfigFile(t *testing.T) {
 		t.Fatal("expected non-nil config")
 	}
 	// Should return default config
-	if cfg.Settings.SessionPageSize != 50 {
-		t.Errorf("expected default SessionPageSize 50, got %d", cfg.Settings.SessionPageSize)
+	if cfg.Settings.Theme != "default" {
+		t.Errorf("expected default Theme 'default', got %q", cfg.Settings.Theme)
 	}
 }
 
@@ -141,7 +137,6 @@ connections:
   10.0.0.1:
     insecure: true
 settings:
-  session_page_size: 100
   theme: dark
 `
 	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
@@ -169,9 +164,6 @@ settings:
 		t.Error("expected Insecure to be true")
 	}
 
-	if cfg.Settings.SessionPageSize != 100 {
-		t.Errorf("expected SessionPageSize 100, got %d", cfg.Settings.SessionPageSize)
-	}
 	if cfg.Settings.Theme != "dark" {
 		t.Errorf("expected Theme 'dark', got %q", cfg.Settings.Theme)
 	}
@@ -304,7 +296,7 @@ func TestConfig_NilConnectionsAfterLoad(t *testing.T) {
 	// Config with no connections section
 	configContent := `
 settings:
-  session_page_size: 100
+  theme: dark
 `
 	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		t.Fatalf("failed to write test config: %v", err)
@@ -364,13 +356,9 @@ func TestCLIFlags_AllFields(t *testing.T) {
 
 func TestSettings_AllFields(t *testing.T) {
 	settings := Settings{
-		SessionPageSize: 100,
-		Theme:           "dark",
+		Theme: "dark",
 	}
 
-	if settings.SessionPageSize != 100 {
-		t.Errorf("expected SessionPageSize 100, got %d", settings.SessionPageSize)
-	}
 	if settings.Theme != "dark" {
 		t.Errorf("expected Theme 'dark', got %q", settings.Theme)
 	}
@@ -553,5 +541,166 @@ func TestConfig_ConnectionHosts(t *testing.T) {
 	hosts = cfg.ConnectionHosts()
 	if len(hosts) != 2 {
 		t.Errorf("expected 2 hosts, got %d", len(hosts))
+	}
+}
+
+func TestAtomicWriteFile_WritesContentAndPermissions(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "out.yaml")
+
+	if err := atomicWriteFile(path, []byte("hello: world\n"), 0600); err != nil {
+		t.Fatalf("atomicWriteFile: %v", err)
+	}
+
+	data, err := os.ReadFile(path) // #nosec G304 -- test-controlled path
+	if err != nil {
+		t.Fatalf("reading result: %v", err)
+	}
+	if string(data) != "hello: world\n" {
+		t.Errorf("content = %q, want %q", data, "hello: world\n")
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if info.Mode().Perm() != 0600 {
+		t.Errorf("mode = %#o, want 0600", info.Mode().Perm())
+	}
+}
+
+func TestAtomicWriteFile_OverwritesExistingFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "out.yaml")
+	if err := os.WriteFile(path, []byte("old"), 0600); err != nil {
+		t.Fatalf("seeding file: %v", err)
+	}
+
+	if err := atomicWriteFile(path, []byte("new"), 0600); err != nil {
+		t.Fatalf("atomicWriteFile: %v", err)
+	}
+
+	data, err := os.ReadFile(path) // #nosec G304 -- test-controlled path
+	if err != nil {
+		t.Fatalf("reading result: %v", err)
+	}
+	if string(data) != "new" {
+		t.Errorf("content = %q, want %q", data, "new")
+	}
+}
+
+// TestAtomicWriteFile_LeavesNoTempFiles guards the rename-into-place contract:
+// after a successful write the directory holds exactly the target file.
+func TestAtomicWriteFile_LeavesNoTempFiles(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "out.yaml")
+
+	if err := atomicWriteFile(path, []byte("x"), 0600); err != nil {
+		t.Fatalf("atomicWriteFile: %v", err)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "out.yaml" {
+		names := make([]string, 0, len(entries))
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		t.Errorf("directory contents = %v, want exactly [out.yaml]", names)
+	}
+}
+
+func TestAtomicWriteFile_ErrorOnMissingDirectory(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "no-such-subdir", "out.yaml")
+
+	err := atomicWriteFile(path, []byte("x"), 0600)
+	if err == nil {
+		t.Fatal("expected error writing into nonexistent directory")
+	}
+}
+
+// TestConfig_Save_CreatesBackup guards Save's backup contract: when
+// ~/.pyre.yaml already exists, its prior contents are preserved in
+// ~/.pyre.yaml.bak before the new contents land.
+func TestConfig_Save_CreatesBackup(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("USERPROFILE", tmpDir)
+
+	configPath := filepath.Join(tmpDir, ".pyre.yaml")
+	if err := os.WriteFile(configPath, []byte("default: old-host\n"), 0600); err != nil {
+		t.Fatalf("seeding config: %v", err)
+	}
+
+	cfg := DefaultConfig()
+	cfg.Default = "new-host"
+	cfg.Connections["new-host"] = ConnectionConfig{}
+	if err := cfg.Save(); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	backup, err := os.ReadFile(configPath + ".bak") // #nosec G304 -- test-controlled path
+	if err != nil {
+		t.Fatalf("reading backup: %v", err)
+	}
+	if string(backup) != "default: old-host\n" {
+		t.Errorf("backup = %q, want prior contents", backup)
+	}
+
+	current, err := os.ReadFile(configPath) // #nosec G304 -- test-controlled path
+	if err != nil {
+		t.Fatalf("reading config: %v", err)
+	}
+	if !bytes.Contains(current, []byte("new-host")) {
+		t.Errorf("saved config missing new content:\n%s", current)
+	}
+
+	info, err := os.Stat(configPath)
+	if err != nil {
+		t.Fatalf("stat config: %v", err)
+	}
+	if info.Mode().Perm() != 0600 {
+		t.Errorf("config mode = %#o, want 0600", info.Mode().Perm())
+	}
+}
+
+func TestConfig_Save_NoBackupOnFirstWrite(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("USERPROFILE", tmpDir)
+
+	cfg := DefaultConfig()
+	if err := cfg.Save(); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	_, err := os.Stat(filepath.Join(tmpDir, ".pyre.yaml.bak"))
+	if err == nil {
+		t.Error("expected no backup file on first save, but it exists")
+	} else if !os.IsNotExist(err) {
+		t.Errorf("unexpected stat error (neither nil nor not-exist): %v", err)
+	}
+}
+
+func TestConfig_CRUD_NilConnectionsMap(t *testing.T) {
+	// A zero-value Config (nil Connections) must behave: Add initializes
+	// the map; Update and Delete report not-found instead of panicking.
+	c := &Config{}
+	if err := c.AddConnection("10.0.0.1", ConnectionConfig{}); err != nil {
+		t.Errorf("AddConnection on nil map: %v", err)
+	}
+	if _, ok := c.GetConnection("10.0.0.1"); !ok {
+		t.Error("expected connection after Add on nil map")
+	}
+
+	c2 := &Config{}
+	if err := c2.UpdateConnection("10.0.0.1", ConnectionConfig{}); err == nil {
+		t.Error("expected error from UpdateConnection on nil map")
+	}
+	c3 := &Config{}
+	if err := c3.DeleteConnection("10.0.0.1"); err == nil {
+		t.Error("expected error from DeleteConnection on nil map")
 	}
 }

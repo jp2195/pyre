@@ -199,6 +199,85 @@ func TestPollLogJob_FirstAttemptIsImmediate(t *testing.T) {
 	}
 }
 
+func TestGetSystemLogs_SanitizesOpaqueField(t *testing.T) {
+	shrinkPollTimings(t, 5, 10*time.Millisecond)
+	// Serve two responses: first the job-submit ACK, then the FIN with log entries.
+	// Raw ESC (0x1B) is illegal in XML 1.0 and would be rejected by the parser
+	// before sanitization; DEL (0x7F) is a legal XML character that the sanitizer
+	// strips, demonstrating the sanitizer is wired in to the fetcher.
+	var calls atomic.Int32
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch calls.Add(1) {
+		case 1:
+			// Log submit: return job ID
+			fmt.Fprint(w, `<response status="success"><result><job>1</job></result></response>`)
+		default:
+			// Poll: return FIN with a log entry that has DEL (0x7F) in opaque.
+			fmt.Fprint(w, `<response status="success"><result><log><logs><entry>`+
+				`<time_generated>2026/06/12 12:00:00</time_generated>`+
+				`<type>system</type><subtype>general</subtype><severity>info</severity>`+
+				`<opaque>before`+"\x7f"+`after</opaque>`+
+				`<eventid>EVT-1</eventid><serial>001234567890</serial><device_name>fw1</device_name>`+
+				`</entry></logs></log><job><status>FIN</status></job></result></response>`)
+		}
+	})
+
+	logs, err := c.GetSystemLogs(context.Background(), "", 10, "")
+	if err != nil {
+		t.Fatalf("GetSystemLogs: %v", err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("expected 1 log entry, got %d", len(logs))
+	}
+	if logs[0].Description != "beforeafter" {
+		t.Errorf("Description = %q, want %q", logs[0].Description, "beforeafter")
+	}
+}
+
+func TestGetThreatLogs_SanitizesThreatFields(t *testing.T) {
+	shrinkPollTimings(t, 5, 10*time.Millisecond)
+	// Raw ESC (0x1B) is illegal in XML 1.0 and would be rejected by the parser
+	// before sanitization; DEL (0x7F) is a legal XML character that the sanitizer
+	// strips, demonstrating the sanitizer is wired in to the fetcher.
+	var calls atomic.Int32
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch calls.Add(1) {
+		case 1:
+			// Log submit: return job ID
+			fmt.Fprint(w, `<response status="success"><result><job>1</job></result></response>`)
+		default:
+			// Poll: return FIN with a threat log entry that has DEL (0x7F) in
+			// threat name (<threat>), URL (<misc>), and filename (<filename>).
+			fmt.Fprint(w, `<response status="success"><result><log><logs><entry>`+
+				`<time_generated>2026/06/12 12:00:00</time_generated>`+
+				`<type>threat</type><subtype>vulnerability</subtype>`+
+				`<threat>bad`+"\x7f"+`name</threat>`+
+				`<misc>http://evil`+"\x7f"+`.example.com/path</misc>`+
+				`<filename>mal`+"\x7f"+`ware.exe</filename>`+
+				`<src>10.0.0.1</src><dst>10.0.0.2</dst>`+
+				`<serial>001234567890</serial><device_name>fw1</device_name>`+
+				`</entry></logs></log><job><status>FIN</status></job></result></response>`)
+		}
+	})
+
+	logs, err := c.GetThreatLogs(context.Background(), "", 10, "")
+	if err != nil {
+		t.Fatalf("GetThreatLogs: %v", err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("expected 1 log entry, got %d", len(logs))
+	}
+	if logs[0].ThreatName != "badname" {
+		t.Errorf("ThreatName = %q, want %q", logs[0].ThreatName, "badname")
+	}
+	if logs[0].URL != "http://evil.example.com/path" {
+		t.Errorf("URL = %q, want %q", logs[0].URL, "http://evil.example.com/path")
+	}
+	if logs[0].Filename != "malware.exe" {
+		t.Errorf("Filename = %q, want %q", logs[0].Filename, "malware.exe")
+	}
+}
+
 func TestPollLogJob_RespectsContextCancellation(t *testing.T) {
 	// Long per-poll interval would ordinarily dominate the loop; cancellation
 	// must interrupt the select immediately.

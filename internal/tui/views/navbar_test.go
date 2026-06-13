@@ -4,8 +4,31 @@ import (
 	"testing"
 )
 
+// testNavGroups is a small fixture exercising the widget mechanics: three
+// groups, multi-item groups first, single-item group last. Item positions
+// relied on by tests: monitor has 4 items; "sessions" is analyze[3].
+func testNavGroups() []NavGroup {
+	return []NavGroup{
+		{ID: "monitor", Label: "Monitor", Key: "1", Items: []NavItem{
+			{ID: "overview", Label: "Overview", Key: "1"},
+			{ID: "network", Label: "Network", Key: "2"},
+			{ID: "security", Label: "Security", Key: "3"},
+			{ID: "vpn", Label: "VPN", Key: "4"},
+		}},
+		{ID: "analyze", Label: "Analyze", Key: "2", Items: []NavItem{
+			{ID: "policies", Label: "Policies", Key: "1"},
+			{ID: "nat", Label: "NAT", Key: "2"},
+			{ID: "objects", Label: "Objects", Key: "3"},
+			{ID: "sessions", Label: "Sessions", Key: "4"},
+		}},
+		{ID: "tools", Label: "Tools", Key: "3", Items: []NavItem{
+			{ID: "config", Label: "Config", Key: "1"},
+		}},
+	}
+}
+
 func TestNewNavbarModel(t *testing.T) {
-	nav := NewNavbarModel()
+	nav := NewNavbarModel(testNavGroups())
 
 	if nav.activeGroup != 0 {
 		t.Errorf("expected activeGroup=0, got %d", nav.activeGroup)
@@ -27,7 +50,7 @@ func TestNewNavbarModel(t *testing.T) {
 }
 
 func TestNavbarModel_SetSize(t *testing.T) {
-	nav := NewNavbarModel()
+	nav := NewNavbarModel(testNavGroups())
 	nav = nav.SetSize(100)
 
 	if nav.width != 100 {
@@ -36,7 +59,7 @@ func TestNavbarModel_SetSize(t *testing.T) {
 }
 
 func TestNavbarModel_SetActiveGroup(t *testing.T) {
-	nav := NewNavbarModel()
+	nav := NewNavbarModel(testNavGroups())
 
 	// Valid group
 	nav = nav.SetActiveGroup(2)
@@ -68,7 +91,7 @@ func TestNavbarModel_SetActiveGroup(t *testing.T) {
 }
 
 func TestNavbarModel_SetActiveItem(t *testing.T) {
-	nav := NewNavbarModel()
+	nav := NewNavbarModel(testNavGroups())
 	nav = nav.SetActiveGroup(0) // Monitor group has 4 items
 
 	// Valid item
@@ -91,7 +114,7 @@ func TestNavbarModel_SetActiveItem(t *testing.T) {
 }
 
 func TestNavbarModel_ActiveGroup(t *testing.T) {
-	nav := NewNavbarModel()
+	nav := NewNavbarModel(testNavGroups())
 
 	group := nav.ActiveGroup()
 	if group == nil {
@@ -110,7 +133,7 @@ func TestNavbarModel_ActiveGroup(t *testing.T) {
 }
 
 func TestNavbarModel_ActiveItem(t *testing.T) {
-	nav := NewNavbarModel()
+	nav := NewNavbarModel(testNavGroups())
 
 	item := nav.ActiveItem()
 	if item == nil {
@@ -129,7 +152,7 @@ func TestNavbarModel_ActiveItem(t *testing.T) {
 }
 
 func TestNavbarModel_ActiveGroupIndex(t *testing.T) {
-	nav := NewNavbarModel()
+	nav := NewNavbarModel(testNavGroups())
 
 	if nav.ActiveGroupIndex() != 0 {
 		t.Errorf("expected ActiveGroupIndex=0, got %d", nav.ActiveGroupIndex())
@@ -142,7 +165,7 @@ func TestNavbarModel_ActiveGroupIndex(t *testing.T) {
 }
 
 func TestNavbarModel_ActiveItemIndex(t *testing.T) {
-	nav := NewNavbarModel()
+	nav := NewNavbarModel(testNavGroups())
 
 	if nav.ActiveItemIndex() != 0 {
 		t.Errorf("expected ActiveItemIndex=0, got %d", nav.ActiveItemIndex())
@@ -155,7 +178,7 @@ func TestNavbarModel_ActiveItemIndex(t *testing.T) {
 }
 
 func TestNavbarModel_SetActiveByID(t *testing.T) {
-	nav := NewNavbarModel()
+	nav := NewNavbarModel(testNavGroups())
 
 	// Set to analyze/sessions
 	nav = nav.SetActiveByID("analyze", "sessions")
@@ -183,7 +206,7 @@ func TestNavbarModel_SetActiveByID(t *testing.T) {
 }
 
 func TestNavbarModel_GetItemID(t *testing.T) {
-	nav := NewNavbarModel()
+	nav := NewNavbarModel(testNavGroups())
 
 	id := nav.GetItemID()
 	if id != "overview" {
@@ -198,7 +221,7 @@ func TestNavbarModel_GetItemID(t *testing.T) {
 }
 
 func TestNavbarModel_RenderTabs(t *testing.T) {
-	nav := NewNavbarModel()
+	nav := NewNavbarModel(testNavGroups())
 
 	rendered := nav.RenderTabs()
 	if rendered == "" {
@@ -212,7 +235,7 @@ func TestNavbarModel_RenderTabs(t *testing.T) {
 }
 
 func TestNavbarModel_RenderSubTabs(t *testing.T) {
-	nav := NewNavbarModel()
+	nav := NewNavbarModel(testNavGroups())
 
 	rendered := nav.RenderSubTabs()
 	if rendered == "" {
@@ -226,7 +249,7 @@ func TestNavbarModel_RenderSubTabs(t *testing.T) {
 }
 
 func TestNavbarModel_View(t *testing.T) {
-	nav := NewNavbarModel()
+	nav := NewNavbarModel(testNavGroups())
 
 	view := nav.View()
 	if view == "" {
@@ -240,7 +263,7 @@ func TestNavbarModel_View(t *testing.T) {
 }
 
 func TestNavbarModel_Height(t *testing.T) {
-	nav := NewNavbarModel()
+	nav := NewNavbarModel(testNavGroups())
 
 	if nav.Height() != 0 {
 		t.Errorf("expected Height=0, got %d", nav.Height())

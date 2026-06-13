@@ -2,7 +2,7 @@ package views
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -11,6 +11,7 @@ import (
 // RuleListConfig defines the type-specific behavior for a RuleListModel.
 type RuleListConfig[T any] struct {
 	Title             string
+	ItemNoun          string // Noun for the banner count, e.g. "rules", "users"; empty defaults to "rules"
 	LoadingMsg        string
 	EmptyMsg          string
 	FilterPlaceholder string
@@ -21,11 +22,13 @@ type RuleListConfig[T any] struct {
 	FormatHeaderRow   func(width int) string          // Renders the table header for available width
 	FormatRow         func(item T, width int) string  // Renders a single row
 	RenderDetail      func(item T, width int) string  // Renders the detail panel
-	IsDisabled        func(item T) bool               // Returns true if item should render as disabled
+	IsDisabled        func(item T) bool               // Optional: returns true if item should render as disabled
+	StyleRow          func(item T, width int) string  // Optional: renders a non-selected row with custom styling (replaces FormatRow + normal/disabled styling)
 }
 
 // RuleListModel provides a generic, filterable, sortable list with detail expansion.
-// It is used by PoliciesModel and NATPoliciesModel to eliminate structural duplication.
+// Table-style views embed it via thin wrappers that supply a RuleListConfig
+// (see PoliciesModel for the canonical example).
 type RuleListModel[T any] struct {
 	TableBase
 	config   RuleListConfig[T]
@@ -59,6 +62,11 @@ func (m RuleListModel[T]) SetLoading(loading bool) RuleListModel[T] {
 // HasData returns true if items have been loaded.
 func (m RuleListModel[T]) HasData() bool {
 	return m.items != nil
+}
+
+// IsFilterMode returns true while the filter text input is focused.
+func (m RuleListModel[T]) IsFilterMode() bool {
+	return m.FilterMode
 }
 
 // SetItems replaces the item list, resets cursor, and re-applies filter/sort.
@@ -101,12 +109,18 @@ func (m *RuleListModel[T]) applyFilter() {
 func (m *RuleListModel[T]) applySort() {
 	sortBy := m.sortBy
 	asc := m.SortAsc
-	sort.Slice(m.filtered, func(i, j int) bool {
-		less := m.config.CompareItems(m.filtered[i], m.filtered[j], sortBy)
-		if asc {
-			return less
+	slices.SortFunc(m.filtered, func(a, b T) int {
+		var c int
+		switch {
+		case m.config.CompareItems(a, b, sortBy):
+			c = -1
+		case m.config.CompareItems(b, a, sortBy):
+			c = 1
 		}
-		return !less
+		if !asc {
+			c = -c
+		}
+		return c
 	})
 }
 
@@ -157,6 +171,10 @@ func (m RuleListModel[T]) Update(msg tea.Msg) (RuleListModel[T], tea.Cmd) {
 			m.Cursor = 0
 			m.Offset = 0
 			return m, nil
+		case "S":
+			m.SortAsc = !m.SortAsc
+			m.applySort()
+			return m, nil
 		}
 
 		// Delegate to TableBase for common navigation
@@ -191,7 +209,11 @@ func (m RuleListModel[T]) View() string {
 
 	var b strings.Builder
 	title := m.config.Title
-	sortInfo := BannerInfoStyle.Render(fmt.Sprintf(" [%d rules | Sort: %s | s: change | /: filter | enter: details]", len(m.filtered), m.sortLabel()))
+	noun := m.config.ItemNoun
+	if noun == "" {
+		noun = "rules"
+	}
+	sortInfo := BannerInfoStyle.Render(fmt.Sprintf(" [%d %s | Sort: %s | s: change | S: dir | /: filter | enter: details]", len(m.filtered), noun, m.sortLabel()))
 	b.WriteString(titleStyle.Render(title) + sortInfo)
 	b.WriteString("\n")
 
@@ -259,7 +281,9 @@ func (m RuleListModel[T]) renderTable() string {
 
 		if isSelected {
 			b.WriteString(selectedStyle.Render(row))
-		} else if m.config.IsDisabled(item) {
+		} else if m.config.StyleRow != nil {
+			b.WriteString(m.config.StyleRow(item, availableWidth))
+		} else if m.config.IsDisabled != nil && m.config.IsDisabled(item) {
 			b.WriteString(disabledStyle.Render(row))
 		} else {
 			b.WriteString(normalStyle.Render(row))

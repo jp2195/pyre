@@ -1,8 +1,9 @@
 package views
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -35,20 +36,20 @@ func filterTrafficLogs(logs []models.TrafficLogEntry, query string) []models.Tra
 
 // sortTrafficLogs sorts the slice in place by the given field.
 func sortTrafficLogs(logs []models.TrafficLogEntry, sortBy LogSortField, asc bool) {
-	sort.Slice(logs, func(i, j int) bool {
-		var less bool
+	slices.SortFunc(logs, func(a, b models.TrafficLogEntry) int {
+		var c int
 		switch sortBy {
 		case LogSortSource:
-			less = logs[i].SourceIP < logs[j].SourceIP
+			c = cmp.Compare(a.SourceIP, b.SourceIP)
 		case LogSortAction:
-			less = logs[i].Action < logs[j].Action
+			c = cmp.Compare(a.Action, b.Action)
 		default: // LogSortTime
-			less = logs[i].Time.Before(logs[j].Time)
+			c = a.Time.Compare(b.Time)
 		}
 		if !asc {
-			return !less
+			c = -c
 		}
-		return less
+		return c
 	})
 }
 
@@ -67,13 +68,7 @@ func (m LogsModel) renderTrafficTable() string {
 		"Time", "Action", "Source", "Dest", "App", "Rule", "Bytes")
 	b.WriteString(TableHeaderStyle.Render(header) + "\n")
 
-	visibleRows := m.visibleRows()
-	end := min(m.Offset+visibleRows, len(m.filteredTraffic))
-
-	for i := m.Offset; i < end; i++ {
-		log := m.filteredTraffic[i]
-		isSelected := i == m.Cursor
-
+	b.WriteString(renderLogRows(m.Offset, m.Cursor, m.visibleRows(), m.filteredTraffic, func(log models.TrafficLogEntry, selected bool) string {
 		timeStr := log.Time.Format("2006-01-02 15:04:05")
 
 		row := fmt.Sprintf("%-19s %-7s %-15s %-15s %-12s %-15s %-10s",
@@ -85,14 +80,12 @@ func (m LogsModel) renderTrafficTable() string {
 			truncate(log.Rule, 15),
 			formatBytes(log.Bytes))
 
-		if isSelected {
-			b.WriteString(TableRowSelectedStyle.Render(row) + "\n")
-		} else {
-			// Color code by action
-			row = colorByAction(row, log.Action)
-			b.WriteString(row + "\n")
+		if selected {
+			return TableRowSelectedStyle.Render(row)
 		}
-	}
+		// Color code by action
+		return colorByAction(row, log.Action)
+	}))
 
 	return b.String()
 }

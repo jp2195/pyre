@@ -1,8 +1,9 @@
 package views
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -156,10 +157,8 @@ func (m NetworkDashboardModel) renderTopInterfaces(width int) string {
 	// Sort interfaces by total bytes (descending)
 	sorted := make([]models.Interface, len(m.interfaces))
 	copy(sorted, m.interfaces)
-	sort.Slice(sorted, func(i, j int) bool {
-		totalI := sorted[i].BytesIn + sorted[i].BytesOut
-		totalJ := sorted[j].BytesIn + sorted[j].BytesOut
-		return totalI > totalJ
+	slices.SortFunc(sorted, func(a, b models.Interface) int {
+		return cmp.Compare(b.BytesIn+b.BytesOut, a.BytesIn+a.BytesOut)
 	})
 
 	// Show top 8 interfaces
@@ -223,10 +222,10 @@ func (m NetworkDashboardModel) renderInterfaceErrors(width int) string {
 	}
 
 	// Sort by total errors/drops
-	sort.Slice(problemIfaces, func(i, j int) bool {
-		totalI := problemIfaces[i].ErrorsIn + problemIfaces[i].ErrorsOut + problemIfaces[i].DropsIn + problemIfaces[i].DropsOut
-		totalJ := problemIfaces[j].ErrorsIn + problemIfaces[j].ErrorsOut + problemIfaces[j].DropsIn + problemIfaces[j].DropsOut
-		return totalI > totalJ
+	slices.SortFunc(problemIfaces, func(a, b models.Interface) int {
+		totalA := a.ErrorsIn + a.ErrorsOut + a.DropsIn + a.DropsOut
+		totalB := b.ErrorsIn + b.ErrorsOut + b.DropsIn + b.DropsOut
+		return cmp.Compare(totalB, totalA)
 	})
 
 	maxShow := min(len(problemIfaces), 6)

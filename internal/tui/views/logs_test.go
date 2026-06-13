@@ -311,3 +311,83 @@ func TestLogsModel_SetSize_ClampsCursor(t *testing.T) {
 		t.Errorf("cursor %d should be less than filtered count %d after resize", m.Cursor, m.filteredCount())
 	}
 }
+
+func TestLogsModel_SetSystemLogs_ClearsPreviousError(t *testing.T) {
+	m := NewLogsModel()
+	m = m.SetSystemLogs(nil, errors.New("fetch failed"))
+	m = m.SetSystemLogs([]models.SystemLogEntry{{Severity: "info", Description: "ok"}}, nil)
+	if m.Err != nil {
+		t.Errorf("Err = %v, want nil after successful refresh", m.Err)
+	}
+}
+
+func TestLogsModel_SetTrafficLogs_ClearsPreviousError(t *testing.T) {
+	m := NewLogsModel()
+	m = m.SetTrafficLogs(nil, errors.New("fetch failed"))
+	m = m.SetTrafficLogs([]models.TrafficLogEntry{{Action: "allow", SourceIP: "10.0.0.1"}}, nil)
+	if m.Err != nil {
+		t.Errorf("Err = %v, want nil after successful refresh", m.Err)
+	}
+}
+
+func TestLogsModel_SetThreatLogs_ClearsPreviousError(t *testing.T) {
+	m := NewLogsModel()
+	m = m.SetThreatLogs(nil, errors.New("fetch failed"))
+	m = m.SetThreatLogs([]models.ThreatLogEntry{{Severity: "high", ThreatName: "X"}}, nil)
+	if m.Err != nil {
+		t.Errorf("Err = %v, want nil after successful refresh", m.Err)
+	}
+}
+
+func TestLogsModel_View_SystemRowContent(t *testing.T) {
+	InitStyles()
+	m := NewLogsModel()
+	m = m.SetSize(120, 30)
+	m = m.SetSystemLogs([]models.SystemLogEntry{
+		{Time: time.Now(), Severity: "critical", Type: "general", Description: "fan failure imminent"},
+		{Time: time.Now(), Severity: "informational", Type: "auth", Description: "admin login ok"},
+	}, nil)
+
+	out := m.View()
+	// CRIT and INFO are the abbreviated forms produced by abbreviateSeverity;
+	// this asserts abbreviation is applied in the rendered output.
+	for _, want := range []string{"fan failure imminent", "admin login ok", "CRIT", "INFO"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in system log view:\n%s", want, out)
+		}
+	}
+}
+
+func TestLogsModel_View_TrafficRowContent(t *testing.T) {
+	InitStyles()
+	m := NewLogsModel()
+	m = m.SetSize(120, 30)
+	m = m.SetTrafficLogs([]models.TrafficLogEntry{
+		{Time: time.Now(), Action: "allow", SourceIP: "10.1.2.3", DestIP: "8.8.4.4", Application: "dns"},
+	}, nil)
+	m, _ = m.Update(tea.KeyPressMsg{Code: ']', Text: "]"}) // System -> Traffic
+
+	out := m.View()
+	for _, want := range []string{"10.1.2.3", "8.8.4.4", "dns"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in traffic log view:\n%s", want, out)
+		}
+	}
+}
+
+func TestLogsModel_View_ThreatRowContent(t *testing.T) {
+	InitStyles()
+	m := NewLogsModel()
+	m = m.SetSize(120, 30)
+	m = m.SetThreatLogs([]models.ThreatLogEntry{
+		{Time: time.Now(), Severity: "high", ThreatName: "Trojan.GenericKD", SourceIP: "203.0.113.5"},
+	}, nil)
+	m, _ = m.Update(tea.KeyPressMsg{Code: '[', Text: "["}) // System -> Threat
+
+	out := m.View()
+	for _, want := range []string{"Trojan.GenericKD", "203.0.113.5"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in threat log view:\n%s", want, out)
+		}
+	}
+}

@@ -26,8 +26,16 @@ func (m Model) doLogin() tea.Cmd {
 	password := m.login.Password()
 	insecure := m.login.Insecure()
 
+	// If this host already has a saved connection config, honor its CA
+	// bundle so interactive login can verify a self-signed firewall cert
+	// without resorting to --insecure.
+	opts := api.ClientOptions{Insecure: insecure}
+	if conn, ok := m.config.GetConnection(host); ok {
+		opts.CACertPath = conn.CACertPath
+	}
+
 	return func() tea.Msg {
-		result, err := auth.GenerateAPIKey(ctx, host, username, password, insecure)
+		result, err := auth.GenerateAPIKey(ctx, host, username, password, opts)
 		if err != nil {
 			return LoginErrorMsg{Err: err}
 		}
@@ -208,12 +216,12 @@ func (m Model) fetchInterfaces() tea.Cmd {
 	if conn == nil {
 		return nil
 	}
-	ctx := m.ctx
 	target := conn.Target()
-	return func() tea.Msg {
-		ifaces, err := conn.Client.GetInterfaces(ctx, target)
+	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.Interface, error) {
+		return conn.Client.GetInterfaces(ctx, target)
+	}, func(ifaces []models.Interface, err error) tea.Msg {
 		return InterfacesMsg{Interfaces: ifaces, Err: err}
-	}
+	})
 }
 
 func (m Model) fetchThreatSummary(conn *auth.Connection) tea.Cmd {
@@ -393,12 +401,12 @@ func (m Model) fetchPolicies() tea.Cmd {
 		return nil
 	}
 
-	ctx := m.ctx
 	target := conn.Target()
-	return func() tea.Msg {
-		policies, err := conn.Client.GetSecurityPolicies(ctx, target)
+	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.SecurityRule, error) {
+		return conn.Client.GetSecurityPolicies(ctx, target)
+	}, func(policies []models.SecurityRule, err error) tea.Msg {
 		return PoliciesMsg{Policies: policies, Err: err}
-	}
+	})
 }
 
 func (m Model) fetchNATPolicies() tea.Cmd {
@@ -407,12 +415,12 @@ func (m Model) fetchNATPolicies() tea.Cmd {
 		return nil
 	}
 
-	ctx := m.ctx
 	target := conn.Target()
-	return func() tea.Msg {
-		rules, err := conn.Client.GetNATRules(ctx, target)
+	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.NATRule, error) {
+		return conn.Client.GetNATRules(ctx, target)
+	}, func(rules []models.NATRule, err error) tea.Msg {
 		return NATPoliciesMsg{Rules: rules, Err: err}
-	}
+	})
 }
 
 func (m Model) fetchSessions() tea.Cmd {
@@ -421,12 +429,12 @@ func (m Model) fetchSessions() tea.Cmd {
 		return nil
 	}
 
-	ctx := m.ctx
 	target := conn.Target()
-	return func() tea.Msg {
-		sessions, err := conn.Client.GetSessions(ctx, "", target)
+	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.Session, error) {
+		return conn.Client.GetSessions(ctx, "", target)
+	}, func(sessions []models.Session, err error) tea.Msg {
 		return SessionsMsg{Sessions: sessions, Err: err}
-	}
+	})
 }
 
 func (m Model) fetchSessionDetail(id int64) tea.Cmd {
@@ -435,12 +443,12 @@ func (m Model) fetchSessionDetail(id int64) tea.Cmd {
 		return nil
 	}
 
-	ctx := m.ctx
 	target := conn.Target()
-	return func() tea.Msg {
-		detail, err := conn.Client.GetSessionByID(ctx, id, target)
+	return fetchCmd(m.ctx, func(ctx context.Context) (*models.SessionDetail, error) {
+		return conn.Client.GetSessionByID(ctx, id, target)
+	}, func(detail *models.SessionDetail, err error) tea.Msg {
 		return SessionDetailMsg{Detail: detail, Err: err}
-	}
+	})
 }
 
 func (m Model) fetchLogs() tea.Cmd {
@@ -457,30 +465,30 @@ func (m Model) fetchLogs() tea.Cmd {
 }
 
 func (m Model) fetchSystemLogs(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
 	target := conn.Target()
-	return func() tea.Msg {
-		logs, err := conn.Client.GetSystemLogs(ctx, "", 100, target)
+	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.SystemLogEntry, error) {
+		return conn.Client.GetSystemLogs(ctx, "", 100, target)
+	}, func(logs []models.SystemLogEntry, err error) tea.Msg {
 		return SystemLogsMsg{Logs: logs, Err: err}
-	}
+	})
 }
 
 func (m Model) fetchTrafficLogs(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
 	target := conn.Target()
-	return func() tea.Msg {
-		logs, err := conn.Client.GetTrafficLogs(ctx, "", 100, target)
+	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.TrafficLogEntry, error) {
+		return conn.Client.GetTrafficLogs(ctx, "", 100, target)
+	}, func(logs []models.TrafficLogEntry, err error) tea.Msg {
 		return TrafficLogsMsg{Logs: logs, Err: err}
-	}
+	})
 }
 
 func (m Model) fetchThreatLogs(conn *auth.Connection) tea.Cmd {
-	ctx := m.ctx
 	target := conn.Target()
-	return func() tea.Msg {
-		logs, err := conn.Client.GetThreatLogs(ctx, "", 100, target)
+	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.ThreatLogEntry, error) {
+		return conn.Client.GetThreatLogs(ctx, "", 100, target)
+	}, func(logs []models.ThreatLogEntry, err error) tea.Msg {
 		return ThreatLogsMsg{Logs: logs, Err: err}
-	}
+	})
 }
 
 func (m Model) refreshCurrentView() tea.Cmd {

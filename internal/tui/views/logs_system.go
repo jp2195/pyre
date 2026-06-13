@@ -1,8 +1,9 @@
 package views
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -31,18 +32,18 @@ func filterSystemLogs(logs []models.SystemLogEntry, query string) []models.Syste
 
 // sortSystemLogs sorts the slice in place by the given field.
 func sortSystemLogs(logs []models.SystemLogEntry, sortBy LogSortField, asc bool) {
-	sort.Slice(logs, func(i, j int) bool {
-		var less bool
+	slices.SortFunc(logs, func(a, b models.SystemLogEntry) int {
+		var c int
 		switch sortBy {
 		case LogSortSeverity:
-			less = severityRank(logs[i].Severity) < severityRank(logs[j].Severity)
+			c = cmp.Compare(severityRank(a.Severity), severityRank(b.Severity))
 		default: // LogSortTime
-			less = logs[i].Time.Before(logs[j].Time)
+			c = a.Time.Compare(b.Time)
 		}
 		if !asc {
-			return !less
+			c = -c
 		}
-		return less
+		return c
 	})
 }
 
@@ -61,35 +62,26 @@ func (m LogsModel) renderSystemTable() string {
 		"Time", "Sev", "Type", "Description")
 	b.WriteString(TableHeaderStyle.Render(header) + "\n")
 
-	visibleRows := m.visibleRows()
-	end := min(m.Offset+visibleRows, len(m.filteredSystem))
-
-	for i := m.Offset; i < end; i++ {
-		log := m.filteredSystem[i]
-		isSelected := i == m.Cursor
-
+	b.WriteString(renderLogRows(m.Offset, m.Cursor, m.visibleRows(), m.filteredSystem, func(log models.SystemLogEntry, selected bool) string {
 		timeStr := log.Time.Format("2006-01-02 15:04:05")
 		sevAbbrev := abbreviateSeverity(log.Severity)
 		desc := truncate(log.Description, m.Width-46)
 
-		if isSelected {
+		if selected {
 			row := fmt.Sprintf("%-19s %-4s %-18s %s",
 				timeStr,
 				sevAbbrev,
 				truncate(log.Type, 18),
 				desc)
-			b.WriteString(TableRowSelectedStyle.Render(row) + "\n")
-		} else {
-			// Build row with colored severity indicator
-			sevStyle := SeverityStyle(log.Severity)
-
-			row := DetailLabelStyle.Render(fmt.Sprintf("%-19s", timeStr)) + " " +
-				sevStyle.Render(fmt.Sprintf("%-4s", sevAbbrev)) + " " +
-				StatusMutedStyle.Render(fmt.Sprintf("%-18s", truncate(log.Type, 18))) + " " +
-				DetailValueStyle.Render(desc)
-			b.WriteString(row + "\n")
+			return TableRowSelectedStyle.Render(row)
 		}
-	}
+		// Build row with colored severity indicator
+		sevStyle := SeverityStyle(log.Severity)
+		return DetailLabelStyle.Render(fmt.Sprintf("%-19s", timeStr)) + " " +
+			sevStyle.Render(fmt.Sprintf("%-4s", sevAbbrev)) + " " +
+			StatusMutedStyle.Render(fmt.Sprintf("%-18s", truncate(log.Type, 18))) + " " +
+			DetailValueStyle.Render(desc)
+	}))
 
 	return b.String()
 }

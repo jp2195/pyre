@@ -39,8 +39,7 @@ type ConnectionConfig struct {
 }
 
 type Settings struct {
-	SessionPageSize int    `yaml:"session_page_size"`
-	Theme           string `yaml:"theme"`
+	Theme string `yaml:"theme"`
 }
 
 // ConfigPath returns the path to the config file (~/.pyre.yaml)
@@ -56,8 +55,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		Connections: make(map[string]ConnectionConfig),
 		Settings: Settings{
-			SessionPageSize: 50,
-			Theme:           "default",
+			Theme: "default",
 		},
 	}
 }

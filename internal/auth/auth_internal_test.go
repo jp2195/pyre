@@ -34,7 +34,10 @@ func TestResolveCredentials_HostPortEnvVar(t *testing.T) {
 	t.Setenv("PYRE_FIREWALL_EXAMPLE_COM_API_KEY", "secret-from-env")
 
 	cfg := &config.Config{}
-	creds := ResolveCredentials(cfg, config.CLIFlags{Host: "firewall.example.com:8443"})
+	creds, err := ResolveCredentials(cfg, config.CLIFlags{Host: "firewall.example.com:8443"})
+	if err != nil {
+		t.Fatalf("ResolveCredentials: %v", err)
+	}
 
 	if creds.APIKey != "secret-from-env" {
 		t.Errorf("expected env-var resolution despite :port, got APIKey=%q", creds.APIKey)

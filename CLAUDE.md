@@ -30,10 +30,11 @@ go fix ./...                  # Apply modernizers (safe, behavior-preserving)
 
 - **Value receivers** on Bubbletea Models (immutable Update pattern), **pointer receivers** for mutation + Cmd return
 - Generic `fetchCmd[T any]()` helper in `commands.go` reduces fetch boilerplate
+- Generic `RuleListModel[T]`/`RuleListConfig[T]` in `views/rule_list.go` powers the policies, NAT, interfaces, IPSec tunnels, GP users, and sessions views; per-view wrappers hold only config + format/render functions. Logs intentionally keeps a custom shell (tab bar + cross-type filtering).
 - Generic `fetchRulesFromPaths[T any]()` in `api/policies.go` for XPath rule fetching
 - `saveConfig()` / `saveState()` return `tea.Cmd` (avoid goroutine race conditions)
-- `setError()` is a pointer receiver that sets `m.err` and returns auto-dismiss tick Cmd
-- Navigation uses table-driven `navTargets` map and `viewToNavbar` for reverse lookup
+- `setError()` is a value receiver that returns an updated Model with `m.err` set plus an auto-dismiss tick Cmd
+- Navigation has a single source of truth: the ordered `navDefs` table in `tui/navigation.go` derives the navbar groups (`navbarGroups()`), `navTargets`, and `viewToNavbar`. Adding a nav item = one `navDefs` entry; `views.NewNavbarModel(groups)` takes the groups as a parameter.
 - Format helpers shared in `views/format_helpers.go`
 - **Bubble Tea v2 View composition**: only the top-level `tui.Model.View()` returns `tea.View`; every sub-view model returns `string`. The top-level composes sub-view strings and sets program options (alt-screen, mouse mode, window title, cursor) on the returned `tea.View` rather than on `tea.NewProgram`.
 - Use `tea.KeyPressMsg` in key handler type switches (not `tea.KeyMsg`, which in v2 is the union interface of press and release). Construct test messages as `tea.KeyPressMsg{Code: tea.KeyDown}` or `tea.KeyPressMsg{Code: 'j', Text: "j"}` — `Runes`/`Type` from v1 no longer exist.
@@ -80,18 +81,21 @@ unexpected failures are never swallowed.
 ## Dependencies
 
 - TUI: Bubble Tea v2 (`charm.land/bubbletea/v2`), lipgloss v2 (`charm.land/lipgloss/v2`), bubbles v2 (`charm.land/bubbles/v2`). Migrated from `github.com/charmbracelet/{bubbletea,lipgloss,bubbles}` on 2026-04-18.
-- YAML: `go.yaml.in/yaml/v4` (not gopkg.in/yaml.v3). Pinned to `v4.0.0-rc.4` pending a stable `v4.Y.Z` release upstream; only release-candidate tags exist today. Revisit quarterly: `go list -m -versions go.yaml.in/yaml/v4`.
+- YAML: `go.yaml.in/yaml/v4` (not gopkg.in/yaml.v3). Pinned to `v4.0.0-rc.5` pending a stable `v4.Y.Z` release upstream; only release-candidate tags exist today. Revisit quarterly: `go list -m -versions go.yaml.in/yaml/v4`.
 - `maxResponseSize = 50MB` const in `client.go`, used with `io.LimitReader`
 - Log polling: `logPollMaxAttempts=30`, `logPollInterval=500ms` in `api/logs.go`
 
 ## Go 1.26 (Current Version)
 
-`go.mod` is pinned to `go 1.26.3` (stdlib CVE patch release). The 1.26.x
-series has shipped two security patches so far: 1.26.2 fixed
-`crypto/tls` / `crypto/x509` issues from 1.26.0–1.26.1, and 1.26.3 fixed
+`go.mod` is pinned to `go 1.26.4` (stdlib CVE patch release). The 1.26.x
+series has shipped three security patches so far: 1.26.2 fixed
+`crypto/tls` / `crypto/x509` issues from 1.26.0–1.26.1; 1.26.3 fixed
 GO-2026-4971 (`net.Dial` / `LookupPort` NUL-byte panic on Windows) and
-GO-2026-4918 (HTTP/2 transport infinite loop in `golang.org/x/net`).
-CI pins `go-version: '1.26.3'`. Key features relevant to this project:
+GO-2026-4918 (HTTP/2 transport infinite loop in `golang.org/x/net`);
+1.26.4 fixed GO-2026-5039 (unescaped inputs in `net/textproto` errors)
+and GO-2026-5037 (inefficient hostname parsing in `crypto/x509`) — both
+flagged by govulncheck against this codebase's keygen and TLS paths.
+CI pins `go-version: '1.26.4'`. Key features relevant to this project:
 
 ### Language Changes
 - **Enhanced `new()` builtin**: `new` now accepts an expression as initial value - `new(expr)` allocates and initializes in one step. Useful for pointer fields: `Age: new(yearsSince(born))`

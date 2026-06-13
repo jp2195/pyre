@@ -75,9 +75,9 @@ func formatListCompact(items []string, maxLen int) string {
 		return "any"
 	}
 	if len(items) == 1 {
-		return truncateStr(items[0], maxLen)
+		return truncateEllipsis(items[0], maxLen)
 	}
-	first := truncateStr(items[0], maxLen-4)
+	first := truncateEllipsis(items[0], maxLen-4)
 	return fmt.Sprintf("%s+%d", first, len(items)-1)
 }
 
@@ -164,11 +164,6 @@ func formatTimestamp(t time.Time) string {
 		return "Never"
 	}
 	return t.Format("2006-01-02 15:04:05")
-}
-
-// truncateStr truncates a string using unicode ellipsis.
-func truncateStr(s string, maxLen int) string {
-	return truncateEllipsis(s, maxLen)
 }
 
 // hasProfiles returns true if the security rule has any individual profiles set.

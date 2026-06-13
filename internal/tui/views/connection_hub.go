@@ -1,8 +1,9 @@
 package views
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -73,17 +74,23 @@ func (m ConnectionHubModel) SetConnections(cfg *config.Config, state *config.Sta
 	}
 
 	// Sort: default first, then by last connected, then alphabetically by host
-	sort.Slice(entries, func(i, j int) bool {
-		if entries[i].IsDefault != entries[j].IsDefault {
-			return entries[i].IsDefault
+	slices.SortFunc(entries, func(a, b ConnectionEntry) int {
+		if a.IsDefault != b.IsDefault {
+			if a.IsDefault {
+				return -1
+			}
+			return 1
 		}
-		if !entries[i].LastConnected.IsZero() && !entries[j].LastConnected.IsZero() {
-			return entries[i].LastConnected.After(entries[j].LastConnected)
+		if !a.LastConnected.IsZero() && !b.LastConnected.IsZero() {
+			return b.LastConnected.Compare(a.LastConnected)
 		}
-		if entries[i].LastConnected.IsZero() != entries[j].LastConnected.IsZero() {
-			return !entries[i].LastConnected.IsZero()
+		if a.LastConnected.IsZero() != b.LastConnected.IsZero() {
+			if !a.LastConnected.IsZero() {
+				return -1
+			}
+			return 1
 		}
-		return entries[i].Host < entries[j].Host
+		return cmp.Compare(a.Host, b.Host)
 	})
 
 	m.connections = entries

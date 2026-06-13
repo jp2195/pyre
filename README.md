@@ -64,6 +64,30 @@ Or build from source (Go 1.26+):
 go install github.com/jp2195/pyre/cmd/pyre@latest
 ```
 
+## Verifying releases
+
+Every release is checksummed, signed, and attested at build time:
+
+- `checksums.txt` — SHA-256 checksums covering every archive.
+- `checksums.txt.sig` / `checksums.txt.pem` — [Sigstore cosign](https://docs.sigstore.dev/) keyless signature, tied to this repo's release workflow identity.
+- GitHub build provenance (SLSA) — ties each archive to the exact Actions run that built it.
+
+```bash
+# 1. Verify the checksum file's signature (requires cosign 2.x)
+cosign verify-blob \
+  --certificate checksums.txt.pem \
+  --signature checksums.txt.sig \
+  --certificate-identity-regexp 'https://github.com/jp2195/pyre/.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  checksums.txt
+
+# 2. Verify your downloaded archive against the signed checksums
+sha256sum --check --ignore-missing checksums.txt
+
+# 3. (Optional) Verify build provenance with the GitHub CLI
+gh attestation verify pyre_<version>_<os>_<arch>.tar.gz --repo jp2195/pyre
+```
+
 ## Quick start
 
 ```bash

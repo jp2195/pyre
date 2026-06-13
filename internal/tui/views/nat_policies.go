@@ -16,6 +16,7 @@ type NATPoliciesModel struct {
 func NewNATPoliciesModel() NATPoliciesModel {
 	config := RuleListConfig[models.NATRule]{
 		Title:             "NAT Policies",
+		ItemNoun:          "rules",
 		LoadingMsg:        "Loading NAT rules...",
 		EmptyMsg:          "No NAT rules found",
 		FilterPlaceholder: "Filter NAT rules...",
@@ -43,6 +44,11 @@ func (m NATPoliciesModel) SetLoading(loading bool) NATPoliciesModel {
 
 func (m NATPoliciesModel) HasData() bool {
 	return m.list.HasData()
+}
+
+// IsFilterMode returns true while the filter text input is focused.
+func (m NATPoliciesModel) IsFilterMode() bool {
+	return m.list.IsFilterMode()
 }
 
 func (m NATPoliciesModel) SetRules(rules []models.NATRule, err error) NATPoliciesModel {

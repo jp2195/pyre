@@ -415,6 +415,32 @@ func (m Model) handleConnectionFormKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd
 	return m, cmd
 }
 
+// currentViewFiltering reports whether the active view's filter text
+// input is focused. Views absent from the switch have no filter.
+func (m Model) currentViewFiltering() bool {
+	switch m.currentView {
+	case ViewPolicies:
+		return m.policies.IsFilterMode()
+	case ViewNATPolicies:
+		return m.natPolicies.IsFilterMode()
+	case ViewSessions:
+		return m.sessions.IsFilterMode()
+	case ViewInterfaces:
+		return m.interfaces.IsFilterMode()
+	case ViewRoutes:
+		return m.routes.IsFilterMode()
+	case ViewIPSecTunnels:
+		return m.ipsecTunnels.IsFilterMode()
+	case ViewGPUsers:
+		return m.gpUsers.IsFilterMode()
+	case ViewLogs:
+		return m.logs.IsFilterMode()
+	case ViewObjects:
+		return m.objects.IsFilterMode()
+	}
+	return false
+}
+
 func (m Model) handleViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 

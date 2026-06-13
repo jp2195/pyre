@@ -1,8 +1,9 @@
 package views
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -90,6 +91,11 @@ func (m ObjectsModel) HasData() bool {
 	return m.addressTab.addresses != nil || m.serviceTab.services != nil
 }
 
+// IsFilterMode returns true while either tab's filter input is focused.
+func (m ObjectsModel) IsFilterMode() bool {
+	return m.addressTab.FilterMode || m.serviceTab.FilterMode
+}
+
 // SetSize propagates dimensions to both sub-tabs.
 func (m ObjectsModel) SetSize(width, height int) ObjectsModel {
 	m.width, m.height = width, height
@@ -172,20 +178,20 @@ func (t *objectsAddressTab) applyFilter() {
 }
 
 func (t *objectsAddressTab) applySort() {
-	sort.Slice(t.filtered, func(i, j int) bool {
-		var less bool
+	slices.SortFunc(t.filtered, func(a, b models.AddressObject) int {
+		var c int
 		switch t.sortBy {
 		case AddressSortType:
-			less = t.filtered[i].Type < t.filtered[j].Type
+			c = cmp.Compare(a.Type, b.Type)
 		case AddressSortValue:
-			less = t.filtered[i].Value < t.filtered[j].Value
+			c = cmp.Compare(a.Value, b.Value)
 		default:
-			less = t.filtered[i].Name < t.filtered[j].Name
+			c = cmp.Compare(a.Name, b.Name)
 		}
-		if t.SortAsc {
-			return less
+		if !t.SortAsc {
+			c = -c
 		}
-		return !less
+		return c
 	})
 }
 
@@ -206,20 +212,20 @@ func (t *objectsServiceTab) applyFilter() {
 }
 
 func (t *objectsServiceTab) applySort() {
-	sort.Slice(t.filtered, func(i, j int) bool {
-		var less bool
+	slices.SortFunc(t.filtered, func(a, b models.ServiceObject) int {
+		var c int
 		switch t.sortBy {
 		case ServiceSortProtocol:
-			less = t.filtered[i].Protocol < t.filtered[j].Protocol
+			c = cmp.Compare(a.Protocol, b.Protocol)
 		case ServiceSortDestPort:
-			less = t.filtered[i].DestPort < t.filtered[j].DestPort
+			c = cmp.Compare(a.DestPort, b.DestPort)
 		default:
-			less = t.filtered[i].Name < t.filtered[j].Name
+			c = cmp.Compare(a.Name, b.Name)
 		}
-		if t.SortAsc {
-			return less
+		if !t.SortAsc {
+			c = -c
 		}
-		return !less
+		return c
 	})
 }
 

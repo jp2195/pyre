@@ -39,3 +39,12 @@ func TestDecodeXML_RejectsInternalEntity(t *testing.T) {
 		t.Fatalf("expected error on internal entity, got nil")
 	}
 }
+
+func TestDecodeXML_Exported_RejectsDoctype(t *testing.T) {
+	var out sampleDoc
+	body := []byte(`<!DOCTYPE response [<!ENTITY x "boom">]><response status="success"><value>hi</value></response>`)
+	err := DecodeXML(bytes.NewReader(body), &out)
+	if err == nil || !strings.Contains(err.Error(), "doctype") {
+		t.Fatalf("expected doctype rejection from exported DecodeXML, got %v", err)
+	}
+}

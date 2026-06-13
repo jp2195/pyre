@@ -58,6 +58,7 @@ func (c *Client) GetManagedDevices(ctx context.Context) ([]models.ManagedDevice,
 		})
 	}
 
+	sanitizeAllStrings(&devices)
 	return devices, nil
 }
 

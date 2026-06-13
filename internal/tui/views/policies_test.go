@@ -204,3 +204,11 @@ func TestPoliciesModel_View_ZeroWidth(t *testing.T) {
 		t.Errorf("expected view to contain 'Loading...' with zero width, got %q", view)
 	}
 }
+
+func TestPoliciesModel_SetSpinnerFrame_ReachesList(t *testing.T) {
+	m := NewPoliciesModel()
+	m = m.SetSpinnerFrame("◢")
+	if m.list.SpinnerFrame != "◢" {
+		t.Errorf("list.SpinnerFrame = %q, want ◢", m.list.SpinnerFrame)
+	}
+}

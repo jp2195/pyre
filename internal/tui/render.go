@@ -100,6 +100,8 @@ func (m Model) currentViewName() string {
 		return "Analyze/GP Users"
 	case ViewLogs:
 		return "Analyze/Logs"
+	case ViewObjects:
+		return "Analyze/Objects"
 	case ViewPicker:
 		return "Connections"
 	case ViewDevicePicker:

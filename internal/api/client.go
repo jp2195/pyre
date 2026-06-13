@@ -61,12 +61,16 @@ type ClientOptions struct {
 	CACertPath string
 }
 
-// newTransport builds an *http.Transport owned by a single Client with a
-// hardened TLS config (MinVersion = TLS 1.2) applied from opts. It returns an
-// error if opts.CACertPath is set but the CA bundle cannot be loaded, so
+// NewTransport builds an *http.Transport with a hardened TLS config
+// (MinVersion = TLS 1.2) applied from opts. It returns an error if
+// opts.CACertPath is set but the CA bundle cannot be loaded, so
 // configuration mistakes surface at connect time rather than as opaque TLS
 // handshake failures on the first request.
-func newTransport(opts ClientOptions) (*http.Transport, error) {
+//
+// It is exported so the keygen flow in internal/auth shares the exact same
+// TLS construction (and fail-closed CA handling) as the main API client.
+// Each call returns a transport owned by its caller.
+func NewTransport(opts ClientOptions) (*http.Transport, error) {
 	tlsCfg := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
@@ -102,7 +106,7 @@ func newTransport(opts ClientOptions) (*http.Transport, error) {
 // be loaded (unreadable file or PEM contains zero certificates). When
 // CACertPath is empty, NewClient uses system roots and never fails.
 func NewClient(host, apiKey string, opts ClientOptions) (*Client, error) {
-	tr, err := newTransport(opts)
+	tr, err := NewTransport(opts)
 	if err != nil {
 		return nil, err
 	}
@@ -193,10 +197,17 @@ func (c *Client) request(ctx context.Context, params url.Values, target string) 
 	}
 	defer func() { _ = resp.Body.Close() }() //nolint:errcheck // best effort cleanup
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize))
+	// Read one byte past the cap so an at-limit response is distinguishable
+	// from an over-limit one, and report the latter explicitly instead of
+	// letting truncated XML surface as a confusing parse error.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize+1))
 	if err != nil {
 		log.Printf("[API Error] reading response: %v", err)
 		return nil, fmt.Errorf("reading response: %w", err)
+	}
+	if len(body) > maxResponseSize {
+		log.Printf("[API Error] response exceeded %d byte limit", maxResponseSize)
+		return nil, fmt.Errorf("response exceeds %dMB limit", maxResponseSize/(1024*1024))
 	}
 
 	var xmlResp XMLResponse

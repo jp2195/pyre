@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -243,82 +244,94 @@ func fetchRulesFromPaths[T any](c *Client, ctx context.Context, xpaths []string,
 	return nil
 }
 
-func (c *Client) GetSecurityPolicies(ctx context.Context, target string) ([]models.SecurityRule, error) {
-	// Pre-rulebase paths (Panorama-pushed rules evaluated first)
-	// Includes paths for both standalone firewalls and Panorama-managed firewalls
-	preRulebasePaths := []string{
-		// Standalone firewall paths
-		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/pre-rulebase/security/rules",
-		"/config/devices/entry/vsys/entry[@name='vsys1']/pre-rulebase/security/rules",
-		// Panorama-pushed rules on managed firewalls
-		"/config/panorama/vsys/entry[@name='vsys1']/pre-rulebase/security/rules",
+// rulebasePaths returns the candidate XPaths for one rulebase location
+// ("pre-rulebase", "rulebase", or "post-rulebase") of the given policy kind
+// ("security" or "nat"). The plain local rulebase has an extra vsys-less
+// fallback; pre/post instead have the Panorama-pushed path.
+func rulebasePaths(location, kind string) []string {
+	if location == "rulebase" {
+		return []string{
+			fmt.Sprintf("/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/rulebase/%s/rules", kind),
+			fmt.Sprintf("/config/devices/entry/vsys/entry[@name='vsys1']/rulebase/%s/rules", kind),
+			fmt.Sprintf("/config/devices/entry/vsys/entry/rulebase/%s/rules", kind),
+		}
 	}
-
-	// Local rulebase paths (locally defined rules)
-	localRulebasePaths := []string{
-		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/rulebase/security/rules",
-		"/config/devices/entry/vsys/entry[@name='vsys1']/rulebase/security/rules",
-		"/config/devices/entry/vsys/entry/rulebase/security/rules",
+	return []string{
+		fmt.Sprintf("/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/%s/%s/rules", location, kind),
+		fmt.Sprintf("/config/devices/entry/vsys/entry[@name='vsys1']/%s/%s/rules", location, kind),
+		fmt.Sprintf("/config/panorama/vsys/entry[@name='vsys1']/%s/%s/rules", location, kind),
 	}
+}
 
-	// Post-rulebase paths (Panorama-pushed rules evaluated last)
-	// Includes paths for both standalone firewalls and Panorama-managed firewalls
-	postRulebasePaths := []string{
-		// Standalone firewall paths
-		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/post-rulebase/security/rules",
-		"/config/devices/entry/vsys/entry[@name='vsys1']/post-rulebase/security/rules",
-		// Panorama-pushed rules on managed firewalls
-		"/config/panorama/vsys/entry[@name='vsys1']/post-rulebase/security/rules",
-	}
+// rulebaseSpec parameterizes fetchRulebase over a policy kind.
+type rulebaseSpec[TEntry, TModel any] struct {
+	// kind is the xpath segment and hit-count rule-base name: "security" or
+	// "nat". Compile-time constant — never user input.
+	kind     string
+	parse    func([]byte) []TEntry
+	convert  func(TEntry, int, models.RuleBase) TModel
+	ruleName func(TModel) string
+	applyHit func(*TModel, hitStats)
+}
 
-	// Fetch from all three rulebase locations
-	preEntries := fetchRulesFromPaths(c, ctx, preRulebasePaths, target, parseSecurityRuleEntries)
-	localEntries := fetchRulesFromPaths(c, ctx, localRulebasePaths, target, parseSecurityRuleEntries)
-	postEntries := fetchRulesFromPaths(c, ctx, postRulebasePaths, target, parseSecurityRuleEntries)
+// fetchRulebase retrieves a complete policy rulebase (pre, local, post — in
+// evaluation order, with 1-based positions), then best-effort decorates the
+// rules with hit-count statistics. Hit-count failures are logged warnings,
+// never errors: the rules themselves are still useful without stats.
+func fetchRulebase[TEntry, TModel any](c *Client, ctx context.Context, target string, spec rulebaseSpec[TEntry, TModel]) ([]TModel, error) {
+	pre := fetchRulesFromPaths(c, ctx, rulebasePaths("pre-rulebase", spec.kind), target, spec.parse)
+	local := fetchRulesFromPaths(c, ctx, rulebasePaths("rulebase", spec.kind), target, spec.parse)
+	post := fetchRulesFromPaths(c, ctx, rulebasePaths("post-rulebase", spec.kind), target, spec.parse)
 
-	// Combine in evaluation order: pre -> local -> post
-	totalEntries := len(preEntries) + len(localEntries) + len(postEntries)
-	rules := make([]models.SecurityRule, 0, totalEntries)
+	rules := make([]TModel, 0, len(pre)+len(local)+len(post))
 	position := 1
-
-	for _, e := range preEntries {
-		rules = append(rules, convertSecurityRuleEntry(e, position, models.RuleBasePre))
-		position++
+	for _, group := range []struct {
+		entries []TEntry
+		base    models.RuleBase
+	}{
+		{pre, models.RuleBasePre},
+		{local, models.RuleBaseLocal},
+		{post, models.RuleBasePost},
+	} {
+		for _, e := range group.entries {
+			rules = append(rules, spec.convert(e, position, group.base))
+			position++
+		}
 	}
-	for _, e := range localEntries {
-		rules = append(rules, convertSecurityRuleEntry(e, position, models.RuleBaseLocal))
-		position++
-	}
-	for _, e := range postEntries {
-		rules = append(rules, convertSecurityRuleEntry(e, position, models.RuleBasePost))
-		position++
-	}
-
 	if len(rules) == 0 {
-		return []models.SecurityRule{}, nil
+		return []TModel{}, nil
 	}
 
-	// Fetch and apply rule hit counts
-	hitCountResp, err := c.Op(ctx, "<show><rule-hit-count><vsys><vsys-name><entry name='vsys1'><rule-base><entry name='security'><rules><all/></rules></entry></rule-base></entry></vsys-name></vsys></rule-hit-count></show>", target)
-	if err != nil {
-		log.Printf("[API Warning] failed to fetch security rule hit counts: %v", err)
-	} else if !hitCountResp.IsSuccess() {
-		log.Printf("[API Warning] security rule hit count request returned non-success: %s", hitCountResp.Error())
-	}
-	if err == nil && hitCountResp.IsSuccess() {
+	cmd := fmt.Sprintf("<show><rule-hit-count><vsys><vsys-name><entry name='vsys1'><rule-base><entry name='%s'><rules><all/></rules></entry></rule-base></entry></vsys-name></vsys></rule-hit-count></show>", spec.kind)
+	hitCountResp, err := c.Op(ctx, cmd, target)
+	switch {
+	case err != nil:
+		log.Printf("[API Warning] failed to fetch %s rule hit counts: %v", spec.kind, err)
+	case !hitCountResp.IsSuccess():
+		log.Printf("[API Warning] %s rule hit count request returned non-success: %s", spec.kind, hitCountResp.Error())
+	default:
 		if hitMap := parseRuleHitCounts(hitCountResp.Result.Inner); hitMap != nil {
 			for i := range rules {
-				if hit, ok := hitMap[rules[i].Name]; ok {
-					rules[i].HitCount = hit.count
-					rules[i].LastHit = hit.lastHit
-					rules[i].FirstHit = hit.firstHit
-					rules[i].LastReset = hit.lastReset
+				if hit, ok := hitMap[spec.ruleName(rules[i])]; ok {
+					spec.applyHit(&rules[i], hit)
 				}
 			}
 		}
 	}
 
 	return rules, nil
+}
+
+func (c *Client) GetSecurityPolicies(ctx context.Context, target string) ([]models.SecurityRule, error) {
+	return fetchRulebase(c, ctx, target, rulebaseSpec[securityRuleEntry, models.SecurityRule]{
+		kind:     "security",
+		parse:    parseSecurityRuleEntries,
+		convert:  convertSecurityRuleEntry,
+		ruleName: func(r models.SecurityRule) string { return r.Name },
+		applyHit: func(r *models.SecurityRule, h hitStats) {
+			r.HitCount, r.LastHit, r.FirstHit, r.LastReset = h.count, h.lastHit, h.firstHit, h.lastReset
+		},
+	})
 }
 
 // natRuleEntry defines the XML structure for NAT rule parsing
@@ -450,79 +463,13 @@ func convertNATRuleEntry(e natRuleEntry, position int, ruleBase models.RuleBase)
 
 // GetNATRules retrieves NAT policy rules from the firewall
 func (c *Client) GetNATRules(ctx context.Context, target string) ([]models.NATRule, error) {
-	// Pre-rulebase paths (Panorama-pushed rules evaluated first)
-	// Includes paths for both standalone firewalls and Panorama-managed firewalls
-	preRulebasePaths := []string{
-		// Standalone firewall paths
-		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/pre-rulebase/nat/rules",
-		"/config/devices/entry/vsys/entry[@name='vsys1']/pre-rulebase/nat/rules",
-		// Panorama-pushed rules on managed firewalls
-		"/config/panorama/vsys/entry[@name='vsys1']/pre-rulebase/nat/rules",
-	}
-
-	// Local rulebase paths (locally defined rules)
-	localRulebasePaths := []string{
-		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/rulebase/nat/rules",
-		"/config/devices/entry/vsys/entry[@name='vsys1']/rulebase/nat/rules",
-		"/config/devices/entry/vsys/entry/rulebase/nat/rules",
-	}
-
-	// Post-rulebase paths (Panorama-pushed rules evaluated last)
-	// Includes paths for both standalone firewalls and Panorama-managed firewalls
-	postRulebasePaths := []string{
-		// Standalone firewall paths
-		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/post-rulebase/nat/rules",
-		"/config/devices/entry/vsys/entry[@name='vsys1']/post-rulebase/nat/rules",
-		// Panorama-pushed rules on managed firewalls
-		"/config/panorama/vsys/entry[@name='vsys1']/post-rulebase/nat/rules",
-	}
-
-	// Fetch from all three rulebase locations
-	preEntries := fetchRulesFromPaths(c, ctx, preRulebasePaths, target, parseNATRuleEntries)
-	localEntries := fetchRulesFromPaths(c, ctx, localRulebasePaths, target, parseNATRuleEntries)
-	postEntries := fetchRulesFromPaths(c, ctx, postRulebasePaths, target, parseNATRuleEntries)
-
-	// Combine in evaluation order: pre -> local -> post
-	totalEntries := len(preEntries) + len(localEntries) + len(postEntries)
-	rules := make([]models.NATRule, 0, totalEntries)
-	position := 1
-
-	for _, e := range preEntries {
-		rules = append(rules, convertNATRuleEntry(e, position, models.RuleBasePre))
-		position++
-	}
-	for _, e := range localEntries {
-		rules = append(rules, convertNATRuleEntry(e, position, models.RuleBaseLocal))
-		position++
-	}
-	for _, e := range postEntries {
-		rules = append(rules, convertNATRuleEntry(e, position, models.RuleBasePost))
-		position++
-	}
-
-	if len(rules) == 0 {
-		return []models.NATRule{}, nil
-	}
-
-	// Fetch and apply NAT rule hit counts
-	hitCountResp, err := c.Op(ctx, "<show><rule-hit-count><vsys><vsys-name><entry name='vsys1'><rule-base><entry name='nat'><rules><all/></rules></entry></rule-base></entry></vsys-name></vsys></rule-hit-count></show>", target)
-	if err != nil {
-		log.Printf("[API Warning] failed to fetch NAT rule hit counts: %v", err)
-	} else if !hitCountResp.IsSuccess() {
-		log.Printf("[API Warning] NAT rule hit count request returned non-success: %s", hitCountResp.Error())
-	}
-	if err == nil && hitCountResp.IsSuccess() {
-		if hitMap := parseRuleHitCounts(hitCountResp.Result.Inner); hitMap != nil {
-			for i := range rules {
-				if hit, ok := hitMap[rules[i].Name]; ok {
-					rules[i].HitCount = hit.count
-					rules[i].LastHit = hit.lastHit
-					rules[i].FirstHit = hit.firstHit
-					rules[i].LastReset = hit.lastReset
-				}
-			}
-		}
-	}
-
-	return rules, nil
+	return fetchRulebase(c, ctx, target, rulebaseSpec[natRuleEntry, models.NATRule]{
+		kind:     "nat",
+		parse:    parseNATRuleEntries,
+		convert:  convertNATRuleEntry,
+		ruleName: func(r models.NATRule) string { return r.Name },
+		applyHit: func(r *models.NATRule, h hitStats) {
+			r.HitCount, r.LastHit, r.FirstHit, r.LastReset = h.count, h.lastHit, h.firstHit, h.lastReset
+		},
+	})
 }

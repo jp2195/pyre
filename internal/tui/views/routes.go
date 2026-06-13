@@ -1,8 +1,9 @@
 package views
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -64,16 +65,22 @@ func NewRoutesModel() RoutesModel {
 func (m RoutesModel) SetSize(width, height int) RoutesModel {
 	m.TableBase = m.TableBase.SetSize(width, height)
 
-	// Clamp route cursor
-	count := len(m.filtered)
-	if m.Cursor >= count && count > 0 {
-		m.Cursor = count - 1
-	}
+	m.EnsureCursorValid(len(m.filtered))
+	visible := m.visibleRows()
+	m.EnsureVisible(visible)
 
-	// Clamp neighbor cursor
+	// The Neighbors tab keeps its own cursor outside TableBase; apply the
+	// same clamp-then-scroll discipline to it.
 	neighborCount := len(m.bgpNeighbors) + len(m.ospfNeighbors)
 	if m.neighborCursor >= neighborCount && neighborCount > 0 {
 		m.neighborCursor = neighborCount - 1
+	}
+	m.neighborCursor = max(m.neighborCursor, 0)
+	if m.neighborCursor < m.neighborOffset {
+		m.neighborOffset = m.neighborCursor
+	}
+	if m.neighborCursor >= m.neighborOffset+visible {
+		m.neighborOffset = m.neighborCursor - visible + 1
 	}
 
 	return m
@@ -109,12 +116,26 @@ func (m RoutesModel) SetRoutes(routes []models.RouteEntry, err error) RoutesMode
 func (m RoutesModel) SetBGPNeighbors(neighbors []models.BGPNeighbor, err error) RoutesModel {
 	m.bgpNeighbors = neighbors
 	m.bgpErr = err
-	return m
+	return m.clampNeighborView()
 }
 
 func (m RoutesModel) SetOSPFNeighbors(neighbors []models.OSPFNeighbor, err error) RoutesModel {
 	m.ospfNeighbors = neighbors
 	m.ospfErr = err
+	return m.clampNeighborView()
+}
+
+// clampNeighborView keeps the Neighbors-tab cursor and offset inside the
+// current combined neighbor list after a data refresh; SetSize handles
+// the resize path with the same discipline.
+func (m RoutesModel) clampNeighborView() RoutesModel {
+	count := len(m.bgpNeighbors) + len(m.ospfNeighbors)
+	if count == 0 {
+		m.neighborCursor, m.neighborOffset = 0, 0
+		return m
+	}
+	m.neighborCursor = min(m.neighborCursor, count-1)
+	m.neighborOffset = min(m.neighborOffset, m.neighborCursor)
 	return m
 }
 
@@ -149,22 +170,22 @@ func (m *RoutesModel) applyFilter() {
 }
 
 func (m *RoutesModel) sortRoutes() {
-	sort.SliceStable(m.filtered, func(i, j int) bool {
-		var less bool
+	slices.SortStableFunc(m.filtered, func(a, b models.RouteEntry) int {
+		var c int
 		switch m.sortBy {
 		case RouteSortProtocol:
-			less = m.filtered[i].Protocol < m.filtered[j].Protocol
+			c = cmp.Compare(a.Protocol, b.Protocol)
 		case RouteSortNexthop:
-			less = m.filtered[i].Nexthop < m.filtered[j].Nexthop
+			c = cmp.Compare(a.Nexthop, b.Nexthop)
 		case RouteSortInterface:
-			less = m.filtered[i].Interface < m.filtered[j].Interface
+			c = cmp.Compare(a.Interface, b.Interface)
 		default: // RouteSortDestination
-			less = m.filtered[i].Destination < m.filtered[j].Destination
+			c = cmp.Compare(a.Destination, b.Destination)
 		}
 		if !m.SortAsc {
-			return !less
+			c = -c
 		}
-		return less
+		return c
 	})
 }
 
@@ -446,18 +467,18 @@ func (m RoutesModel) formatRouteRow(route models.RouteEntry, width int) string {
 
 	if width >= 100 {
 		return fmt.Sprintf("%-6s %-22s %-18s %-14s %-6s %-12s",
-			proto, truncateStr(route.Destination, 22),
-			truncateStr(nexthop, 18), truncateStr(route.Interface, 14),
-			metric, truncateStr(route.VirtualRouter, 12))
+			proto, truncateEllipsis(route.Destination, 22),
+			truncateEllipsis(nexthop, 18), truncateEllipsis(route.Interface, 14),
+			metric, truncateEllipsis(route.VirtualRouter, 12))
 	} else if width >= 70 {
 		return fmt.Sprintf("%-6s %-20s %-16s %-12s %-6s",
-			proto, truncateStr(route.Destination, 20),
-			truncateStr(nexthop, 16), truncateStr(route.Interface, 12),
+			proto, truncateEllipsis(route.Destination, 20),
+			truncateEllipsis(nexthop, 16), truncateEllipsis(route.Interface, 12),
 			metric)
 	}
 	return fmt.Sprintf("%-6s %-18s %-16s",
-		proto, truncateStr(route.Destination, 18),
-		truncateStr(nexthop, 16))
+		proto, truncateEllipsis(route.Destination, 18),
+		truncateEllipsis(nexthop, 16))
 }
 
 func (m RoutesModel) renderNeighborsTab() string {
@@ -595,17 +616,17 @@ func (m RoutesModel) formatNeighborHeaderRow(width int) string {
 func (m RoutesModel) formatNeighborRow(nType, peer, state, asArea, prefix, uptime, vr string, width int) string {
 	if width >= 100 {
 		return fmt.Sprintf("%-5s %-16s %-12s %-10s %-8s %-12s %-12s",
-			nType, truncateStr(peer, 16), truncateStr(state, 12),
-			truncateStr(asArea, 10), prefix, truncateStr(uptime, 12),
-			truncateStr(vr, 12))
+			nType, truncateEllipsis(peer, 16), truncateEllipsis(state, 12),
+			truncateEllipsis(asArea, 10), prefix, truncateEllipsis(uptime, 12),
+			truncateEllipsis(vr, 12))
 	} else if width >= 70 {
 		return fmt.Sprintf("%-5s %-16s %-12s %-10s %-8s %-12s",
-			nType, truncateStr(peer, 16), truncateStr(state, 12),
-			truncateStr(asArea, 10), prefix, truncateStr(uptime, 12))
+			nType, truncateEllipsis(peer, 16), truncateEllipsis(state, 12),
+			truncateEllipsis(asArea, 10), prefix, truncateEllipsis(uptime, 12))
 	}
 	return fmt.Sprintf("%-5s %-16s %-12s %-10s",
-		nType, truncateStr(peer, 16), truncateStr(state, 12),
-		truncateStr(asArea, 10))
+		nType, truncateEllipsis(peer, 16), truncateEllipsis(state, 12),
+		truncateEllipsis(asArea, 10))
 }
 
 // IsFilterMode returns true if the filter input is active

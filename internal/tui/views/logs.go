@@ -72,9 +72,7 @@ func (m LogsModel) HasData() bool {
 
 func (m LogsModel) SetSystemLogs(logs []models.SystemLogEntry, err error) LogsModel {
 	m.systemLogs = logs
-	if err != nil {
-		m.Err = err
-	}
+	m.Err = err
 	m.Loading = false
 	m.lastRefresh = time.Now()
 	m.applyFilter()
@@ -84,9 +82,7 @@ func (m LogsModel) SetSystemLogs(logs []models.SystemLogEntry, err error) LogsMo
 
 func (m LogsModel) SetTrafficLogs(logs []models.TrafficLogEntry, err error) LogsModel {
 	m.trafficLogs = logs
-	if err != nil {
-		m.Err = err
-	}
+	m.Err = err
 	m.Loading = false
 	m.lastRefresh = time.Now()
 	m.applyFilter()
@@ -96,9 +92,7 @@ func (m LogsModel) SetTrafficLogs(logs []models.TrafficLogEntry, err error) Logs
 
 func (m LogsModel) SetThreatLogs(logs []models.ThreatLogEntry, err error) LogsModel {
 	m.threatLogs = logs
-	if err != nil {
-		m.Err = err
-	}
+	m.Err = err
 	m.Loading = false
 	m.lastRefresh = time.Now()
 	m.applyFilter()
@@ -418,6 +412,18 @@ func (m LogsModel) renderHelp() string {
 
 // --- Shared helpers used by log type files ---
 
+// renderLogRows renders the visible window of a filtered log slice. renderRow
+// is called for each visible item and must return the fully styled row string
+// for both selected and normal states.
+func renderLogRows[T any](offset, cursor, visibleRows int, items []T, renderRow func(item T, selected bool) string) string {
+	var b strings.Builder
+	end := min(offset+visibleRows, len(items))
+	for i := offset; i < end; i++ {
+		b.WriteString(renderRow(items[i], i == cursor) + "\n")
+	}
+	return b.String()
+}
+
 // abbreviateSeverity returns a short severity label.
 func abbreviateSeverity(severity string) string {
 	switch strings.ToLower(severity) {
@@ -459,29 +465,4 @@ func colorBySeverity(row, severity string) string {
 
 func colorByAction(row, action string) string {
 	return ActionStyle(action).Render(row)
-}
-
-// wrapText wraps text to the specified width.
-func wrapText(text string, width int) []string {
-	if width <= 0 {
-		return []string{text}
-	}
-
-	var lines []string
-	words := strings.Fields(text)
-	if len(words) == 0 {
-		return []string{}
-	}
-
-	currentLine := words[0]
-	for _, word := range words[1:] {
-		if len(currentLine)+1+len(word) <= width {
-			currentLine += " " + word
-		} else {
-			lines = append(lines, currentLine)
-			currentLine = word
-		}
-	}
-	lines = append(lines, currentLine)
-	return lines
 }

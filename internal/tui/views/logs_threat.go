@@ -1,8 +1,9 @@
 package views
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -35,22 +36,22 @@ func filterThreatLogs(logs []models.ThreatLogEntry, query string) []models.Threa
 
 // sortThreatLogs sorts the slice in place by the given field.
 func sortThreatLogs(logs []models.ThreatLogEntry, sortBy LogSortField, asc bool) {
-	sort.Slice(logs, func(i, j int) bool {
-		var less bool
+	slices.SortFunc(logs, func(a, b models.ThreatLogEntry) int {
+		var c int
 		switch sortBy {
 		case LogSortSeverity:
-			less = severityRank(logs[i].Severity) < severityRank(logs[j].Severity)
+			c = cmp.Compare(severityRank(a.Severity), severityRank(b.Severity))
 		case LogSortSource:
-			less = logs[i].SourceIP < logs[j].SourceIP
+			c = cmp.Compare(a.SourceIP, b.SourceIP)
 		case LogSortAction:
-			less = logs[i].Action < logs[j].Action
+			c = cmp.Compare(a.Action, b.Action)
 		default: // LogSortTime
-			less = logs[i].Time.Before(logs[j].Time)
+			c = a.Time.Compare(b.Time)
 		}
 		if !asc {
-			return !less
+			c = -c
 		}
-		return less
+		return c
 	})
 }
 
@@ -69,13 +70,7 @@ func (m LogsModel) renderThreatTable() string {
 		"Time", "Severity", "Threat", "Source", "Action", "Category")
 	b.WriteString(TableHeaderStyle.Render(header) + "\n")
 
-	visibleRows := m.visibleRows()
-	end := min(m.Offset+visibleRows, len(m.filteredThreat))
-
-	for i := m.Offset; i < end; i++ {
-		log := m.filteredThreat[i]
-		isSelected := i == m.Cursor
-
+	b.WriteString(renderLogRows(m.Offset, m.Cursor, m.visibleRows(), m.filteredThreat, func(log models.ThreatLogEntry, selected bool) string {
 		timeStr := log.Time.Format("2006-01-02 15:04:05")
 
 		row := fmt.Sprintf("%-19s %-9s %-20s %-15s %-7s %-15s",
@@ -86,14 +81,12 @@ func (m LogsModel) renderThreatTable() string {
 			truncate(log.Action, 7),
 			truncate(log.ThreatCategory, 15))
 
-		if isSelected {
-			b.WriteString(TableRowSelectedStyle.Render(row) + "\n")
-		} else {
-			// Color code by severity
-			row = colorBySeverity(row, log.Severity)
-			b.WriteString(row + "\n")
+		if selected {
+			return TableRowSelectedStyle.Render(row)
 		}
-	}
+		// Color code by severity
+		return colorBySeverity(row, log.Severity)
+	}))
 
 	return b.String()
 }

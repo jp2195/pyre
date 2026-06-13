@@ -2,7 +2,6 @@ package views
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -12,20 +11,13 @@ import (
 	"github.com/jp2195/pyre/internal/models"
 )
 
-type SessionSortField int
-
-const (
-	SessionSortID SessionSortField = iota
-	SessionSortBytes
-	SessionSortAge
-	SessionSortApplication
-)
+// FetchDetailCmd is returned when the user requests session detail fetch.
+type FetchDetailCmd struct {
+	SessionID int64
+}
 
 type SessionsModel struct {
-	TableBase
-	sessions []models.Session
-	filtered []models.Session
-	sortBy   SessionSortField
+	list RuleListModel[models.Session]
 
 	// Detail view state
 	detail        *models.SessionDetail // Cached detail for selected session
@@ -34,46 +26,56 @@ type SessionsModel struct {
 }
 
 func NewSessionsModel() SessionsModel {
-	return SessionsModel{
-		TableBase: NewTableBase("Filter sessions..."),
+	config := RuleListConfig[models.Session]{
+		Title:             "Active Sessions",
+		ItemNoun:          "sessions",
+		LoadingMsg:        "Loading sessions...",
+		EmptyMsg:          "No sessions found",
+		FilterPlaceholder: "Filter sessions...",
+		SortLabels:        []string{"ID", "Bytes", "Age", "App"},
+		DefaultSortAsc:    func(idx int) bool { return idx == 0 || idx == 3 },
+		MatchFilter:       matchSession,
+		CompareItems:      compareSession,
+		FormatHeaderRow:   formatSessionHeader,
+		FormatRow:         formatSessionRow,
+		StyleRow:          styleSessionRow,
+		// RenderDetail is bound per-render in View so it can see the
+		// current cached detail / loading state.
 	}
+	return SessionsModel{list: NewRuleListModel(config)}
 }
 
 func (m SessionsModel) SetSize(width, height int) SessionsModel {
-	m.TableBase = m.TableBase.SetSize(width, height)
-	m.EnsureCursorValid(len(m.filtered))
-	if visibleRows := m.visibleRows(); visibleRows > 0 {
-		m.EnsureVisible(visibleRows)
-	}
+	m.list = m.list.SetSize(width, height)
 	return m
 }
 
 func (m SessionsModel) SetLoading(loading bool) SessionsModel {
-	m.TableBase = m.TableBase.SetLoading(loading)
+	m.list = m.list.SetLoading(loading)
 	return m
 }
 
 // SetSpinnerFrame updates the current spinner animation frame.
 func (m SessionsModel) SetSpinnerFrame(frame string) SessionsModel {
-	m.TableBase = m.TableBase.SetSpinnerFrame(frame)
+	m.list.SpinnerFrame = frame
 	return m
 }
 
 // HasData returns true if sessions have been loaded.
 func (m SessionsModel) HasData() bool {
-	return m.sessions != nil
+	return m.list.HasData()
+}
+
+// IsFilterMode returns true while the filter text input is focused.
+func (m SessionsModel) IsFilterMode() bool {
+	return m.list.IsFilterMode()
 }
 
 func (m SessionsModel) SetSessions(sessions []models.Session, err error) SessionsModel {
-	m.sessions = sessions
-	m.Err = err
-	m.Loading = false
-	m.Cursor = 0
-	m.Offset = 0
+	m.list = m.list.SetItems(sessions, err)
 	m.detail = nil // Clear detail when sessions refresh
 	m.detailID = 0
 	m.detailLoading = false
-	m.applyFilter()
 	return m
 }
 
@@ -87,20 +89,11 @@ func (m SessionsModel) SetDetail(detail *models.SessionDetail, err error) Sessio
 	return m
 }
 
-// SetDetailLoading sets the detail loading state for a specific session ID.
-func (m SessionsModel) SetDetailLoading(id int64) SessionsModel {
-	m.detailLoading = true
-	m.detailID = id
-	m.detail = nil
+// SetExpanded sets the detail-panel expansion state. Used by tests that need
+// to pre-expand the detail panel before dispatching keys.
+func (m SessionsModel) SetExpanded(expanded bool) SessionsModel {
+	m.list.Expanded = expanded
 	return m
-}
-
-// SelectedSession returns the currently selected session, if any.
-func (m SessionsModel) SelectedSession() *models.Session {
-	if m.Cursor >= 0 && m.Cursor < len(m.filtered) {
-		return &m.filtered[m.Cursor]
-	}
-	return nil
 }
 
 // IsDetailLoading returns true if detail is currently loading.
@@ -113,265 +106,114 @@ func (m SessionsModel) GetDetailID() int64 {
 	return m.detailID
 }
 
-func (m *SessionsModel) applyFilter() {
-	if m.FilterValue() == "" {
-		m.filtered = make([]models.Session, len(m.sessions))
-		copy(m.filtered, m.sessions)
-	} else {
-		query := strings.ToLower(m.FilterValue())
-		m.filtered = nil
-
-		for _, s := range m.sessions {
-			if strings.Contains(strings.ToLower(s.Application), query) ||
-				strings.Contains(s.SourceIP, query) ||
-				strings.Contains(s.DestIP, query) ||
-				strings.Contains(strings.ToLower(s.SourceZone), query) ||
-				strings.Contains(strings.ToLower(s.DestZone), query) ||
-				strings.Contains(strings.ToLower(s.Rule), query) ||
-				strings.Contains(strings.ToLower(s.User), query) {
-				m.filtered = append(m.filtered, s)
-			}
-		}
-	}
-	m.applySort()
-}
-
-func (m *SessionsModel) applySort() {
-	sort.Slice(m.filtered, func(i, j int) bool {
-		var less bool
-		switch m.sortBy {
-		case SessionSortBytes:
-			less = (m.filtered[i].BytesIn + m.filtered[i].BytesOut) < (m.filtered[j].BytesIn + m.filtered[j].BytesOut)
-		case SessionSortAge:
-			less = m.filtered[i].StartTime.Before(m.filtered[j].StartTime)
-		case SessionSortApplication:
-			less = m.filtered[i].Application < m.filtered[j].Application
-		default: // SessionSortID
-			less = m.filtered[i].ID < m.filtered[j].ID
-		}
-		if m.SortAsc {
-			return less
-		}
-		return !less
-	})
-}
-
-func (m *SessionsModel) cycleSort() {
-	m.sortBy = (m.sortBy + 1) % 4
-	// Default to descending for bytes/age, ascending for ID/app
-	m.SortAsc = m.sortBy == SessionSortID || m.sortBy == SessionSortApplication
-	m.applySort()
-}
-
-func (m SessionsModel) sortLabel() string {
-	dir := "↓"
-	if m.SortAsc {
-		dir = "↑"
-	}
-	switch m.sortBy {
-	case SessionSortBytes:
-		return fmt.Sprintf("Bytes %s", dir)
-	case SessionSortAge:
-		return fmt.Sprintf("Age %s", dir)
-	case SessionSortApplication:
-		return fmt.Sprintf("App %s", dir)
-	default:
-		return fmt.Sprintf("ID %s", dir)
-	}
-}
-
-// FetchDetailCmd is returned when the user requests session detail fetch.
-type FetchDetailCmd struct {
-	SessionID int64
-}
-
 func (m SessionsModel) Update(msg tea.Msg) (SessionsModel, tea.Cmd) {
-	if m.FilterMode {
-		return m.updateFilter(msg)
+	// 'd' fetches extended detail for the selected session; handled here
+	// (not in RuleListModel) because the loading guard and cache live on
+	// this wrapper.
+	if key, ok := msg.(tea.KeyPressMsg); ok && !m.list.FilterMode && key.String() == "d" {
+		filtered := m.list.Filtered()
+		if m.list.Expanded && m.list.Cursor < len(filtered) && !m.detailLoading {
+			session := filtered[m.list.Cursor]
+			m.detailLoading = true
+			m.detailID = session.ID
+			return m, func() tea.Msg {
+				return FetchDetailCmd{SessionID: session.ID}
+			}
+		}
+		return m, nil
 	}
 
-	switch msg := msg.(type) {
-	case tea.KeyPressMsg:
-		// Handle session-specific keys first
-		switch msg.String() {
-		case "esc":
-			if m.HandleClearFilter() {
-				m.applyFilter()
-			}
-			return m, nil
-		case "s":
-			m.cycleSort()
-			m.Cursor = 0
-			m.Offset = 0
-			return m, nil
-		case "d":
-			// 'd' fetches detail for selected session
-			if m.Expanded && m.Cursor < len(m.filtered) && !m.detailLoading {
-				session := m.filtered[m.Cursor]
-				m.detailLoading = true
-				m.detailID = session.ID
-				return m, func() tea.Msg {
-					return FetchDetailCmd{SessionID: session.ID}
-				}
-			}
-			return m, nil
-		}
-
-		// Delegate to TableBase for common navigation
-		visible := m.visibleRows()
-		oldCursor := m.Cursor
-		base, handled, cmd := m.HandleNavigation(msg, len(m.filtered), visible)
-		if handled {
-			m.TableBase = base
-			// Clear cached detail if cursor moved to different session
-			if m.Cursor != oldCursor {
-				m.detail = nil
-				m.detailID = 0
-				m.detailLoading = false
-			}
-			return m, cmd
-		}
-	}
-
-	return m, nil
-}
-
-func (m SessionsModel) updateFilter(msg tea.Msg) (SessionsModel, tea.Cmd) {
-	base, exited, cmd := m.HandleFilterMode(msg)
-	m.TableBase = base
-	if exited {
-		m.applyFilter()
+	oldCursor := m.list.Cursor
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
+	// Clear cached detail if cursor moved to a different session.
+	if m.list.Cursor != oldCursor {
+		m.detail = nil
+		m.detailID = 0
+		m.detailLoading = false
 	}
 	return m, cmd
 }
 
-func (m SessionsModel) visibleRows() int {
-	return m.VisibleRows(8, 8)
-}
-
 func (m SessionsModel) View() string {
-	if m.Width == 0 {
-		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
+	detail, loading := m.detail, m.detailLoading
+	m.list.config.RenderDetail = func(s models.Session, width int) string {
+		return renderSessionDetail(s, detail, loading)
 	}
-
-	titleStyle := ViewTitleStyle.MarginBottom(1)
-	panelStyle := ViewPanelStyle.Width(m.Width - 4)
-
-	var b strings.Builder
-	title := "Active Sessions"
-	sortInfo := BannerInfoStyle.Render(fmt.Sprintf(" [%d sessions | Sort: %s | s: change]", len(m.filtered), m.sortLabel()))
-	b.WriteString(titleStyle.Render(title) + sortInfo)
-	b.WriteString("\n")
-
-	if m.FilterMode {
-		b.WriteString(FilterBorderStyle.Render(m.Filter.View()))
-		b.WriteString("\n\n")
-	} else if m.IsFiltered() {
-		filterInfo := FilterInfoStyle.Render(fmt.Sprintf("Filter: %s (press / to edit, esc to clear)", m.FilterValue()))
-		b.WriteString(filterInfo)
-		b.WriteString("\n\n")
-	}
-
-	if m.Err != nil {
-		b.WriteString(ErrorMsgStyle.Render("Error: " + m.Err.Error()))
-		return panelStyle.Render(b.String())
-	}
-
-	if m.Loading || m.sessions == nil {
-		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading sessions..."))
-		return panelStyle.Render(b.String())
-	}
-
-	if len(m.filtered) == 0 {
-		b.WriteString(EmptyMsgStyle.Render("No sessions found"))
-		return panelStyle.Render(b.String())
-	}
-
-	b.WriteString(m.renderTable())
-
-	if m.Expanded && m.Cursor < len(m.filtered) {
-		b.WriteString("\n\n")
-		b.WriteString(m.renderDetail(m.filtered[m.Cursor]))
-	}
-
-	return panelStyle.Render(b.String())
+	return m.list.View()
 }
 
-func (m SessionsModel) renderTable() string {
-	headerStyle := TableHeaderStyle
-	selectedStyle := TableRowSelectedStyle
+// --- Type-specific functions ---
 
-	// State-based colors
-	activeStyle := StatusActiveStyle
-	discardStyle := StatusWarningStyle
-	closedStyle := StatusMutedStyle
+func matchSession(s models.Session, query string) bool {
+	return strings.Contains(strings.ToLower(s.Application), query) ||
+		strings.Contains(s.SourceIP, query) ||
+		strings.Contains(s.DestIP, query) ||
+		strings.Contains(strings.ToLower(s.SourceZone), query) ||
+		strings.Contains(strings.ToLower(s.DestZone), query) ||
+		strings.Contains(strings.ToLower(s.Rule), query) ||
+		strings.Contains(strings.ToLower(s.User), query)
+}
 
-	var b strings.Builder
-
-	// Header: ID, Source, Destination, Port, Proto, App, State, Zones, Age, Bytes
-	header := fmt.Sprintf("%-7s %-15s %-15s %-5s %-4s %-10s %-7s %-15s %-5s %-8s",
-		"ID", "Source", "Destination", "Port", "Pro", "App", "State", "Zones", "Age", "Bytes")
-	b.WriteString(headerStyle.Render(header) + "\n")
-
-	visibleRows := m.visibleRows()
-	end := min(m.Offset+visibleRows, len(m.filtered))
-
-	for i := m.Offset; i < end; i++ {
-		s := m.filtered[i]
-		isSelected := i == m.Cursor
-
-		// Format zone flow (e.g., "trust→untrust")
-		zoneFlow := fmt.Sprintf("%s→%s", truncate(s.SourceZone, 7), truncate(s.DestZone, 7))
-
-		// Format protocol
-		proto := s.Protocol
-		if proto == "" {
-			proto = "tcp"
-		}
-
-		row := fmt.Sprintf("%-7d %-15s %-15s %-5d %-4s %-10s %-7s %-15s %-5s %-8s",
-			s.ID,
-			truncate(s.SourceIP, 15),
-			truncate(s.DestIP, 15),
-			s.DestPort,
-			truncate(proto, 4),
-			truncate(s.Application, 10),
-			truncate(s.State, 7),
-			truncate(zoneFlow, 15),
-			formatDuration(s.StartTime),
-			formatBytes(s.BytesIn+s.BytesOut))
-
-		if isSelected {
-			b.WriteString(selectedStyle.Render(row) + "\n")
-		} else {
-			// Color code by state - render state portion with color
-			prefix := fmt.Sprintf("%-7d %-15s %-15s %-5d %-4s %-10s ",
-				s.ID,
-				truncate(s.SourceIP, 15),
-				truncate(s.DestIP, 15),
-				s.DestPort,
-				truncate(proto, 4),
-				truncate(s.Application, 10))
-			stateStr := fmt.Sprintf("%-7s", truncate(s.State, 7))
-			suffix := fmt.Sprintf(" %-15s %-5s %-8s",
-				truncate(zoneFlow, 15),
-				formatDuration(s.StartTime),
-				formatBytes(s.BytesIn+s.BytesOut))
-
-			switch strings.ToUpper(s.State) {
-			case "ACTIVE":
-				b.WriteString(prefix + activeStyle.Render(stateStr) + suffix + "\n")
-			case "DISCARD", "DROP":
-				b.WriteString(prefix + discardStyle.Render(stateStr) + suffix + "\n")
-			case "CLOSED", "INIT":
-				b.WriteString(prefix + closedStyle.Render(stateStr) + suffix + "\n")
-			default:
-				b.WriteString(row + "\n")
-			}
-		}
+func compareSession(a, b models.Session, sortIdx int) bool {
+	switch sortIdx {
+	case 1: // Bytes
+		return a.BytesIn+a.BytesOut < b.BytesIn+b.BytesOut
+	case 2: // Age
+		return a.StartTime.Before(b.StartTime)
+	case 3: // App
+		return a.Application < b.Application
+	default: // ID
+		return a.ID < b.ID
 	}
+}
 
-	return b.String()
+func formatSessionHeader(width int) string {
+	return fmt.Sprintf("%-7s %-15s %-15s %-5s %-4s %-10s %-7s %-15s %-5s %-8s",
+		"ID", "Source", "Destination", "Port", "Pro", "App", "State", "Zones", "Age", "Bytes")
+}
+
+// sessionRowParts splits a row into prefix, state cell, and suffix so the
+// state cell can be color-coded independently for non-selected rows.
+func sessionRowParts(s models.Session) (prefix, state, suffix string) {
+	zoneFlow := fmt.Sprintf("%s→%s", truncate(s.SourceZone, 7), truncate(s.DestZone, 7))
+	proto := s.Protocol
+	if proto == "" {
+		proto = "tcp"
+	}
+	prefix = fmt.Sprintf("%-7d %-15s %-15s %-5d %-4s %-10s ",
+		s.ID,
+		truncate(s.SourceIP, 15),
+		truncate(s.DestIP, 15),
+		s.DestPort,
+		truncate(proto, 4),
+		truncate(s.Application, 10))
+	state = fmt.Sprintf("%-7s", truncate(s.State, 7))
+	suffix = fmt.Sprintf(" %-15s %-5s %-8s",
+		truncate(zoneFlow, 15),
+		formatDuration(s.StartTime),
+		formatBytes(s.BytesIn+s.BytesOut))
+	return prefix, state, suffix
+}
+
+func formatSessionRow(s models.Session, width int) string {
+	prefix, state, suffix := sessionRowParts(s)
+	return prefix + state + suffix
+}
+
+// styleSessionRow renders a non-selected row with the state cell color-coded.
+func styleSessionRow(s models.Session, width int) string {
+	prefix, state, suffix := sessionRowParts(s)
+	switch strings.ToUpper(s.State) {
+	case "ACTIVE":
+		return prefix + StatusActiveStyle.Render(state) + suffix
+	case "DISCARD", "DROP":
+		return prefix + StatusWarningStyle.Render(state) + suffix
+	case "CLOSED", "INIT":
+		return prefix + StatusMutedStyle.Render(state) + suffix
+	default:
+		return prefix + state + suffix
+	}
 }
 
 func formatDuration(start time.Time) string {
@@ -391,7 +233,7 @@ func formatDuration(start time.Time) string {
 	return fmt.Sprintf("%dd", int(d.Hours()/24))
 }
 
-func (m SessionsModel) renderDetail(s models.Session) string {
+func renderSessionDetail(s models.Session, detail *models.SessionDetail, detailLoading bool) string {
 	titleStyle := ViewTitleStyle
 	labelStyle := DetailLabelStyle
 	valueStyle := DetailValueStyle
@@ -402,9 +244,9 @@ func (m SessionsModel) renderDetail(s models.Session) string {
 	b.WriteString(titleStyle.Render(fmt.Sprintf("Session Details: %d", s.ID)))
 
 	// Show hint for fetching extended details
-	if m.detail == nil && !m.detailLoading {
+	if detail == nil && !detailLoading {
 		b.WriteString(dimStyle.Render("  [d: fetch extended details]"))
-	} else if m.detailLoading {
+	} else if detailLoading {
 		b.WriteString(dimStyle.Render("  (loading...)"))
 	}
 	b.WriteString("\n\n")
@@ -434,8 +276,8 @@ func (m SessionsModel) renderDetail(s models.Session) string {
 	}
 
 	// Extended details (if fetched and for this session)
-	if m.detail != nil && m.detail.ID == s.ID {
-		d := m.detail
+	if detail != nil && detail.ID == s.ID {
+		d := detail
 
 		// NAT Section
 		if d.NATDestIP != "" || d.NATRule != "" {

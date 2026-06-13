@@ -1,8 +1,9 @@
 package views
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -357,8 +358,8 @@ func (m ConfigDashboardModel) renderMostHitRules(width int) string {
 	// Sort by hit count
 	sorted := make([]models.SecurityRule, len(m.policies))
 	copy(sorted, m.policies)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].HitCount > sorted[j].HitCount
+	slices.SortFunc(sorted, func(a, b models.SecurityRule) int {
+		return cmp.Compare(b.HitCount, a.HitCount)
 	})
 
 	// Show top rules
