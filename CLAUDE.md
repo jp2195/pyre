@@ -81,18 +81,21 @@ unexpected failures are never swallowed.
 ## Dependencies
 
 - TUI: Bubble Tea v2 (`charm.land/bubbletea/v2`), lipgloss v2 (`charm.land/lipgloss/v2`), bubbles v2 (`charm.land/bubbles/v2`). Migrated from `github.com/charmbracelet/{bubbletea,lipgloss,bubbles}` on 2026-04-18.
-- YAML: `go.yaml.in/yaml/v4` (not gopkg.in/yaml.v3). Pinned to `v4.0.0-rc.4` pending a stable `v4.Y.Z` release upstream; only release-candidate tags exist today. Revisit quarterly: `go list -m -versions go.yaml.in/yaml/v4`.
+- YAML: `go.yaml.in/yaml/v4` (not gopkg.in/yaml.v3). Pinned to `v4.0.0-rc.5` pending a stable `v4.Y.Z` release upstream; only release-candidate tags exist today. Revisit quarterly: `go list -m -versions go.yaml.in/yaml/v4`.
 - `maxResponseSize = 50MB` const in `client.go`, used with `io.LimitReader`
 - Log polling: `logPollMaxAttempts=30`, `logPollInterval=500ms` in `api/logs.go`
 
 ## Go 1.26 (Current Version)
 
-`go.mod` is pinned to `go 1.26.3` (stdlib CVE patch release). The 1.26.x
-series has shipped two security patches so far: 1.26.2 fixed
-`crypto/tls` / `crypto/x509` issues from 1.26.0–1.26.1, and 1.26.3 fixed
+`go.mod` is pinned to `go 1.26.4` (stdlib CVE patch release). The 1.26.x
+series has shipped three security patches so far: 1.26.2 fixed
+`crypto/tls` / `crypto/x509` issues from 1.26.0–1.26.1; 1.26.3 fixed
 GO-2026-4971 (`net.Dial` / `LookupPort` NUL-byte panic on Windows) and
-GO-2026-4918 (HTTP/2 transport infinite loop in `golang.org/x/net`).
-CI pins `go-version: '1.26.3'`. Key features relevant to this project:
+GO-2026-4918 (HTTP/2 transport infinite loop in `golang.org/x/net`);
+1.26.4 fixed GO-2026-5039 (unescaped inputs in `net/textproto` errors)
+and GO-2026-5037 (inefficient hostname parsing in `crypto/x509`) — both
+flagged by govulncheck against this codebase's keygen and TLS paths.
+CI pins `go-version: '1.26.4'`. Key features relevant to this project:
 
 ### Language Changes
 - **Enhanced `new()` builtin**: `new` now accepts an expression as initial value - `new(expr)` allocates and initializes in one step. Useful for pointer fields: `Age: new(yearsSince(born))`
