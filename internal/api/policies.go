@@ -6,98 +6,137 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jp2195/pyre/internal/models"
 )
 
+// memberList is the recurring PAN-OS <x><member>...</member></x> shape.
+type memberList struct {
+	Member []string `xml:"member"`
+}
+
 // securityRuleEntry defines the XML structure for security rule parsing
 type securityRuleEntry struct {
-	Name        string `xml:"name,attr"`
-	Disabled    string `xml:"disabled"`
-	Description string `xml:"description"`
-	RuleType    string `xml:"rule-type"`
-	Action      string `xml:"action"`
-	Tag         struct {
-		Member []string `xml:"member"`
-	} `xml:"tag"`
-	From struct {
-		Member []string `xml:"member"`
-	} `xml:"from"`
-	To struct {
-		Member []string `xml:"member"`
-	} `xml:"to"`
-	Source struct {
-		Member []string `xml:"member"`
-	} `xml:"source"`
-	SourceUser struct {
-		Member []string `xml:"member"`
-	} `xml:"source-user"`
-	NegateSource string `xml:"negate-source"`
-	Destination  struct {
-		Member []string `xml:"member"`
-	} `xml:"destination"`
-	NegateDest  string `xml:"negate-destination"`
-	Application struct {
-		Member []string `xml:"member"`
-	} `xml:"application"`
-	Service struct {
-		Member []string `xml:"member"`
-	} `xml:"service"`
-	Category struct {
-		Member []string `xml:"member"`
-	} `xml:"category"`
-	LogStart       string `xml:"log-start"`
-	LogEnd         string `xml:"log-end"`
-	LogSetting     string `xml:"log-setting"`
+	Name           string     `xml:"name,attr"`
+	Disabled       string     `xml:"disabled"`
+	Description    string     `xml:"description"`
+	RuleType       string     `xml:"rule-type"`
+	Action         string     `xml:"action"`
+	Tag            memberList `xml:"tag"`
+	From           memberList `xml:"from"`
+	To             memberList `xml:"to"`
+	Source         memberList `xml:"source"`
+	SourceUser     memberList `xml:"source-user"`
+	NegateSource   string     `xml:"negate-source"`
+	Destination    memberList `xml:"destination"`
+	NegateDest     string     `xml:"negate-destination"`
+	Application    memberList `xml:"application"`
+	Service        memberList `xml:"service"`
+	Category       memberList `xml:"category"`
+	LogStart       string     `xml:"log-start"`
+	LogEnd         string     `xml:"log-end"`
+	LogSetting     string     `xml:"log-setting"`
 	ProfileSetting struct {
-		Group struct {
-			Member []string `xml:"member"`
-		} `xml:"group"`
+		Group    memberList `xml:"group"`
 		Profiles struct {
-			Virus struct {
-				Member []string `xml:"member"`
-			} `xml:"virus"`
-			Spyware struct {
-				Member []string `xml:"member"`
-			} `xml:"spyware"`
-			Vulnerability struct {
-				Member []string `xml:"member"`
-			} `xml:"vulnerability"`
-			URLFiltering struct {
-				Member []string `xml:"member"`
-			} `xml:"url-filtering"`
-			FileBlocking struct {
-				Member []string `xml:"member"`
-			} `xml:"file-blocking"`
-			WildFireAnalysis struct {
-				Member []string `xml:"member"`
-			} `xml:"wildfire-analysis"`
+			Virus            memberList `xml:"virus"`
+			Spyware          memberList `xml:"spyware"`
+			Vulnerability    memberList `xml:"vulnerability"`
+			URLFiltering     memberList `xml:"url-filtering"`
+			FileBlocking     memberList `xml:"file-blocking"`
+			WildFireAnalysis memberList `xml:"wildfire-analysis"`
 		} `xml:"profiles"`
 	} `xml:"profile-setting"`
 }
 
-// parseSecurityRuleEntries parses XML response into security rule entries
-func parseSecurityRuleEntries(inner []byte) []securityRuleEntry {
-	var entries []securityRuleEntry
-
-	// Try parsing with <rules> wrapper (xpath ends at /rules, so response includes the element)
+// parseRuleEntries parses a rulebase XML response, tolerating both the
+// <rules><entry>... wrapper and bare <entry> shapes PAN-OS emits.
+func parseRuleEntries[T any](inner []byte) []T {
 	var withWrapper struct {
-		Entry []securityRuleEntry `xml:"rules>entry"`
+		Entry []T `xml:"rules>entry"`
 	}
-	if unmarshalErr := decodeXML(bytes.NewReader(WrapInner(inner)), &withWrapper); unmarshalErr == nil && len(withWrapper.Entry) > 0 {
-		entries = withWrapper.Entry
-	} else {
-		// Try parsing without wrapper (entries directly in result)
-		var withoutWrapper struct {
-			Entry []securityRuleEntry `xml:"entry"`
-		}
-		if decodeXML(bytes.NewReader(WrapInner(inner)), &withoutWrapper) == nil {
-			entries = withoutWrapper.Entry
-		}
+	if err := decodeXML(bytes.NewReader(WrapInner(inner)), &withWrapper); err == nil && len(withWrapper.Entry) > 0 {
+		return withWrapper.Entry
 	}
+	var withoutWrapper struct {
+		Entry []T `xml:"entry"`
+	}
+	if decodeXML(bytes.NewReader(WrapInner(inner)), &withoutWrapper) == nil {
+		return withoutWrapper.Entry
+	}
+	return nil
+}
 
-	return entries
+// rulebasePaths returns the candidate XPaths for the pre/local/post
+// rulebases of the given kind ("security" or "nat"). One definition —
+// the security and NAT lists previously only differed by this segment.
+func rulebasePaths(kind string) (pre, local, post []string) {
+	pre = []string{
+		// Standalone firewall paths
+		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/pre-rulebase/" + kind + "/rules",
+		"/config/devices/entry/vsys/entry[@name='vsys1']/pre-rulebase/" + kind + "/rules",
+		// Panorama-pushed rules on managed firewalls
+		"/config/panorama/vsys/entry[@name='vsys1']/pre-rulebase/" + kind + "/rules",
+	}
+	local = []string{
+		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/rulebase/" + kind + "/rules",
+		"/config/devices/entry/vsys/entry[@name='vsys1']/rulebase/" + kind + "/rules",
+		"/config/devices/entry/vsys/entry/rulebase/" + kind + "/rules",
+	}
+	post = []string{
+		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/post-rulebase/" + kind + "/rules",
+		"/config/devices/entry/vsys/entry[@name='vsys1']/post-rulebase/" + kind + "/rules",
+		"/config/panorama/vsys/entry[@name='vsys1']/post-rulebase/" + kind + "/rules",
+	}
+	return pre, local, post
+}
+
+// fetchAllRulebases fetches pre/local/post rulebases concurrently (they are
+// independent requests) and converts entries in evaluation order.
+func fetchAllRulebases[E, R any](ctx context.Context, c *Client, target, kind string, convert func(E, int, models.RuleBase) R) []R {
+	prePaths, localPaths, postPaths := rulebasePaths(kind)
+
+	var preEntries, localEntries, postEntries []E
+	var wg sync.WaitGroup
+	wg.Go(func() { preEntries = fetchRulesFromPaths(c, ctx, prePaths, target, parseRuleEntries[E]) })
+	wg.Go(func() { localEntries = fetchRulesFromPaths(c, ctx, localPaths, target, parseRuleEntries[E]) })
+	wg.Go(func() { postEntries = fetchRulesFromPaths(c, ctx, postPaths, target, parseRuleEntries[E]) })
+	wg.Wait()
+
+	rules := make([]R, 0, len(preEntries)+len(localEntries)+len(postEntries))
+	position := 1
+	for _, e := range preEntries {
+		rules = append(rules, convert(e, position, models.RuleBasePre))
+		position++
+	}
+	for _, e := range localEntries {
+		rules = append(rules, convert(e, position, models.RuleBaseLocal))
+		position++
+	}
+	for _, e := range postEntries {
+		rules = append(rules, convert(e, position, models.RuleBasePost))
+		position++
+	}
+	return rules
+}
+
+// fetchRuleHitCounts fetches hit-count stats for the named rulebase
+// ("security" or "nat"). Failures are logged and return nil — hit counts
+// are enrichment, never fatal.
+func (c *Client) fetchRuleHitCounts(ctx context.Context, target, ruleBaseName string) map[string]hitStats {
+	cmd := "<show><rule-hit-count><vsys><vsys-name><entry name='vsys1'><rule-base><entry name='" + ruleBaseName + "'><rules><all/></rules></entry></rule-base></entry></vsys-name></vsys></rule-hit-count></show>"
+	resp, err := c.Op(ctx, cmd, target)
+	if err != nil {
+		log.Printf("[API Warning] failed to fetch %s rule hit counts: %v", ruleBaseName, err)
+		return nil
+	}
+	if !resp.IsSuccess() {
+		log.Printf("[API Warning] %s rule hit count request returned non-success: %s", ruleBaseName, resp.Error())
+		return nil
+	}
+	return parseRuleHitCounts(resp.Result.Inner)
 }
 
 // convertSecurityRuleEntry converts a parsed XML entry to a SecurityRule model
@@ -244,121 +283,48 @@ func fetchRulesFromPaths[T any](c *Client, ctx context.Context, xpaths []string,
 }
 
 func (c *Client) GetSecurityPolicies(ctx context.Context, target string) ([]models.SecurityRule, error) {
-	// Pre-rulebase paths (Panorama-pushed rules evaluated first)
-	// Includes paths for both standalone firewalls and Panorama-managed firewalls
-	preRulebasePaths := []string{
-		// Standalone firewall paths
-		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/pre-rulebase/security/rules",
-		"/config/devices/entry/vsys/entry[@name='vsys1']/pre-rulebase/security/rules",
-		// Panorama-pushed rules on managed firewalls
-		"/config/panorama/vsys/entry[@name='vsys1']/pre-rulebase/security/rules",
-	}
-
-	// Local rulebase paths (locally defined rules)
-	localRulebasePaths := []string{
-		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/rulebase/security/rules",
-		"/config/devices/entry/vsys/entry[@name='vsys1']/rulebase/security/rules",
-		"/config/devices/entry/vsys/entry/rulebase/security/rules",
-	}
-
-	// Post-rulebase paths (Panorama-pushed rules evaluated last)
-	// Includes paths for both standalone firewalls and Panorama-managed firewalls
-	postRulebasePaths := []string{
-		// Standalone firewall paths
-		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/post-rulebase/security/rules",
-		"/config/devices/entry/vsys/entry[@name='vsys1']/post-rulebase/security/rules",
-		// Panorama-pushed rules on managed firewalls
-		"/config/panorama/vsys/entry[@name='vsys1']/post-rulebase/security/rules",
-	}
-
-	// Fetch from all three rulebase locations
-	preEntries := fetchRulesFromPaths(c, ctx, preRulebasePaths, target, parseSecurityRuleEntries)
-	localEntries := fetchRulesFromPaths(c, ctx, localRulebasePaths, target, parseSecurityRuleEntries)
-	postEntries := fetchRulesFromPaths(c, ctx, postRulebasePaths, target, parseSecurityRuleEntries)
-
-	// Combine in evaluation order: pre -> local -> post
-	totalEntries := len(preEntries) + len(localEntries) + len(postEntries)
-	rules := make([]models.SecurityRule, 0, totalEntries)
-	position := 1
-
-	for _, e := range preEntries {
-		rules = append(rules, convertSecurityRuleEntry(e, position, models.RuleBasePre))
-		position++
-	}
-	for _, e := range localEntries {
-		rules = append(rules, convertSecurityRuleEntry(e, position, models.RuleBaseLocal))
-		position++
-	}
-	for _, e := range postEntries {
-		rules = append(rules, convertSecurityRuleEntry(e, position, models.RuleBasePost))
-		position++
-	}
-
+	rules := fetchAllRulebases(ctx, c, target, "security", convertSecurityRuleEntry)
 	if len(rules) == 0 {
 		return []models.SecurityRule{}, nil
 	}
 
-	// Fetch and apply rule hit counts
-	hitCountResp, err := c.Op(ctx, "<show><rule-hit-count><vsys><vsys-name><entry name='vsys1'><rule-base><entry name='security'><rules><all/></rules></entry></rule-base></entry></vsys-name></vsys></rule-hit-count></show>", target)
-	if err != nil {
-		log.Printf("[API Warning] failed to fetch security rule hit counts: %v", err)
-	} else if !hitCountResp.IsSuccess() {
-		log.Printf("[API Warning] security rule hit count request returned non-success: %s", hitCountResp.Error())
-	}
-	if err == nil && hitCountResp.IsSuccess() {
-		if hitMap := parseRuleHitCounts(hitCountResp.Result.Inner); hitMap != nil {
-			for i := range rules {
-				if hit, ok := hitMap[rules[i].Name]; ok {
-					rules[i].HitCount = hit.count
-					rules[i].LastHit = hit.lastHit
-					rules[i].FirstHit = hit.firstHit
-					rules[i].LastReset = hit.lastReset
-				}
+	if hitMap := c.fetchRuleHitCounts(ctx, target, "security"); hitMap != nil {
+		for i := range rules {
+			if hit, ok := hitMap[rules[i].Name]; ok {
+				rules[i].HitCount = hit.count
+				rules[i].LastHit = hit.lastHit
+				rules[i].FirstHit = hit.firstHit
+				rules[i].LastReset = hit.lastReset
 			}
 		}
 	}
-
 	return rules, nil
 }
 
 // natRuleEntry defines the XML structure for NAT rule parsing
 type natRuleEntry struct {
-	Name        string `xml:"name,attr"`
-	Disabled    string `xml:"disabled"`
-	Description string `xml:"description"`
-	NATType     string `xml:"nat-type"`
-	Tag         struct {
-		Member []string `xml:"member"`
-	} `xml:"tag"`
-	From struct {
-		Member []string `xml:"member"`
-	} `xml:"from"`
-	To struct {
-		Member []string `xml:"member"`
-	} `xml:"to"`
-	Source struct {
-		Member []string `xml:"member"`
-	} `xml:"source"`
-	Destination struct {
-		Member []string `xml:"member"`
-	} `xml:"destination"`
-	Service           string `xml:"service"`
-	ToInterface       string `xml:"to-interface"`
+	Name              string     `xml:"name,attr"`
+	Disabled          string     `xml:"disabled"`
+	Description       string     `xml:"description"`
+	NATType           string     `xml:"nat-type"`
+	Tag               memberList `xml:"tag"`
+	From              memberList `xml:"from"`
+	To                memberList `xml:"to"`
+	Source            memberList `xml:"source"`
+	Destination       memberList `xml:"destination"`
+	Service           string     `xml:"service"`
+	ToInterface       string     `xml:"to-interface"`
 	SourceTranslation struct {
 		DynamicIPAndPort struct {
 			InterfaceAddress struct {
 				Interface string `xml:"interface"`
 				IP        string `xml:"ip"`
 			} `xml:"interface-address"`
-			TranslatedAddress struct {
-				Member []string `xml:"member"`
-			} `xml:"translated-address"`
+			TranslatedAddress memberList `xml:"translated-address"`
 		} `xml:"dynamic-ip-and-port"`
 		DynamicIP struct {
-			TranslatedAddress struct {
-				Member []string `xml:"member"`
-			} `xml:"translated-address"`
-			Fallback struct {
+			TranslatedAddress memberList `xml:"translated-address"`
+			Fallback          struct {
 				Interface struct {
 					Interface string `xml:"interface"`
 					IP        string `xml:"ip"`
@@ -375,29 +341,6 @@ type natRuleEntry struct {
 		TranslatedPort    string `xml:"translated-port"`
 	} `xml:"destination-translation"`
 	ActiveActiveDeviceBinding string `xml:"active-active-device-binding"`
-}
-
-// parseNATRuleEntries parses XML response into NAT rule entries
-func parseNATRuleEntries(inner []byte) []natRuleEntry {
-	var entries []natRuleEntry
-
-	// Try parsing with <rules> wrapper
-	var withWrapper struct {
-		Entry []natRuleEntry `xml:"rules>entry"`
-	}
-	if unmarshalErr := decodeXML(bytes.NewReader(WrapInner(inner)), &withWrapper); unmarshalErr == nil && len(withWrapper.Entry) > 0 {
-		entries = withWrapper.Entry
-	} else {
-		// Try parsing without wrapper
-		var withoutWrapper struct {
-			Entry []natRuleEntry `xml:"entry"`
-		}
-		if decodeXML(bytes.NewReader(WrapInner(inner)), &withoutWrapper) == nil {
-			entries = withoutWrapper.Entry
-		}
-	}
-
-	return entries
 }
 
 // convertNATRuleEntry converts a parsed XML entry to a NATRule model
@@ -450,79 +393,20 @@ func convertNATRuleEntry(e natRuleEntry, position int, ruleBase models.RuleBase)
 
 // GetNATRules retrieves NAT policy rules from the firewall
 func (c *Client) GetNATRules(ctx context.Context, target string) ([]models.NATRule, error) {
-	// Pre-rulebase paths (Panorama-pushed rules evaluated first)
-	// Includes paths for both standalone firewalls and Panorama-managed firewalls
-	preRulebasePaths := []string{
-		// Standalone firewall paths
-		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/pre-rulebase/nat/rules",
-		"/config/devices/entry/vsys/entry[@name='vsys1']/pre-rulebase/nat/rules",
-		// Panorama-pushed rules on managed firewalls
-		"/config/panorama/vsys/entry[@name='vsys1']/pre-rulebase/nat/rules",
-	}
-
-	// Local rulebase paths (locally defined rules)
-	localRulebasePaths := []string{
-		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/rulebase/nat/rules",
-		"/config/devices/entry/vsys/entry[@name='vsys1']/rulebase/nat/rules",
-		"/config/devices/entry/vsys/entry/rulebase/nat/rules",
-	}
-
-	// Post-rulebase paths (Panorama-pushed rules evaluated last)
-	// Includes paths for both standalone firewalls and Panorama-managed firewalls
-	postRulebasePaths := []string{
-		// Standalone firewall paths
-		"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/post-rulebase/nat/rules",
-		"/config/devices/entry/vsys/entry[@name='vsys1']/post-rulebase/nat/rules",
-		// Panorama-pushed rules on managed firewalls
-		"/config/panorama/vsys/entry[@name='vsys1']/post-rulebase/nat/rules",
-	}
-
-	// Fetch from all three rulebase locations
-	preEntries := fetchRulesFromPaths(c, ctx, preRulebasePaths, target, parseNATRuleEntries)
-	localEntries := fetchRulesFromPaths(c, ctx, localRulebasePaths, target, parseNATRuleEntries)
-	postEntries := fetchRulesFromPaths(c, ctx, postRulebasePaths, target, parseNATRuleEntries)
-
-	// Combine in evaluation order: pre -> local -> post
-	totalEntries := len(preEntries) + len(localEntries) + len(postEntries)
-	rules := make([]models.NATRule, 0, totalEntries)
-	position := 1
-
-	for _, e := range preEntries {
-		rules = append(rules, convertNATRuleEntry(e, position, models.RuleBasePre))
-		position++
-	}
-	for _, e := range localEntries {
-		rules = append(rules, convertNATRuleEntry(e, position, models.RuleBaseLocal))
-		position++
-	}
-	for _, e := range postEntries {
-		rules = append(rules, convertNATRuleEntry(e, position, models.RuleBasePost))
-		position++
-	}
-
+	rules := fetchAllRulebases(ctx, c, target, "nat", convertNATRuleEntry)
 	if len(rules) == 0 {
 		return []models.NATRule{}, nil
 	}
 
-	// Fetch and apply NAT rule hit counts
-	hitCountResp, err := c.Op(ctx, "<show><rule-hit-count><vsys><vsys-name><entry name='vsys1'><rule-base><entry name='nat'><rules><all/></rules></entry></rule-base></entry></vsys-name></vsys></rule-hit-count></show>", target)
-	if err != nil {
-		log.Printf("[API Warning] failed to fetch NAT rule hit counts: %v", err)
-	} else if !hitCountResp.IsSuccess() {
-		log.Printf("[API Warning] NAT rule hit count request returned non-success: %s", hitCountResp.Error())
-	}
-	if err == nil && hitCountResp.IsSuccess() {
-		if hitMap := parseRuleHitCounts(hitCountResp.Result.Inner); hitMap != nil {
-			for i := range rules {
-				if hit, ok := hitMap[rules[i].Name]; ok {
-					rules[i].HitCount = hit.count
-					rules[i].LastHit = hit.lastHit
-					rules[i].FirstHit = hit.firstHit
-					rules[i].LastReset = hit.lastReset
-				}
+	if hitMap := c.fetchRuleHitCounts(ctx, target, "nat"); hitMap != nil {
+		for i := range rules {
+			if hit, ok := hitMap[rules[i].Name]; ok {
+				rules[i].HitCount = hit.count
+				rules[i].LastHit = hit.lastHit
+				rules[i].FirstHit = hit.firstHit
+				rules[i].LastReset = hit.lastReset
 			}
 		}
 	}
-
 	return rules, nil
 }
