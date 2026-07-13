@@ -116,36 +116,38 @@ func formatThroughput(kbps int64) string {
 	return fmt.Sprintf("%d Kbps", kbps)
 }
 
-func formatTimeAgo(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
+// relTimeOpts controls the cosmetic differences between the app's
+// relative-time displays; the bucketing algorithm is shared.
+type relTimeOpts struct {
+	zeroLabel    string // returned for the zero time
+	justNowLabel string // returned for < 1 minute
+	weeks        bool   // include a weeks bucket before falling back to a date
+	dateFormat   string // final fallback format
+}
 
+func formatRelativeTime(t time.Time, o relTimeOpts) string {
+	if t.IsZero() {
+		return o.zeroLabel
+	}
 	d := time.Since(t)
 	switch {
 	case d < time.Minute:
-		return "just now"
+		return o.justNowLabel
 	case d < time.Hour:
-		mins := int(d.Minutes())
-		if mins == 1 {
-			return "1m ago"
-		}
-		return fmt.Sprintf("%dm ago", mins)
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
 	case d < 24*time.Hour:
-		hours := int(d.Hours())
-		if hours == 1 {
-			return "1h ago"
-		}
-		return fmt.Sprintf("%dh ago", hours)
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
 	case d < 7*24*time.Hour:
-		days := int(d.Hours() / 24)
-		if days == 1 {
-			return "1d ago"
-		}
-		return fmt.Sprintf("%dd ago", days)
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	case o.weeks && d < 30*24*time.Hour:
+		return fmt.Sprintf("%dw ago", int(d.Hours()/24/7))
 	default:
-		return t.Format("Jan 2")
+		return t.Format(o.dateFormat)
 	}
+}
+
+func formatTimeAgo(t time.Time) string {
+	return formatRelativeTime(t, relTimeOpts{zeroLabel: "", justNowLabel: "just now", dateFormat: "Jan 2"})
 }
 
 // renderZeroHitRulesPanel renders the "Zero-Hit Rules" panel shared by the

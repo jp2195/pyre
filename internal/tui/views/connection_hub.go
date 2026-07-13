@@ -308,43 +308,5 @@ func (m ConnectionHubModel) renderEntry(entry ConnectionEntry, selected bool) st
 
 // formatConnectionTimeAgo returns a human-readable relative time
 func formatConnectionTimeAgo(t time.Time) string {
-	if t.IsZero() {
-		return "Never"
-	}
-
-	d := time.Since(t)
-
-	if d < time.Minute {
-		return "Just now"
-	}
-	if d < time.Hour {
-		mins := int(d.Minutes())
-		if mins == 1 {
-			return "1m ago"
-		}
-		return fmt.Sprintf("%dm ago", mins)
-	}
-	if d < 24*time.Hour {
-		hours := int(d.Hours())
-		if hours == 1 {
-			return "1h ago"
-		}
-		return fmt.Sprintf("%dh ago", hours)
-	}
-	if d < 7*24*time.Hour {
-		days := int(d.Hours() / 24)
-		if days == 1 {
-			return "1d ago"
-		}
-		return fmt.Sprintf("%dd ago", days)
-	}
-	if d < 30*24*time.Hour {
-		weeks := int(d.Hours() / 24 / 7)
-		if weeks == 1 {
-			return "1w ago"
-		}
-		return fmt.Sprintf("%dw ago", weeks)
-	}
-
-	return t.Format("Jan 2, 2006")
+	return formatRelativeTime(t, relTimeOpts{zeroLabel: "Never", justNowLabel: "Just now", weeks: true, dateFormat: "Jan 2, 2006"})
 }

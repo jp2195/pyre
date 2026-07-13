@@ -140,23 +140,7 @@ func formatHitCountFull(count int64) string {
 
 // formatLastHit formats a time as a relative duration for table display.
 func formatLastHit(t time.Time) string {
-	if t.IsZero() {
-		return "never"
-	}
-	d := time.Since(t)
-	if d < time.Minute {
-		return "just now"
-	}
-	if d < time.Hour {
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	}
-	if d < 24*time.Hour {
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	}
-	if d < 7*24*time.Hour {
-		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-	}
-	return t.Format("Jan 2")
+	return formatRelativeTime(t, relTimeOpts{zeroLabel: "never", justNowLabel: "just now", dateFormat: "Jan 2"})
 }
 
 // formatTimestamp formats a time as a full timestamp.

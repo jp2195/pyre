@@ -2,6 +2,7 @@ package views
 
 import (
 	"testing"
+	"time"
 	"unicode/utf8"
 )
 
@@ -215,6 +216,31 @@ func TestTruncateRuneSafe(t *testing.T) {
 		}
 		if !utf8.ValidString(got) {
 			t.Errorf("truncate(%q, %d) produced invalid UTF-8: %q", tt.in, tt.maxLen, got)
+		}
+	}
+}
+
+func TestRelativeTimeFormatters(t *testing.T) {
+	now := time.Now()
+	cases := []struct {
+		name string
+		fn   func(time.Time) string
+		in   time.Time
+		want string
+	}{
+		{"timeAgo zero", formatTimeAgo, time.Time{}, ""},
+		{"timeAgo minutes", formatTimeAgo, now.Add(-5 * time.Minute), "5m ago"},
+		{"timeAgo hours", formatTimeAgo, now.Add(-3 * time.Hour), "3h ago"},
+		{"connection zero", formatConnectionTimeAgo, time.Time{}, "Never"},
+		{"connection just now", formatConnectionTimeAgo, now.Add(-10 * time.Second), "Just now"},
+		{"connection weeks", formatConnectionTimeAgo, now.Add(-14 * 24 * time.Hour), "2w ago"},
+		{"lastHit zero", formatLastHit, time.Time{}, "never"},
+		{"lastHit just now", formatLastHit, now.Add(-10 * time.Second), "just now"},
+		{"lastHit days", formatLastHit, now.Add(-2 * 24 * time.Hour), "2d ago"},
+	}
+	for _, c := range cases {
+		if got := c.fn(c.in); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
 		}
 	}
 }
