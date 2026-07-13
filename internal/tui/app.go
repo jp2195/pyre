@@ -324,17 +324,51 @@ func (m Model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // handleRefresh sets loading state and refreshes the current view.
 func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	if m.currentView == ViewDashboard {
-		return m, m.fetchCurrentDashboardData()
+		return m, tea.Batch(m.fetchCurrentDashboardData(), m.spinner.Tick)
 	}
 	if e, ok := detailViews[m.currentView]; ok {
 		e.setLoading(&m)
-		return m, e.refresh(&m)
+		return m, tea.Batch(e.refresh(&m), m.spinner.Tick)
 	}
 	return m, nil
 }
 
+// anyLoading reports whether any visible work is in flight — the condition
+// under which the spinner tick chain must keep running.
+func (m Model) anyLoading() bool {
+	if m.loading {
+		return true
+	}
+	for _, vs := range detailViewOrder {
+		if detailViews[vs].isLoading(&m) {
+			return true
+		}
+	}
+	// Dashboards signal loading via nil data rather than a flag.
+	if m.currentView == ViewDashboard {
+		switch m.currentDashboard {
+		case views.DashboardNetwork:
+			return !m.networkDashboard.HasData()
+		case views.DashboardSecurity:
+			return !m.securityDashboard.HasData()
+		case views.DashboardVPN:
+			return !m.vpnDashboard.HasData()
+		case views.DashboardConfig:
+			return !m.configDashboard.HasData()
+		default:
+			return !m.dashboard.HasData()
+		}
+	}
+	return false
+}
+
 // handleSpinnerTick updates the spinner and shares its frame with all views.
 func (m Model) handleSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
+	if !m.anyLoading() {
+		// Drop the tick chain; it restarts wherever a fetch is dispatched.
+		return m, nil
+	}
+
 	var cmd tea.Cmd
 	m.spinner, cmd = m.spinner.Update(msg)
 

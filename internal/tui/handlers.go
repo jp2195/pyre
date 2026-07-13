@@ -27,7 +27,7 @@ func (m Model) handleLoginKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case msg.String() == "enter":
 		if m.login.CanSubmit() {
 			m.loading = true
-			return m, m.doLogin()
+			return m, tea.Batch(m.doLogin(), m.spinner.Tick)
 		}
 
 	case msg.String() == " ":
@@ -99,14 +99,14 @@ func (m Model) handleDevicePickerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) 
 				return m, m.setError(err)
 			}
 			m.currentView = ViewDashboard
-			return m, m.fetchCurrentDashboardData()
+			return m, tea.Batch(m.fetchCurrentDashboardData(), m.spinner.Tick)
 		}
 		return m, nil
 
 	case key.Matches(msg, devicePickerKeys.Refresh):
 		conn := m.session.GetActiveConnection()
 		if conn != nil {
-			return m, m.fetchManagedDevices(conn)
+			return m, tea.Batch(m.fetchManagedDevices(conn), m.spinner.Tick)
 		}
 		return m, nil
 	}

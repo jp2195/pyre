@@ -53,6 +53,11 @@ func (m GPUsersModel) HasData() bool {
 	return m.list.HasData()
 }
 
+// IsLoading reports whether a fetch is in flight for this view.
+func (m GPUsersModel) IsLoading() bool {
+	return m.list.Loading
+}
+
 func (m GPUsersModel) SetUsers(users []models.GlobalProtectUser, err error) GPUsersModel {
 	m.list = m.list.SetItems(users, err)
 	return m

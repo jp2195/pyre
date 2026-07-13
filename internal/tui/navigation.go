@@ -131,7 +131,7 @@ func (m Model) navigateToCurrentItem() (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	if target.fetch != nil && !target.hasData(&m) {
-		cmd = target.fetch(&m)
+		cmd = tea.Batch(target.fetch(&m), m.spinner.Tick)
 	}
 
 	return m, cmd

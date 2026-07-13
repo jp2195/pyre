@@ -57,6 +57,11 @@ func (m IPSecTunnelsModel) HasData() bool {
 	return m.list.HasData()
 }
 
+// IsLoading reports whether a fetch is in flight for this view.
+func (m IPSecTunnelsModel) IsLoading() bool {
+	return m.list.Loading
+}
+
 func (m IPSecTunnelsModel) SetTunnels(tunnels []models.IPSecTunnel, err error) IPSecTunnelsModel {
 	m.list = m.list.SetItems(tunnels, err)
 	return m

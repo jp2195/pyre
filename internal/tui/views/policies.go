@@ -45,6 +45,11 @@ func (m PoliciesModel) HasData() bool {
 	return m.list.HasData()
 }
 
+// IsLoading reports whether a fetch is in flight for this view.
+func (m PoliciesModel) IsLoading() bool {
+	return m.list.Loading
+}
+
 func (m PoliciesModel) SetPolicies(policies []models.SecurityRule, err error) PoliciesModel {
 	m.list = m.list.SetItems(policies, err)
 	return m

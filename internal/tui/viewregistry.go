@@ -12,6 +12,7 @@ import (
 type viewEntry struct {
 	name       string // header breadcrumb, e.g. "Analyze/Policies"
 	hasData    func(m *Model) bool
+	isLoading  func(m *Model) bool
 	setLoading func(m *Model)
 	setSize    func(m *Model, w, h int)
 	setSpinner func(m *Model, frame string)
@@ -30,6 +31,7 @@ var detailViews = map[ViewState]viewEntry{
 	ViewPolicies: {
 		name:       "Analyze/Policies",
 		hasData:    func(m *Model) bool { return m.policies.HasData() },
+		isLoading:  func(m *Model) bool { return m.policies.IsLoading() },
 		setLoading: func(m *Model) { m.policies = m.policies.SetLoading(true) },
 		setSize:    func(m *Model, w, h int) { m.policies = m.policies.SetSize(w, h) },
 		setSpinner: func(m *Model, f string) { m.policies = m.policies.SetSpinnerFrame(f) },
@@ -44,6 +46,7 @@ var detailViews = map[ViewState]viewEntry{
 	ViewNATPolicies: {
 		name:       "Analyze/NAT",
 		hasData:    func(m *Model) bool { return m.natPolicies.HasData() },
+		isLoading:  func(m *Model) bool { return m.natPolicies.IsLoading() },
 		setLoading: func(m *Model) { m.natPolicies = m.natPolicies.SetLoading(true) },
 		setSize:    func(m *Model, w, h int) { m.natPolicies = m.natPolicies.SetSize(w, h) },
 		setSpinner: func(m *Model, f string) { m.natPolicies = m.natPolicies.SetSpinnerFrame(f) },
@@ -58,6 +61,7 @@ var detailViews = map[ViewState]viewEntry{
 	ViewSessions: {
 		name:       "Analyze/Sessions",
 		hasData:    func(m *Model) bool { return m.sessions.HasData() },
+		isLoading:  func(m *Model) bool { return m.sessions.Loading },
 		setLoading: func(m *Model) { m.sessions = m.sessions.SetLoading(true) },
 		setSize:    func(m *Model, w, h int) { m.sessions = m.sessions.SetSize(w, h) },
 		setSpinner: func(m *Model, f string) { m.sessions = m.sessions.SetSpinnerFrame(f) },
@@ -72,6 +76,7 @@ var detailViews = map[ViewState]viewEntry{
 	ViewInterfaces: {
 		name:       "Analyze/Interfaces",
 		hasData:    func(m *Model) bool { return m.interfaces.HasData() },
+		isLoading:  func(m *Model) bool { return m.interfaces.Loading },
 		setLoading: func(m *Model) { m.interfaces = m.interfaces.SetLoading(true) },
 		setSize:    func(m *Model, w, h int) { m.interfaces = m.interfaces.SetSize(w, h) },
 		setSpinner: func(m *Model, f string) { m.interfaces = m.interfaces.SetSpinnerFrame(f) },
@@ -93,6 +98,7 @@ var detailViews = map[ViewState]viewEntry{
 	ViewRoutes: {
 		name:       "Analyze/Routes",
 		hasData:    func(m *Model) bool { return m.routes.HasData() },
+		isLoading:  func(m *Model) bool { return m.routes.Loading },
 		setLoading: func(m *Model) { m.routes = m.routes.SetLoading(true) },
 		setSize:    func(m *Model, w, h int) { m.routes = m.routes.SetSize(w, h) },
 		setSpinner: func(m *Model, f string) { m.routes = m.routes.SetSpinnerFrame(f) },
@@ -107,6 +113,7 @@ var detailViews = map[ViewState]viewEntry{
 	ViewIPSecTunnels: {
 		name:       "Analyze/IPSec",
 		hasData:    func(m *Model) bool { return m.ipsecTunnels.HasData() },
+		isLoading:  func(m *Model) bool { return m.ipsecTunnels.IsLoading() },
 		setLoading: func(m *Model) { m.ipsecTunnels = m.ipsecTunnels.SetLoading(true) },
 		setSize:    func(m *Model, w, h int) { m.ipsecTunnels = m.ipsecTunnels.SetSize(w, h) },
 		setSpinner: func(m *Model, f string) { m.ipsecTunnels = m.ipsecTunnels.SetSpinnerFrame(f) },
@@ -126,6 +133,7 @@ var detailViews = map[ViewState]viewEntry{
 	ViewGPUsers: {
 		name:       "Analyze/GP Users",
 		hasData:    func(m *Model) bool { return m.gpUsers.HasData() },
+		isLoading:  func(m *Model) bool { return m.gpUsers.IsLoading() },
 		setLoading: func(m *Model) { m.gpUsers = m.gpUsers.SetLoading(true) },
 		setSize:    func(m *Model, w, h int) { m.gpUsers = m.gpUsers.SetSize(w, h) },
 		setSpinner: func(m *Model, f string) { m.gpUsers = m.gpUsers.SetSpinnerFrame(f) },
@@ -145,6 +153,7 @@ var detailViews = map[ViewState]viewEntry{
 	ViewLogs: {
 		name:       "Analyze/Logs",
 		hasData:    func(m *Model) bool { return m.logs.HasData() },
+		isLoading:  func(m *Model) bool { return m.logs.Loading },
 		setLoading: func(m *Model) { m.logs = m.logs.SetLoading(true) },
 		setSize:    func(m *Model, w, h int) { m.logs = m.logs.SetSize(w, h) },
 		setSpinner: func(m *Model, f string) { m.logs = m.logs.SetSpinnerFrame(f) },

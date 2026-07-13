@@ -16,7 +16,7 @@ func TestDetailViewRegistryComplete(t *testing.T) {
 		if e.name == "" {
 			t.Errorf("ViewState %d: empty name", vs)
 		}
-		if e.hasData == nil || e.setLoading == nil || e.setSize == nil ||
+		if e.hasData == nil || e.isLoading == nil || e.setLoading == nil || e.setSize == nil ||
 			e.setSpinner == nil || e.update == nil || e.render == nil || e.refresh == nil {
 			t.Errorf("%s: incomplete viewEntry (nil closure)", e.name)
 		}

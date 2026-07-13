@@ -45,6 +45,11 @@ func (m NATPoliciesModel) HasData() bool {
 	return m.list.HasData()
 }
 
+// IsLoading reports whether a fetch is in flight for this view.
+func (m NATPoliciesModel) IsLoading() bool {
+	return m.list.Loading
+}
+
 func (m NATPoliciesModel) SetRules(rules []models.NATRule, err error) NATPoliciesModel {
 	m.list = m.list.SetItems(rules, err)
 	return m

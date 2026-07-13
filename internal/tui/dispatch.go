@@ -96,7 +96,7 @@ func (m Model) handleAuthMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.selectedConnection = ""
 		m.selectedConnectionConfig = config.ConnectionConfig{}
-		cmds = append(cmds, m.fetchCurrentDashboardData(), m.detectPanorama(conn))
+		cmds = append(cmds, m.fetchCurrentDashboardData(), m.detectPanorama(conn), m.spinner.Tick)
 
 	case LoginErrorMsg:
 		m.loading = false
@@ -107,7 +107,7 @@ func (m Model) handleAuthMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if conn != nil {
 			conn.IsPanorama = msg.IsPanorama
 			if msg.IsPanorama {
-				cmds = append(cmds, m.fetchManagedDevices(conn))
+				cmds = append(cmds, m.fetchManagedDevices(conn), m.spinner.Tick)
 			}
 		}
 
@@ -216,7 +216,7 @@ func (m Model) handleNavigationMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case DashboardSelectedMsg:
 		m.currentDashboard = msg.Dashboard
 		m.currentView = ViewDashboard
-		return m, m.fetchCurrentDashboardData()
+		return m, tea.Batch(m.fetchCurrentDashboardData(), m.spinner.Tick)
 
 	case SwitchViewMsg:
 		return m.handleSwitchView(msg)
@@ -225,7 +225,7 @@ func (m Model) handleNavigationMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.currentDashboard = msg.Dashboard
 		m.currentView = ViewDashboard
 		m.syncNavbarToCurrentView()
-		return m, m.fetchCurrentDashboardData()
+		return m, tea.Batch(m.fetchCurrentDashboardData(), m.spinner.Tick)
 
 	case ShowPickerMsg:
 		m.currentView = ViewPicker
@@ -296,11 +296,11 @@ func (m Model) handleSwitchView(msg SwitchViewMsg) (tea.Model, tea.Cmd) {
 	m.currentView = msg.View
 	m.syncNavbarToCurrentView()
 	if msg.View == ViewDashboard {
-		return m, m.fetchCurrentDashboardData()
+		return m, tea.Batch(m.fetchCurrentDashboardData(), m.spinner.Tick)
 	}
 	if e, ok := detailViews[msg.View]; ok && !e.hasData(&m) {
 		e.setLoading(&m)
-		return m, e.refresh(&m)
+		return m, tea.Batch(e.refresh(&m), m.spinner.Tick)
 	}
 	return m, nil
 }
