@@ -116,6 +116,39 @@ func (c *Client) pollLogJob(ctx context.Context, jobID, target string) (*XMLResp
 	return nil, fmt.Errorf("log poll timed out after %d attempts", logPollMaxAttempts)
 }
 
+// runLogQuery submits a PAN-OS log query of the given type, waits for the
+// job to finish via pollLogJob, and returns the final response's inner XML
+// for type-specific decoding. It replaces three identical inline copies.
+func (c *Client) runLogQuery(ctx context.Context, logType, query string, maxLogs int, target string) ([]byte, error) {
+	if maxLogs <= 0 {
+		maxLogs = 100
+	}
+
+	resp, err := c.Log(ctx, logType, maxLogs, query, target)
+	if err != nil {
+		return nil, err
+	}
+	if checkErr := CheckResponse(resp); checkErr != nil {
+		return nil, checkErr
+	}
+
+	var jobResult struct {
+		Job string `xml:"job"`
+	}
+	if decodeErr := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &jobResult); decodeErr != nil {
+		return nil, fmt.Errorf("parsing job response: %w", decodeErr)
+	}
+	if jobResult.Job == "" {
+		return nil, fmt.Errorf("no job ID returned")
+	}
+
+	resultResp, err := c.pollLogJob(ctx, jobResult.Job, target)
+	if err != nil {
+		return nil, err
+	}
+	return resultResp.Result.Inner, nil
+}
+
 // parseLogTime parses various PAN-OS time formats
 func parseLogTime(timeStr string) time.Time {
 	if timeStr == "" {
@@ -131,33 +164,7 @@ func parseLogTime(timeStr string) time.Time {
 // GetSystemLogs retrieves system logs with optional query filter
 // Uses type=log API which returns a job ID, then polls for results
 func (c *Client) GetSystemLogs(ctx context.Context, query string, maxLogs int, target string) ([]models.SystemLogEntry, error) {
-	if maxLogs <= 0 {
-		maxLogs = 100
-	}
-
-	// Submit log query - this returns a job ID
-	resp, err := c.Log(ctx, "system", maxLogs, query, target)
-	if err != nil {
-		return nil, err
-	}
-	if checkErr := CheckResponse(resp); checkErr != nil {
-		return nil, checkErr
-	}
-
-	// Parse job ID from response
-	var jobResult struct {
-		Job string `xml:"job"`
-	}
-	if decodeErr := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &jobResult); decodeErr != nil {
-		return nil, fmt.Errorf("parsing job response: %w", decodeErr)
-	}
-
-	if jobResult.Job == "" {
-		return nil, fmt.Errorf("no job ID returned")
-	}
-
-	// Poll until the job reports completion (bounded retries, real errors).
-	resultResp, err := c.pollLogJob(ctx, jobResult.Job, target)
+	inner, err := c.runLogQuery(ctx, "system", query, maxLogs, target)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +183,7 @@ func (c *Client) GetSystemLogs(ctx context.Context, query string, maxLogs int, t
 			} `xml:"entry"`
 		} `xml:"log>logs"`
 	}
-	if err := decodeXML(bytes.NewReader(WrapInner(resultResp.Result.Inner)), &statusResult); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(inner)), &statusResult); err != nil {
 		return nil, fmt.Errorf("parsing system log entries: %w", err)
 	}
 
@@ -199,32 +206,7 @@ func (c *Client) GetSystemLogs(ctx context.Context, query string, maxLogs int, t
 
 // GetTrafficLogs retrieves traffic logs with optional query filter
 func (c *Client) GetTrafficLogs(ctx context.Context, query string, maxLogs int, target string) ([]models.TrafficLogEntry, error) {
-	if maxLogs <= 0 {
-		maxLogs = 100
-	}
-
-	// Submit log query
-	resp, err := c.Log(ctx, "traffic", maxLogs, query, target)
-	if err != nil {
-		return nil, err
-	}
-	if checkErr := CheckResponse(resp); checkErr != nil {
-		return nil, checkErr
-	}
-
-	var jobResult struct {
-		Job string `xml:"job"`
-	}
-	if decodeErr := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &jobResult); decodeErr != nil {
-		return nil, fmt.Errorf("parsing job response: %w", decodeErr)
-	}
-
-	if jobResult.Job == "" {
-		return nil, fmt.Errorf("no job ID returned")
-	}
-
-	// Poll until the job reports completion (bounded retries, real errors).
-	resultResp, err := c.pollLogJob(ctx, jobResult.Job, target)
+	inner, err := c.runLogQuery(ctx, "traffic", query, maxLogs, target)
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +249,7 @@ func (c *Client) GetTrafficLogs(ctx context.Context, query string, maxLogs int, 
 			} `xml:"entry"`
 		} `xml:"log>logs"`
 	}
-	if err := decodeXML(bytes.NewReader(WrapInner(resultResp.Result.Inner)), &statusResult); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(inner)), &statusResult); err != nil {
 		return nil, fmt.Errorf("parsing traffic log entries: %w", err)
 	}
 
@@ -314,32 +296,7 @@ func (c *Client) GetTrafficLogs(ctx context.Context, query string, maxLogs int, 
 
 // GetThreatLogs retrieves threat logs with optional query filter
 func (c *Client) GetThreatLogs(ctx context.Context, query string, maxLogs int, target string) ([]models.ThreatLogEntry, error) {
-	if maxLogs <= 0 {
-		maxLogs = 100
-	}
-
-	// Submit log query
-	resp, err := c.Log(ctx, "threat", maxLogs, query, target)
-	if err != nil {
-		return nil, err
-	}
-	if checkErr := CheckResponse(resp); checkErr != nil {
-		return nil, checkErr
-	}
-
-	var jobResult struct {
-		Job string `xml:"job"`
-	}
-	if decodeErr := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &jobResult); decodeErr != nil {
-		return nil, fmt.Errorf("parsing job response: %w", decodeErr)
-	}
-
-	if jobResult.Job == "" {
-		return nil, fmt.Errorf("no job ID returned")
-	}
-
-	// Poll until the job reports completion (bounded retries, real errors).
-	resultResp, err := c.pollLogJob(ctx, jobResult.Job, target)
+	inner, err := c.runLogQuery(ctx, "threat", query, maxLogs, target)
 	if err != nil {
 		return nil, err
 	}
@@ -383,7 +340,7 @@ func (c *Client) GetThreatLogs(ctx context.Context, query string, maxLogs int, t
 			} `xml:"entry"`
 		} `xml:"log>logs"`
 	}
-	if err := decodeXML(bytes.NewReader(WrapInner(resultResp.Result.Inner)), &statusResult); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(inner)), &statusResult); err != nil {
 		return nil, fmt.Errorf("parsing threat log entries: %w", err)
 	}
 
