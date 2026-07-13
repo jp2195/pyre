@@ -78,6 +78,9 @@ var navTargets = map[string]navTarget{
 		hasData: func(m *Model) bool { return m.interfaces.HasData() },
 		fetch: func(m *Model) tea.Cmd {
 			m.interfaces = m.interfaces.SetLoading(true)
+			if conn := m.session.GetActiveConnection(); conn != nil {
+				return tea.Batch(m.fetchInterfaces(), m.fetchARPTable(conn))
+			}
 			return m.fetchInterfaces()
 		},
 	},

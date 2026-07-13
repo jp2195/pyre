@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"log"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/auth"
@@ -39,6 +41,9 @@ func (m Model) handleDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.fetchSessionDetail(msg.SessionID)
 
 	default:
+		// A message type not registered above would otherwise vanish
+		// silently and look like "the fetch never returned".
+		log.Printf("[TUI Warning] unhandled message type %T", msg)
 		return m, nil
 	}
 }
