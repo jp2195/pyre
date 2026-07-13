@@ -39,7 +39,7 @@ func TestProtoToName(t *testing.T) {
 		{"6", "tcp"},
 		{"17", "udp"},
 		{"1", "icmp"},
-		{"", "tcp"}, // default
+		{"", "tcp"},  // default
 		{"99", "99"}, // unknown passes through
 	}
 	for _, tc := range tests {

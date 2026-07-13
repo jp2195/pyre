@@ -32,13 +32,13 @@ import "strings"
 //     no hang).
 func SanitizeForDisplay(s string) string {
 	const (
-		stateNormal  = iota
-		stateEsc     // just saw ESC (0x1b); waiting on the introducer byte
-		stateCSI     // inside CSI (ESC '['); drop until final byte 0x40-0x7e
-		stateOSC     // inside OSC (ESC ']'); drop until BEL or ST
-		stateOSCEsc  // saw ESC inside OSC; '\\' closes it, else resume OSC
-		stateStr     // inside DCS/PM/APC/SOS; drop until ST (ESC '\\')
-		stateStrEsc  // saw ESC inside string; '\\' closes it, else resume
+		stateNormal = iota
+		stateEsc    // just saw ESC (0x1b); waiting on the introducer byte
+		stateCSI    // inside CSI (ESC '['); drop until final byte 0x40-0x7e
+		stateOSC    // inside OSC (ESC ']'); drop until BEL or ST
+		stateOSCEsc // saw ESC inside OSC; '\\' closes it, else resume OSC
+		stateStr    // inside DCS/PM/APC/SOS; drop until ST (ESC '\\')
+		stateStrEsc // saw ESC inside string; '\\' closes it, else resume
 	)
 	var b strings.Builder
 	b.Grow(len(s))

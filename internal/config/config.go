@@ -120,6 +120,8 @@ func (c *Config) Save() error {
 		backupPath := configPath + ".bak"
 		data, readErr := os.ReadFile(configPath) // #nosec G304 -- Path is constructed from user's home directory
 		if readErr == nil {
+			// #nosec G703 -- backupPath is configPath + ".bak"; configPath
+			// comes from os.UserHomeDir (not user-controlled at this layer)
 			if writeErr := os.WriteFile(backupPath, data, 0600); writeErr != nil {
 				return fmt.Errorf("failed to create backup: %w", writeErr)
 			}

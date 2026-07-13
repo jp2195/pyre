@@ -22,8 +22,11 @@ linters:
 
   settings:
     errcheck:
+      # check-type-assertions catches missing comma-ok on .(T) assertions.
+      # check-blank is intentionally off so `_ = foo()` is accepted as an
+      # explicit intent-to-discard — the Go-community standard.
       check-type-assertions: true
-      check-blank: true
+      check-blank: false
 
     govet:
       enable-all: true
@@ -42,7 +45,7 @@ linters:
 
   exclusions:
     rules:
-      # Ignore long lines in generated files
+      # Tests routinely ignore cleanup errors (deferred Close, etc.)
       - path: _test\.go
         linters:
           - errcheck
@@ -50,6 +53,18 @@ linters:
       # Allow unused parameters in test files
       - path: _test\.go
         text: "unused-parameter"
+
+      # Hardcoded credentials in test fixtures are not real secrets.
+      - path: _test\.go
+        text: "G101"
+
+      # Test fixtures can echo query params back; not a real XSS surface.
+      - path: _test\.go
+        text: "G705"
+
+      # Test-only mock server doesn't need MaxBytesReader around ParseForm.
+      - path: internal/testutil/
+        text: "G120"
 
 issues:
   max-issues-per-linter: 50

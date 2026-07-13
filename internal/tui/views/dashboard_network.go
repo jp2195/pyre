@@ -180,7 +180,7 @@ func (m NetworkDashboardModel) renderTopInterfaces(width int) string {
 		}
 
 		name := truncateEllipsis(iface.Name, nameWidth)
-		b.WriteString(fmt.Sprintf("%-*s ", nameWidth, name))
+		fmt.Fprintf(&b, "%-*s ", nameWidth, name)
 		b.WriteString(stateStyle.Render(fmt.Sprintf("%-4s", iface.State)))
 		b.WriteString(" ")
 		b.WriteString(dimStyle().Render("In:"))
@@ -236,7 +236,7 @@ func (m NetworkDashboardModel) renderInterfaceErrors(width int) string {
 		iface := problemIfaces[i]
 		name := truncateEllipsis(iface.Name, nameWidth)
 
-		b.WriteString(fmt.Sprintf("%-*s ", nameWidth, name))
+		fmt.Fprintf(&b, "%-*s ", nameWidth, name)
 
 		if iface.ErrorsIn > 0 || iface.ErrorsOut > 0 {
 			b.WriteString(errorStyle().Render(fmt.Sprintf("Err:%d/%d ", iface.ErrorsIn, iface.ErrorsOut)))

@@ -1,8 +1,8 @@
 package api
 
 import (
-	"context"
 	"bytes"
+	"context"
 	"log"
 
 	"github.com/jp2195/pyre/internal/models"

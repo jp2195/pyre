@@ -140,16 +140,16 @@ func (c *Client) GetSystemLogs(ctx context.Context, query string, maxLogs int, t
 	if err != nil {
 		return nil, err
 	}
-	if err := CheckResponse(resp); err != nil {
-		return nil, err
+	if checkErr := CheckResponse(resp); checkErr != nil {
+		return nil, checkErr
 	}
 
 	// Parse job ID from response
 	var jobResult struct {
 		Job string `xml:"job"`
 	}
-	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &jobResult); err != nil {
-		return nil, fmt.Errorf("parsing job response: %w", err)
+	if decodeErr := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &jobResult); decodeErr != nil {
+		return nil, fmt.Errorf("parsing job response: %w", decodeErr)
 	}
 
 	if jobResult.Job == "" {
@@ -208,15 +208,15 @@ func (c *Client) GetTrafficLogs(ctx context.Context, query string, maxLogs int, 
 	if err != nil {
 		return nil, err
 	}
-	if err := CheckResponse(resp); err != nil {
-		return nil, err
+	if checkErr := CheckResponse(resp); checkErr != nil {
+		return nil, checkErr
 	}
 
 	var jobResult struct {
 		Job string `xml:"job"`
 	}
-	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &jobResult); err != nil {
-		return nil, fmt.Errorf("parsing job response: %w", err)
+	if decodeErr := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &jobResult); decodeErr != nil {
+		return nil, fmt.Errorf("parsing job response: %w", decodeErr)
 	}
 
 	if jobResult.Job == "" {
@@ -323,15 +323,15 @@ func (c *Client) GetThreatLogs(ctx context.Context, query string, maxLogs int, t
 	if err != nil {
 		return nil, err
 	}
-	if err := CheckResponse(resp); err != nil {
-		return nil, err
+	if checkErr := CheckResponse(resp); checkErr != nil {
+		return nil, checkErr
 	}
 
 	var jobResult struct {
 		Job string `xml:"job"`
 	}
-	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &jobResult); err != nil {
-		return nil, fmt.Errorf("parsing job response: %w", err)
+	if decodeErr := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &jobResult); decodeErr != nil {
+		return nil, fmt.Errorf("parsing job response: %w", decodeErr)
 	}
 
 	if jobResult.Job == "" {

@@ -301,5 +301,3 @@ func TestRequest_DoctypeRejected_NotPanic(t *testing.T) {
 		t.Errorf("err = %v, want to mention doctype/directive", err)
 	}
 }
-
-
