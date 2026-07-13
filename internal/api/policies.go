@@ -285,9 +285,13 @@ func fetchRulebase[TEntry, TModel any](c *Client, ctx context.Context, target st
 	// round trips (each of which may itself try several candidate XPaths).
 	var pre, local, post []TEntry
 	var wg sync.WaitGroup
-	wg.Go(func() { pre = fetchRulesFromPaths(c, ctx, rulebasePaths("pre-rulebase", spec.kind), target, spec.parse) })
+	wg.Go(func() {
+		pre = fetchRulesFromPaths(c, ctx, rulebasePaths("pre-rulebase", spec.kind), target, spec.parse)
+	})
 	wg.Go(func() { local = fetchRulesFromPaths(c, ctx, rulebasePaths("rulebase", spec.kind), target, spec.parse) })
-	wg.Go(func() { post = fetchRulesFromPaths(c, ctx, rulebasePaths("post-rulebase", spec.kind), target, spec.parse) })
+	wg.Go(func() {
+		post = fetchRulesFromPaths(c, ctx, rulebasePaths("post-rulebase", spec.kind), target, spec.parse)
+	})
 	wg.Wait()
 
 	rules := make([]TModel, 0, len(pre)+len(local)+len(post))

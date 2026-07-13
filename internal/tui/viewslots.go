@@ -114,7 +114,7 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.policies = m.policies.SetLoading(v)
 			},
-			isLoading: func(m *Model) bool { return m.policies.IsLoading() },
+			isLoading:  func(m *Model) bool { return m.policies.IsLoading() },
 			refreshFor: ViewPolicies,
 		},
 		{
@@ -127,7 +127,7 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.natPolicies = m.natPolicies.SetLoading(v)
 			},
-			isLoading: func(m *Model) bool { return m.natPolicies.IsLoading() },
+			isLoading:  func(m *Model) bool { return m.natPolicies.IsLoading() },
 			refreshFor: ViewNATPolicies,
 		},
 		{
@@ -140,7 +140,7 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.sessions = m.sessions.SetLoading(v)
 			},
-			isLoading: func(m *Model) bool { return m.sessions.IsLoading() },
+			isLoading:  func(m *Model) bool { return m.sessions.IsLoading() },
 			refreshFor: ViewSessions,
 		},
 		{
@@ -153,7 +153,7 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.interfaces = m.interfaces.SetLoading(v)
 			},
-			isLoading: func(m *Model) bool { return m.interfaces.IsLoading() },
+			isLoading:  func(m *Model) bool { return m.interfaces.IsLoading() },
 			refreshFor: ViewInterfaces,
 		},
 		{
@@ -166,7 +166,7 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.routes = m.routes.SetLoading(v)
 			},
-			isLoading: func(m *Model) bool { return m.routes.Loading },
+			isLoading:  func(m *Model) bool { return m.routes.Loading },
 			refreshFor: ViewRoutes,
 		},
 		{
@@ -179,7 +179,7 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.ipsecTunnels = m.ipsecTunnels.SetLoading(v)
 			},
-			isLoading: func(m *Model) bool { return m.ipsecTunnels.IsLoading() },
+			isLoading:  func(m *Model) bool { return m.ipsecTunnels.IsLoading() },
 			refreshFor: ViewIPSecTunnels,
 		},
 		{
@@ -192,7 +192,7 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.gpUsers = m.gpUsers.SetLoading(v)
 			},
-			isLoading: func(m *Model) bool { return m.gpUsers.IsLoading() },
+			isLoading:  func(m *Model) bool { return m.gpUsers.IsLoading() },
 			refreshFor: ViewGPUsers,
 		},
 		{
@@ -205,7 +205,7 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.logs = m.logs.SetLoading(v)
 			},
-			isLoading: func(m *Model) bool { return m.logs.Loading },
+			isLoading:  func(m *Model) bool { return m.logs.Loading },
 			refreshFor: ViewLogs,
 		},
 		{
@@ -218,7 +218,7 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.objects = m.objects.SetLoading(v)
 			},
-			isLoading: func(m *Model) bool { return m.objects.IsLoading() },
+			isLoading:  func(m *Model) bool { return m.objects.IsLoading() },
 			refreshFor: ViewObjects,
 		},
 
