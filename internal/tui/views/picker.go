@@ -64,6 +64,12 @@ func (m PickerModel) Update(msg tea.Msg) (PickerModel, tea.Cmd) {
 			if m.cursor > 0 {
 				m.cursor--
 			}
+		case "g", "home":
+			m.cursor = 0
+		case "G", "end":
+			if len(m.connections) > 0 {
+				m.cursor = len(m.connections) - 1
+			}
 		}
 	}
 	return m, nil
@@ -132,7 +138,7 @@ func (m PickerModel) View() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("j/k: navigate  enter: select  a: add new  esc: back"))
+	b.WriteString(helpStyle.Render("j/k: navigate  g/G: first/last  enter: select  a: add new  esc: back"))
 
 	content := b.String()
 

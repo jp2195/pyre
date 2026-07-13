@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"log"
 	"slices"
 	"strconv"
 	"strings"
@@ -35,8 +36,10 @@ func (c *Client) GetThreatSummary(ctx context.Context, target string) (*models.T
 		} `xml:"global>counters>entry"`
 	}
 	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
-		// Fallback: try to parse simple counter format
-		// Return empty summary if parsing fails (device may not have threat prevention)
+		// Return empty summary if parsing fails (device may not have threat
+		// prevention), but log it: schema drift would otherwise silently
+		// render as "0 threats" forever.
+		log.Printf("[API Warning] failed to parse threat summary counters: %v", err)
 		return summary, nil
 	}
 
@@ -86,6 +89,7 @@ func (c *Client) GetGlobalProtectInfo(ctx context.Context, target string) (*mode
 		} `xml:"entry"`
 	}
 	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
+		log.Printf("[API Warning] failed to parse GlobalProtect gateway users: %v", err)
 		return info, nil
 	}
 

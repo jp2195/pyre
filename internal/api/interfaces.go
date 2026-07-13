@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"log"
 	"strings"
 
 	"github.com/jp2195/pyre/internal/models"
@@ -50,7 +51,8 @@ func (c *Client) GetInterfaces(ctx context.Context, target string) ([]models.Int
 		} `xml:"hw"`
 	}
 	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
-		// Return empty list rather than error
+		// Return empty list rather than error, but leave a trail.
+		log.Printf("[API Warning] failed to parse interface list: %v", err)
 		return []models.Interface{}, nil
 	}
 
