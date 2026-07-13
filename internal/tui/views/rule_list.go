@@ -23,6 +23,7 @@ type RuleListConfig[T any] struct {
 	FormatRow         func(item T, width int) string  // Renders a single row
 	RenderDetail      func(item T, width int) string  // Renders the detail panel
 	IsDisabled        func(item T) bool               // Returns true if item should render as disabled
+	StyleRow          func(item T, row string) string // Optional: overrides styling for non-selected rows
 }
 
 // RuleListModel provides a generic, filterable, sortable list with detail expansion.
@@ -280,6 +281,8 @@ func (m RuleListModel[T]) renderTable() string {
 
 		if isSelected {
 			b.WriteString(selectedStyle.Render(row))
+		} else if m.config.StyleRow != nil {
+			b.WriteString(m.config.StyleRow(item, row))
 		} else if m.config.IsDisabled(item) {
 			b.WriteString(disabledStyle.Render(row))
 		} else {

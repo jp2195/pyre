@@ -31,6 +31,11 @@ var (
 	StatusWarningStyle  lipgloss.Style
 	StatusMutedStyle    lipgloss.Style
 
+	// Tunnel-state row styles (cached; used by the IPSec tunnels list)
+	TunnelUpRowStyle   lipgloss.Style
+	TunnelInitRowStyle lipgloss.Style
+	TunnelDownRowStyle lipgloss.Style
+
 	// Action styles - for policy actions
 	ActionAllowStyle lipgloss.Style
 	ActionDenyStyle  lipgloss.Style
@@ -154,6 +159,11 @@ func InitStyles() {
 		Bold(true).
 		Foreground(c.TextLabel).
 		MarginTop(1)
+
+	// Tunnel-state row styles
+	TunnelUpRowStyle = lipgloss.NewStyle().Foreground(c.Success)
+	TunnelInitRowStyle = lipgloss.NewStyle().Foreground(c.Warning)
+	TunnelDownRowStyle = lipgloss.NewStyle().Foreground(c.Error)
 
 	// Status/State styles
 	StatusActiveStyle = lipgloss.NewStyle().
