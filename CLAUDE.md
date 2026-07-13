@@ -34,6 +34,7 @@ go fix ./...                  # Apply modernizers (safe, behavior-preserving)
 - `saveConfig()` / `saveState()` return `tea.Cmd` (avoid goroutine race conditions)
 - `setError()` is a pointer receiver that sets `m.err` and returns auto-dismiss tick Cmd
 - Navigation uses table-driven `navTargets` map and `viewToNavbar` for reverse lookup
+- **View registry**: `internal/tui/viewregistry.go` holds the single `detailViews` table; resize/spinner/refresh/key/render/breadcrumb dispatch for detail views all derive from it. Adding a view = one registry entry + one message case in `dispatch.go` + a `views/` file.
 - Format helpers shared in `views/format_helpers.go`
 - **Bubble Tea v2 View composition**: only the top-level `tui.Model.View()` returns `tea.View`; every sub-view model returns `string`. The top-level composes sub-view strings and sets program options (alt-screen, mouse mode, window title, cursor) on the returned `tea.View` rather than on `tea.NewProgram`.
 - Use `tea.KeyPressMsg` in key handler type switches (not `tea.KeyMsg`, which in v2 is the union interface of press and release). Construct test messages as `tea.KeyPressMsg{Code: tea.KeyDown}` or `tea.KeyPressMsg{Code: 'j', Text: "j"}` — `Runes`/`Type` from v1 no longer exist.
@@ -55,6 +56,8 @@ are resolved per invocation in this order (see `auth.ResolveCredentials`):
 
 1. CLI flag `--api-key` (or `flags.APIKey`).
 2. Environment variable `PYRE_API_KEY`.
+2a. Environment variables `PYRE_HOST` and `PYRE_INSECURE` supply the host
+    and TLS-skip flag when not set by CLI flags (`PYRE_INSECURE=true` only).
 3. Host-specific environment variable `PYRE_<HOST>_API_KEY`, where `<HOST>`
    is the connection host uppercased with `.` and `-` replaced by `_`.
 4. Fall through to `Credentials.PromptForPassword = true` so the TUI
