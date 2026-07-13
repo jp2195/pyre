@@ -11,6 +11,7 @@ import (
 // RuleListConfig defines the type-specific behavior for a RuleListModel.
 type RuleListConfig[T any] struct {
 	Title             string
+	ItemsLabel        string // Noun in the count banner (default "rules")
 	LoadingMsg        string
 	EmptyMsg          string
 	FilterPlaceholder string
@@ -207,7 +208,11 @@ func (m RuleListModel[T]) View() string {
 
 	var b strings.Builder
 	title := m.config.Title
-	sortInfo := BannerInfoStyle.Render(fmt.Sprintf(" [%d rules | Sort: %s | s: change | /: filter | enter: details]", len(m.filtered), m.sortLabel()))
+	label := m.config.ItemsLabel
+	if label == "" {
+		label = "rules"
+	}
+	sortInfo := BannerInfoStyle.Render(fmt.Sprintf(" [%d %s | Sort: %s | s: change | /: filter | enter: details]", len(m.filtered), label, m.sortLabel()))
 	b.WriteString(titleStyle.Render(title) + sortInfo)
 	b.WriteString("\n")
 
