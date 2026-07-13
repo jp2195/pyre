@@ -50,6 +50,11 @@ func (m InterfacesModel) SetLoading(loading bool) InterfacesModel {
 	return m
 }
 
+// IsLoading reports whether a fetch is in flight for this view.
+func (m InterfacesModel) IsLoading() bool {
+	return m.list.Loading
+}
+
 // SetSpinnerFrame updates the current spinner animation frame.
 func (m InterfacesModel) SetSpinnerFrame(frame string) InterfacesModel {
 	m.list.SpinnerFrame = frame

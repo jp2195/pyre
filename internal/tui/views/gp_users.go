@@ -41,6 +41,11 @@ func (m GPUsersModel) SetLoading(loading bool) GPUsersModel {
 	return m
 }
 
+// IsLoading reports whether a fetch is in flight for this view.
+func (m GPUsersModel) IsLoading() bool {
+	return m.list.Loading
+}
+
 // SetSpinnerFrame updates the current spinner animation frame.
 func (m GPUsersModel) SetSpinnerFrame(frame string) GPUsersModel {
 	m.list.SpinnerFrame = frame

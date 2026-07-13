@@ -17,6 +17,10 @@ type viewSlot struct {
 	resize  func(m *Model, w, h, contentH int)
 	spinner func(m *Model, frame string)
 	loading func(m *Model, v bool)
+	// isLoading reports whether this slot's view currently has a fetch in
+	// flight; non-nil for the refreshable views. Used by anyLoading to gate
+	// the spinner tick chain so it stops when nothing is loading.
+	isLoading func(m *Model) bool
 	// refreshFor is the ViewState that triggers a refresh for this slot; 0 when the
 	// slot is not refreshable.
 	// NOTE: the zero value collides with ViewConnectionHub (= 0); this is only safe
@@ -110,6 +114,7 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.policies = m.policies.SetLoading(v)
 			},
+			isLoading: func(m *Model) bool { return m.policies.IsLoading() },
 			refreshFor: ViewPolicies,
 		},
 		{
@@ -122,6 +127,7 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.natPolicies = m.natPolicies.SetLoading(v)
 			},
+			isLoading: func(m *Model) bool { return m.natPolicies.IsLoading() },
 			refreshFor: ViewNATPolicies,
 		},
 		{
@@ -134,6 +140,7 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.sessions = m.sessions.SetLoading(v)
 			},
+			isLoading: func(m *Model) bool { return m.sessions.IsLoading() },
 			refreshFor: ViewSessions,
 		},
 		{
@@ -146,6 +153,7 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.interfaces = m.interfaces.SetLoading(v)
 			},
+			isLoading: func(m *Model) bool { return m.interfaces.IsLoading() },
 			refreshFor: ViewInterfaces,
 		},
 		{
@@ -158,6 +166,7 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.routes = m.routes.SetLoading(v)
 			},
+			isLoading: func(m *Model) bool { return m.routes.Loading },
 			refreshFor: ViewRoutes,
 		},
 		{
@@ -170,6 +179,7 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.ipsecTunnels = m.ipsecTunnels.SetLoading(v)
 			},
+			isLoading: func(m *Model) bool { return m.ipsecTunnels.IsLoading() },
 			refreshFor: ViewIPSecTunnels,
 		},
 		{
@@ -182,6 +192,7 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.gpUsers = m.gpUsers.SetLoading(v)
 			},
+			isLoading: func(m *Model) bool { return m.gpUsers.IsLoading() },
 			refreshFor: ViewGPUsers,
 		},
 		{
@@ -194,6 +205,7 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.logs = m.logs.SetLoading(v)
 			},
+			isLoading: func(m *Model) bool { return m.logs.Loading },
 			refreshFor: ViewLogs,
 		},
 		{
@@ -206,6 +218,7 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.objects = m.objects.SetLoading(v)
 			},
+			isLoading: func(m *Model) bool { return m.objects.IsLoading() },
 			refreshFor: ViewObjects,
 		},
 
