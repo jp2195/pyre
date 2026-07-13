@@ -7,6 +7,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jp2195/pyre/internal/models"
@@ -279,9 +280,15 @@ type rulebaseSpec[TEntry, TModel any] struct {
 // rules with hit-count statistics. Hit-count failures are logged warnings,
 // never errors: the rules themselves are still useful without stats.
 func fetchRulebase[TEntry, TModel any](c *Client, ctx context.Context, target string, spec rulebaseSpec[TEntry, TModel]) ([]TModel, error) {
-	pre := fetchRulesFromPaths(c, ctx, rulebasePaths("pre-rulebase", spec.kind), target, spec.parse)
-	local := fetchRulesFromPaths(c, ctx, rulebasePaths("rulebase", spec.kind), target, spec.parse)
-	post := fetchRulesFromPaths(c, ctx, rulebasePaths("post-rulebase", spec.kind), target, spec.parse)
+	// The pre/local/post rulebases are independent requests; fetch them
+	// concurrently so the Policies view isn't blocked on 3 sequential
+	// round trips (each of which may itself try several candidate XPaths).
+	var pre, local, post []TEntry
+	var wg sync.WaitGroup
+	wg.Go(func() { pre = fetchRulesFromPaths(c, ctx, rulebasePaths("pre-rulebase", spec.kind), target, spec.parse) })
+	wg.Go(func() { local = fetchRulesFromPaths(c, ctx, rulebasePaths("rulebase", spec.kind), target, spec.parse) })
+	wg.Go(func() { post = fetchRulesFromPaths(c, ctx, rulebasePaths("post-rulebase", spec.kind), target, spec.parse) })
+	wg.Wait()
 
 	rules := make([]TModel, 0, len(pre)+len(local)+len(post))
 	position := 1
