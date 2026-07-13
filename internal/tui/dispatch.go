@@ -109,7 +109,7 @@ func (m Model) handleAuthMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ManagedDevicesMsg:
 		conn := m.session.GetActiveConnection()
 		if conn != nil && msg.Err == nil {
-			conn.ManagedDevices = msg.Devices
+			conn.SetManagedDevices(msg.Devices)
 			if m.currentView == ViewDashboard && conn.IsPanorama && conn.TargetSerial == "" {
 				m.currentView = ViewDevicePicker
 				m.devicePicker = m.devicePicker.SetDevices(msg.Devices, conn.TargetSerial, conn.Host)

@@ -496,3 +496,19 @@ func TestIsConnectionError(t *testing.T) {
 		})
 	}
 }
+
+func TestConnection_SetManagedDevices(t *testing.T) {
+	conn := &Connection{IsPanorama: true}
+	devices := []models.ManagedDevice{
+		{Serial: "0123456789AB", Hostname: "fw-1", Connected: true},
+		{Serial: "0123456789CD", Hostname: "fw-2"},
+	}
+	conn.SetManagedDevices(devices)
+	if len(conn.ManagedDevices) != 2 {
+		t.Fatalf("expected 2 managed devices, got %d", len(conn.ManagedDevices))
+	}
+	conn.TargetSerial = "0123456789CD"
+	if got := conn.GetTargetDevice(); got == nil || got.Hostname != "fw-2" {
+		t.Fatalf("GetTargetDevice = %+v, want fw-2", got)
+	}
+}

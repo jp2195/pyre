@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"regexp"
@@ -97,7 +96,8 @@ func (s *Session) RemoveConnection(host string) {
 	defer s.mu.Unlock()
 	// Zero credential fields before dropping the reference so the secret
 	// stops being reachable from any surviving *Connection pointer a
-	// caller might still hold. The keychain keeps the persistent copy.
+	// caller might still hold. Credentials are session-only and never
+	// persisted (no keychain, no token cache).
 	if conn, ok := s.Connections[host]; ok {
 		conn.APIKey = ""
 		if conn.Config != nil {
@@ -270,21 +270,11 @@ func (c *Connection) GetTargetDevice() *models.ManagedDevice {
 	return nil
 }
 
-// RefreshManagedDevices fetches the latest list of managed devices from Panorama.
-func (c *Connection) RefreshManagedDevices(ctx context.Context) error {
-	if !c.IsPanorama {
-		return nil
-	}
-
-	// GetManagedDevices intentionally targets Panorama itself regardless of
-	// the connection's current TargetSerial, so no save/restore dance is
-	// required with the stateless client.
-	devices, err := c.Client.GetManagedDevices(ctx)
-	if err != nil {
-		return err
-	}
+// SetManagedDevices replaces the managed-device list. It must only be
+// called from the TUI event loop (like SetTarget), which is what makes
+// concurrent reads from View()/renderHeader safe.
+func (c *Connection) SetManagedDevices(devices []models.ManagedDevice) {
 	c.ManagedDevices = devices
-	return nil
 }
 
 // ConnectedDeviceCount returns the count of connected managed devices.

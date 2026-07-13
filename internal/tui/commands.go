@@ -147,8 +147,10 @@ func (m Model) fetchSystemInfo(conn *auth.Connection) tea.Cmd {
 func (m Model) fetchManagedDevices(conn *auth.Connection) tea.Cmd {
 	ctx := m.ctx
 	return func() tea.Msg {
-		err := conn.RefreshManagedDevices(ctx)
-		return ManagedDevicesMsg{Devices: conn.ManagedDevices, Err: err}
+		// Read-only in this goroutine: the ManagedDevices write happens on
+		// the event loop when ManagedDevicesMsg is handled (see dispatch.go).
+		devices, err := conn.Client.GetManagedDevices(ctx)
+		return ManagedDevicesMsg{Devices: devices, Err: err}
 	}
 }
 
