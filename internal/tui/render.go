@@ -67,12 +67,12 @@ func (m Model) renderHeader() string {
 }
 
 func (m Model) currentViewName() string {
+	if e, ok := detailViews[m.currentView]; ok {
+		return e.name
+	}
 	switch m.currentView {
 	case ViewDashboard:
-		// Use breadcrumb format: Monitor/SubView
 		switch m.currentDashboard {
-		case views.DashboardMain:
-			return "Monitor/Overview"
 		case views.DashboardNetwork:
 			return "Monitor/Network"
 		case views.DashboardSecurity:
@@ -84,22 +84,6 @@ func (m Model) currentViewName() string {
 		default:
 			return "Monitor/Overview"
 		}
-	case ViewPolicies:
-		return "Analyze/Policies"
-	case ViewNATPolicies:
-		return "Analyze/NAT"
-	case ViewSessions:
-		return "Analyze/Sessions"
-	case ViewInterfaces:
-		return "Analyze/Interfaces"
-	case ViewRoutes:
-		return "Analyze/Routes"
-	case ViewIPSecTunnels:
-		return "Analyze/IPSec"
-	case ViewGPUsers:
-		return "Analyze/GP Users"
-	case ViewLogs:
-		return "Analyze/Logs"
 	case ViewPicker:
 		return "Connections"
 	case ViewDevicePicker:

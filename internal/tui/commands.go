@@ -460,40 +460,6 @@ func (m Model) fetchThreatLogs(conn *auth.Connection) tea.Cmd {
 	}
 }
 
-func (m Model) refreshCurrentView() tea.Cmd {
-	switch m.currentView {
-	case ViewDashboard:
-		return m.fetchCurrentDashboardData()
-	case ViewPolicies:
-		return m.fetchPolicies()
-	case ViewNATPolicies:
-		return m.fetchNATPolicies()
-	case ViewSessions:
-		return m.fetchSessions()
-	case ViewInterfaces:
-		conn := m.session.GetActiveConnection()
-		if conn != nil {
-			return tea.Batch(m.fetchInterfaces(), m.fetchARPTable(conn))
-		}
-		return m.fetchInterfaces()
-	case ViewRoutes:
-		return m.fetchRoutesData()
-	case ViewIPSecTunnels:
-		conn := m.session.GetActiveConnection()
-		if conn != nil {
-			return m.fetchIPSecTunnels(conn)
-		}
-	case ViewGPUsers:
-		conn := m.session.GetActiveConnection()
-		if conn != nil {
-			return m.fetchGlobalProtectUsers(conn)
-		}
-	case ViewLogs:
-		return m.fetchLogs()
-	}
-	return nil
-}
-
 // saveConfig marshals on the event loop (so no goroutine ever reads the
 // live Config maps) and only performs file I/O in the background.
 func (m Model) saveConfig() tea.Cmd {

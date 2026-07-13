@@ -407,28 +407,13 @@ func (m Model) handleConnectionFormKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd
 }
 
 func (m Model) handleViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-
-	switch m.currentView {
-	case ViewDashboard:
+	if m.currentView == ViewDashboard {
+		var cmd tea.Cmd
 		m.dashboard, cmd = m.dashboard.Update(msg)
-	case ViewPolicies:
-		m.policies, cmd = m.policies.Update(msg)
-	case ViewNATPolicies:
-		m.natPolicies, cmd = m.natPolicies.Update(msg)
-	case ViewSessions:
-		m.sessions, cmd = m.sessions.Update(msg)
-	case ViewInterfaces:
-		m.interfaces, cmd = m.interfaces.Update(msg)
-	case ViewRoutes:
-		m.routes, cmd = m.routes.Update(msg)
-	case ViewIPSecTunnels:
-		m.ipsecTunnels, cmd = m.ipsecTunnels.Update(msg)
-	case ViewGPUsers:
-		m.gpUsers, cmd = m.gpUsers.Update(msg)
-	case ViewLogs:
-		m.logs, cmd = m.logs.Update(msg)
+		return m, cmd
 	}
-
-	return m, cmd
+	if e, ok := detailViews[m.currentView]; ok {
+		return m, e.update(&m, msg)
+	}
+	return m, nil
 }

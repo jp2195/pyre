@@ -266,7 +266,7 @@ func (m Model) handleNavigationMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case RefreshTickMsg:
-		return m, m.refreshCurrentView()
+		return m.handleRefresh()
 	}
 
 	return m, nil
@@ -298,59 +298,12 @@ func (m Model) handleStatusMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) handleSwitchView(msg SwitchViewMsg) (tea.Model, tea.Cmd) {
 	m.currentView = msg.View
 	m.syncNavbarToCurrentView()
-	switch msg.View {
-	case ViewDashboard:
+	if msg.View == ViewDashboard {
 		return m, m.fetchCurrentDashboardData()
-	case ViewPolicies:
-		if !m.policies.HasData() {
-			m.policies = m.policies.SetLoading(true)
-			return m, m.fetchPolicies()
-		}
-	case ViewNATPolicies:
-		if !m.natPolicies.HasData() {
-			m.natPolicies = m.natPolicies.SetLoading(true)
-			return m, m.fetchNATPolicies()
-		}
-	case ViewSessions:
-		if !m.sessions.HasData() {
-			m.sessions = m.sessions.SetLoading(true)
-			return m, m.fetchSessions()
-		}
-	case ViewInterfaces:
-		if !m.interfaces.HasData() {
-			m.interfaces = m.interfaces.SetLoading(true)
-			conn := m.session.GetActiveConnection()
-			if conn != nil {
-				return m, tea.Batch(m.fetchInterfaces(), m.fetchARPTable(conn))
-			}
-			return m, m.fetchInterfaces()
-		}
-	case ViewRoutes:
-		if !m.routes.HasData() {
-			m.routes = m.routes.SetLoading(true)
-			return m, m.fetchRoutesData()
-		}
-	case ViewIPSecTunnels:
-		if !m.ipsecTunnels.HasData() {
-			m.ipsecTunnels = m.ipsecTunnels.SetLoading(true)
-			conn := m.session.GetActiveConnection()
-			if conn != nil {
-				return m, m.fetchIPSecTunnels(conn)
-			}
-		}
-	case ViewGPUsers:
-		if !m.gpUsers.HasData() {
-			m.gpUsers = m.gpUsers.SetLoading(true)
-			conn := m.session.GetActiveConnection()
-			if conn != nil {
-				return m, m.fetchGlobalProtectUsers(conn)
-			}
-		}
-	case ViewLogs:
-		if !m.logs.HasData() {
-			m.logs = m.logs.SetLoading(true)
-			return m, m.fetchLogs()
-		}
+	}
+	if e, ok := detailViews[msg.View]; ok && !e.hasData(&m) {
+		e.setLoading(&m)
+		return m, e.refresh(&m)
 	}
 	return m, nil
 }

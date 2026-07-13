@@ -204,14 +204,9 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.securityDashboard = m.securityDashboard.SetSize(msg.Width, contentHeight)
 	m.vpnDashboard = m.vpnDashboard.SetSize(msg.Width, contentHeight)
 	m.configDashboard = m.configDashboard.SetSize(msg.Width, contentHeight)
-	m.policies = m.policies.SetSize(msg.Width, contentHeight)
-	m.natPolicies = m.natPolicies.SetSize(msg.Width, contentHeight)
-	m.sessions = m.sessions.SetSize(msg.Width, contentHeight)
-	m.interfaces = m.interfaces.SetSize(msg.Width, contentHeight)
-	m.routes = m.routes.SetSize(msg.Width, contentHeight)
-	m.ipsecTunnels = m.ipsecTunnels.SetSize(msg.Width, contentHeight)
-	m.gpUsers = m.gpUsers.SetSize(msg.Width, contentHeight)
-	m.logs = m.logs.SetSize(msg.Width, contentHeight)
+	for _, vs := range detailViewOrder {
+		detailViews[vs].setSize(&m, msg.Width, contentHeight)
+	}
 	m.picker = m.picker.SetSize(msg.Width, contentHeight)
 	m.devicePicker = m.devicePicker.SetSize(msg.Width, contentHeight)
 	m.commandPalette = m.commandPalette.SetSize(msg.Width, msg.Height)
@@ -328,25 +323,14 @@ func (m Model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 // handleRefresh sets loading state and refreshes the current view.
 func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
-	switch m.currentView {
-	case ViewPolicies:
-		m.policies = m.policies.SetLoading(true)
-	case ViewNATPolicies:
-		m.natPolicies = m.natPolicies.SetLoading(true)
-	case ViewSessions:
-		m.sessions = m.sessions.SetLoading(true)
-	case ViewInterfaces:
-		m.interfaces = m.interfaces.SetLoading(true)
-	case ViewRoutes:
-		m.routes = m.routes.SetLoading(true)
-	case ViewIPSecTunnels:
-		m.ipsecTunnels = m.ipsecTunnels.SetLoading(true)
-	case ViewGPUsers:
-		m.gpUsers = m.gpUsers.SetLoading(true)
-	case ViewLogs:
-		m.logs = m.logs.SetLoading(true)
+	if m.currentView == ViewDashboard {
+		return m, m.fetchCurrentDashboardData()
 	}
-	return m, m.refreshCurrentView()
+	if e, ok := detailViews[m.currentView]; ok {
+		e.setLoading(&m)
+		return m, e.refresh(&m)
+	}
+	return m, nil
 }
 
 // handleSpinnerTick updates the spinner and shares its frame with all views.
@@ -356,14 +340,9 @@ func (m Model) handleSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
 
 	// Share spinner frame with all views
 	frame := m.spinner.View()
-	m.policies = m.policies.SetSpinnerFrame(frame)
-	m.natPolicies = m.natPolicies.SetSpinnerFrame(frame)
-	m.sessions = m.sessions.SetSpinnerFrame(frame)
-	m.interfaces = m.interfaces.SetSpinnerFrame(frame)
-	m.routes = m.routes.SetSpinnerFrame(frame)
-	m.ipsecTunnels = m.ipsecTunnels.SetSpinnerFrame(frame)
-	m.gpUsers = m.gpUsers.SetSpinnerFrame(frame)
-	m.logs = m.logs.SetSpinnerFrame(frame)
+	for _, vs := range detailViewOrder {
+		detailViews[vs].setSpinner(&m, frame)
+	}
 
 	// Share spinner frame with dashboard views
 	m.dashboard = m.dashboard.SetSpinnerFrame(frame)
@@ -429,29 +408,10 @@ func (m Model) renderContent() string {
 			content = m.dashboard.View()
 		}
 
-	case ViewPolicies:
-		content = m.policies.View()
-
-	case ViewNATPolicies:
-		content = m.natPolicies.View()
-
-	case ViewSessions:
-		content = m.sessions.View()
-
-	case ViewInterfaces:
-		content = m.interfaces.View()
-
-	case ViewRoutes:
-		content = m.routes.View()
-
-	case ViewIPSecTunnels:
-		content = m.ipsecTunnels.View()
-
-	case ViewGPUsers:
-		content = m.gpUsers.View()
-
-	case ViewLogs:
-		content = m.logs.View()
+	default:
+		if e, ok := detailViews[m.currentView]; ok {
+			content = e.render(&m)
+		}
 	}
 
 	if m.showHelp {

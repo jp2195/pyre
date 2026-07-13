@@ -48,82 +48,15 @@ var navTargets = map[string]navTarget{
 		fetch:     func(m *Model) tea.Cmd { return m.fetchConfigDashboardData() },
 	},
 
-	// Analyze group (detail views)
-	"policies": {
-		view:    ViewPolicies,
-		hasData: func(m *Model) bool { return m.policies.HasData() },
-		fetch: func(m *Model) tea.Cmd {
-			m.policies = m.policies.SetLoading(true)
-			return m.fetchPolicies()
-		},
-	},
-	"nat": {
-		view:    ViewNATPolicies,
-		hasData: func(m *Model) bool { return m.natPolicies.HasData() },
-		fetch: func(m *Model) tea.Cmd {
-			m.natPolicies = m.natPolicies.SetLoading(true)
-			return m.fetchNATPolicies()
-		},
-	},
-	"sessions": {
-		view:    ViewSessions,
-		hasData: func(m *Model) bool { return m.sessions.HasData() },
-		fetch: func(m *Model) tea.Cmd {
-			m.sessions = m.sessions.SetLoading(true)
-			return m.fetchSessions()
-		},
-	},
-	"interfaces": {
-		view:    ViewInterfaces,
-		hasData: func(m *Model) bool { return m.interfaces.HasData() },
-		fetch: func(m *Model) tea.Cmd {
-			m.interfaces = m.interfaces.SetLoading(true)
-			if conn := m.session.GetActiveConnection(); conn != nil {
-				return tea.Batch(m.fetchInterfaces(), m.fetchARPTable(conn))
-			}
-			return m.fetchInterfaces()
-		},
-	},
-	"routes": {
-		view:    ViewRoutes,
-		hasData: func(m *Model) bool { return m.routes.HasData() },
-		fetch: func(m *Model) tea.Cmd {
-			m.routes = m.routes.SetLoading(true)
-			return m.fetchRoutesData()
-		},
-	},
-	"ipsec": {
-		view:    ViewIPSecTunnels,
-		hasData: func(m *Model) bool { return m.ipsecTunnels.HasData() },
-		fetch: func(m *Model) tea.Cmd {
-			m.ipsecTunnels = m.ipsecTunnels.SetLoading(true)
-			conn := m.session.GetActiveConnection()
-			if conn != nil {
-				return m.fetchIPSecTunnels(conn)
-			}
-			return nil
-		},
-	},
-	"gpusers": {
-		view:    ViewGPUsers,
-		hasData: func(m *Model) bool { return m.gpUsers.HasData() },
-		fetch: func(m *Model) tea.Cmd {
-			m.gpUsers = m.gpUsers.SetLoading(true)
-			conn := m.session.GetActiveConnection()
-			if conn != nil {
-				return m.fetchGlobalProtectUsers(conn)
-			}
-			return nil
-		},
-	},
-	"logs": {
-		view:    ViewLogs,
-		hasData: func(m *Model) bool { return m.logs.HasData() },
-		fetch: func(m *Model) tea.Cmd {
-			m.logs = m.logs.SetLoading(true)
-			return m.fetchLogs()
-		},
-	},
+	// Analyze group (detail views) — all delegate to the view registry.
+	"policies":   detailNavTarget(ViewPolicies),
+	"nat":        detailNavTarget(ViewNATPolicies),
+	"sessions":   detailNavTarget(ViewSessions),
+	"interfaces": detailNavTarget(ViewInterfaces),
+	"routes":     detailNavTarget(ViewRoutes),
+	"ipsec":      detailNavTarget(ViewIPSecTunnels),
+	"gpusers":    detailNavTarget(ViewGPUsers),
+	"logs":       detailNavTarget(ViewLogs),
 }
 
 // navbarMapping maps (view, dashboard) pairs to (group, item) IDs for navbar sync.
