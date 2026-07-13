@@ -45,6 +45,11 @@ func (m IPSecTunnelsModel) SetLoading(loading bool) IPSecTunnelsModel {
 	return m
 }
 
+// IsLoading reports whether a fetch is in flight for this view.
+func (m IPSecTunnelsModel) IsLoading() bool {
+	return m.list.Loading
+}
+
 // SetSpinnerFrame updates the current spinner animation frame.
 func (m IPSecTunnelsModel) SetSpinnerFrame(frame string) IPSecTunnelsModel {
 	m.list.SpinnerFrame = frame

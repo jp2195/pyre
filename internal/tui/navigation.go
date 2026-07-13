@@ -107,6 +107,12 @@ var navDefs = []navGroupDef{
 				hasData: func(m *Model) bool { return m.interfaces.HasData() },
 				fetch: func(m *Model) tea.Cmd {
 					m.interfaces = m.interfaces.SetLoading(true)
+					// Interfaces always fetch the ARP table alongside, matching
+					// the switch-view/refresh paths (avoids showing interfaces
+					// without ARP data when navigating via the navbar).
+					if conn := m.session.GetActiveConnection(); conn != nil {
+						return tea.Batch(m.fetchInterfaces(), m.fetchARPTable(conn))
+					}
 					return m.fetchInterfaces()
 				},
 			}},
@@ -269,7 +275,7 @@ func (m Model) navigateToCurrentItem() (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	if target.fetch != nil && !target.hasData(&m) {
-		cmd = target.fetch(&m)
+		cmd = tea.Batch(target.fetch(&m), m.spinner.Tick)
 	}
 
 	return m, cmd

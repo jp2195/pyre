@@ -111,6 +111,12 @@ func (m ObjectsModel) SetLoading(loading bool) ObjectsModel {
 	return m
 }
 
+// IsLoading reports whether a fetch is in flight for this view. Both sub-tabs
+// share the loading flag (see SetLoading), so either tab answers.
+func (m ObjectsModel) IsLoading() bool {
+	return m.addressTab.Loading
+}
+
 // SetSpinnerFrame propagates spinner frame to both sub-tabs.
 func (m ObjectsModel) SetSpinnerFrame(frame string) ObjectsModel {
 	m.spinnerFrame = frame

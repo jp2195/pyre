@@ -55,6 +55,11 @@ func (m SessionsModel) SetLoading(loading bool) SessionsModel {
 	return m
 }
 
+// IsLoading reports whether a fetch is in flight for this view.
+func (m SessionsModel) IsLoading() bool {
+	return m.list.Loading
+}
+
 // SetSpinnerFrame updates the current spinner animation frame.
 func (m SessionsModel) SetSpinnerFrame(frame string) SessionsModel {
 	m.list.SpinnerFrame = frame

@@ -2,6 +2,7 @@ package views
 
 import (
 	"testing"
+	"unicode/utf8"
 )
 
 func TestTruncate(t *testing.T) {
@@ -41,7 +42,7 @@ func TestTruncateEllipsis(t *testing.T) {
 		{"no truncation needed", "hello", 10, "hello"},
 		{"exact length", "hello", 5, "hello"},
 		{"truncate with unicode ellipsis", "hello world", 8, "hello w…"},
-		{"max 1", "hello", 1, "h"},
+		{"max 1", "hello", 1, "…"},
 		{"empty string", "", 5, ""},
 	}
 
@@ -167,5 +168,53 @@ func TestCleanValue(t *testing.T) {
 				t.Errorf("cleanValue(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestTruncateEllipsisRuneSafe(t *testing.T) {
+	tests := []struct {
+		in     string
+		maxLen int
+		want   string
+	}{
+		{"hello", 10, "hello"},
+		{"hello world", 8, "hello w…"},
+		{"héllö wörld", 8, "héllö w…"}, // multi-byte input must not be split mid-rune
+		{"日本語のテキスト", 4, "日本語…"},
+		{"ab", 1, "…"},
+		{"", 5, ""},
+		{"abc", 0, ""},
+	}
+	for _, tt := range tests {
+		got := truncateEllipsis(tt.in, tt.maxLen)
+		if got != tt.want {
+			t.Errorf("truncateEllipsis(%q, %d) = %q, want %q", tt.in, tt.maxLen, got, tt.want)
+		}
+		if !utf8.ValidString(got) {
+			t.Errorf("truncateEllipsis(%q, %d) produced invalid UTF-8: %q", tt.in, tt.maxLen, got)
+		}
+	}
+}
+
+func TestTruncateRuneSafe(t *testing.T) {
+	tests := []struct {
+		in     string
+		maxLen int
+		want   string
+	}{
+		{"hello", 10, "hello"},
+		{"hello world", 8, "hello..."},
+		{"héllö wörld", 8, "héllö..."},
+		{"abcd", 3, "abc"},
+		{"日本語のテキスト", 3, "日本語"},
+	}
+	for _, tt := range tests {
+		got := truncate(tt.in, tt.maxLen)
+		if got != tt.want {
+			t.Errorf("truncate(%q, %d) = %q, want %q", tt.in, tt.maxLen, got, tt.want)
+		}
+		if !utf8.ValidString(got) {
+			t.Errorf("truncate(%q, %d) produced invalid UTF-8: %q", tt.in, tt.maxLen, got)
+		}
 	}
 }

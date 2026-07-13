@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -702,5 +703,25 @@ func TestConfig_CRUD_NilConnectionsMap(t *testing.T) {
 	c3 := &Config{}
 	if err := c3.DeleteConnection("10.0.0.1"); err == nil {
 		t.Error("expected error from DeleteConnection on nil map")
+	}
+}
+
+func TestConfig_MarshalExcludesCredentials(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Connections["fw1.example.com"] = ConnectionConfig{
+		Username: "admin",
+		APIKey:   "SUPERSECRETKEY",
+		Password: "hunter2",
+	}
+	data, err := cfg.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	s := string(data)
+	if strings.Contains(s, "SUPERSECRETKEY") || strings.Contains(s, "hunter2") {
+		t.Fatalf("marshaled config leaked credentials:\n%s", s)
+	}
+	if !strings.Contains(s, "admin") {
+		t.Fatalf("marshaled config missing username:\n%s", s)
 	}
 }

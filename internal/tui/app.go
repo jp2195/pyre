@@ -331,11 +331,45 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			s.loading(&m, true)
 		}
 	}
-	return m, m.refreshCurrentView()
+	return m, tea.Batch(m.refreshCurrentView(), m.spinner.Tick)
+}
+
+// anyLoading reports whether any visible work is in flight — the condition
+// under which the spinner tick chain must keep running.
+func (m Model) anyLoading() bool {
+	if m.loading {
+		return true
+	}
+	for _, s := range viewSlots() {
+		if s.isLoading != nil && s.isLoading(&m) {
+			return true
+		}
+	}
+	// Dashboards signal loading via nil data rather than a flag.
+	if m.currentView == ViewDashboard {
+		switch m.currentDashboard {
+		case views.DashboardNetwork:
+			return !m.networkDashboard.HasData()
+		case views.DashboardSecurity:
+			return !m.securityDashboard.HasData()
+		case views.DashboardVPN:
+			return !m.vpnDashboard.HasData()
+		case views.DashboardConfig:
+			return !m.configDashboard.HasData()
+		default:
+			return !m.dashboard.HasData()
+		}
+	}
+	return false
 }
 
 // handleSpinnerTick updates the spinner and shares its frame with all views via viewSlots.
 func (m Model) handleSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
+	if !m.anyLoading() {
+		// Drop the tick chain; it restarts wherever a fetch is dispatched.
+		return m, nil
+	}
+
 	var cmd tea.Cmd
 	m.spinner, cmd = m.spinner.Update(msg)
 

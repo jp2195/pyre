@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"log"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/auth"
@@ -39,6 +41,9 @@ func (m Model) handleDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.fetchSessionDetail(msg.SessionID)
 
 	default:
+		// A message type not registered above would otherwise vanish
+		// silently and look like "the fetch never returned".
+		log.Printf("[TUI Warning] unhandled message type %T", msg)
 		return m, nil
 	}
 }
@@ -91,7 +96,7 @@ func (m Model) handleAuthMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.selectedConnection = ""
 		m.selectedConnectionConfig = config.ConnectionConfig{}
-		cmds = append(cmds, m.fetchCurrentDashboardData(), m.detectPanorama(conn))
+		cmds = append(cmds, m.fetchCurrentDashboardData(), m.detectPanorama(conn), m.spinner.Tick)
 
 	case LoginErrorMsg:
 		m.loading = false
@@ -102,7 +107,7 @@ func (m Model) handleAuthMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if conn != nil {
 			conn.SetPanoramaInfo(msg.IsPanorama)
 			if msg.IsPanorama {
-				cmds = append(cmds, m.fetchManagedDevices(conn))
+				cmds = append(cmds, m.fetchManagedDevices(conn), m.spinner.Tick)
 			}
 		}
 
@@ -215,13 +220,16 @@ func (m Model) handleViewDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) handleNavigationMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case SwitchViewMsg:
-		return m.handleSwitchView(msg)
+		// Restart the spinner tick alongside any fetch handleSwitchView
+		// dispatches; the tick self-stops next cycle if nothing is loading.
+		nm, cmd := m.handleSwitchView(msg)
+		return nm, tea.Batch(cmd, m.spinner.Tick)
 
 	case SwitchDashboardMsg:
 		m.currentDashboard = msg.Dashboard
 		m.currentView = ViewDashboard
 		m.syncNavbarToCurrentView()
-		return m, m.fetchCurrentDashboardData()
+		return m, tea.Batch(m.fetchCurrentDashboardData(), m.spinner.Tick)
 
 	case ShowPickerMsg:
 		m.currentView = ViewPicker
@@ -262,7 +270,7 @@ func (m Model) handleNavigationMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case RefreshTickMsg:
-		return m, m.refreshCurrentView()
+		return m, tea.Batch(m.refreshCurrentView(), m.spinner.Tick)
 	}
 
 	return m, nil

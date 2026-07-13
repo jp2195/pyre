@@ -1,14 +1,11 @@
 package views
 
 import (
-	"cmp"
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 	"github.com/jp2195/pyre/internal/tui/theme"
@@ -18,8 +15,9 @@ import (
 type SecurityDashboardModel struct {
 	DashboardBase
 
-	threatSummary *models.ThreatSummary
-	policies      []models.SecurityRule
+	threatSummary  *models.ThreatSummary
+	policies       []models.SecurityRule
+	policiesByHits []models.SecurityRule
 
 	threatErr error
 	policyErr error
@@ -54,6 +52,11 @@ func (m SecurityDashboardModel) SetThreatSummary(summary *models.ThreatSummary, 
 func (m SecurityDashboardModel) SetPolicies(policies []models.SecurityRule, err error) SecurityDashboardModel {
 	m.policies = policies
 	m.policyErr = err
+	if policies == nil {
+		m.policiesByHits = nil
+	} else {
+		m.policiesByHits = sortPoliciesByHits(policies)
+	}
 	return m
 }
 
@@ -223,148 +226,9 @@ func (m SecurityDashboardModel) renderThreatSeverity(width int) string {
 }
 
 func (m SecurityDashboardModel) renderZeroHitRules(width int) string {
-	var b strings.Builder
-	b.WriteString(titleStyle().Render("Zero-Hit Rules"))
-	b.WriteString("\n")
-
-	if m.policyErr != nil {
-		b.WriteString(dimStyle().Render("Not available"))
-		return panelStyle().Width(width).Render(b.String())
-	}
-	if m.policies == nil {
-		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
-		return panelStyle().Width(width).Render(b.String())
-	}
-
-	// Find rules with zero hits
-	var zeroHitRules []models.SecurityRule
-	for _, rule := range m.policies {
-		if rule.HitCount == 0 && !rule.Disabled {
-			zeroHitRules = append(zeroHitRules, rule)
-		}
-	}
-
-	if len(zeroHitRules) == 0 {
-		b.WriteString(highlightStyle().Render("All active rules have hits"))
-		return panelStyle().Width(width).Render(b.String())
-	}
-
-	// Summary
-	totalActive := 0
-	for _, rule := range m.policies {
-		if !rule.Disabled {
-			totalActive++
-		}
-	}
-
-	pct := float64(len(zeroHitRules)) / float64(totalActive) * 100
-	b.WriteString(warningStyle().Render(strconv.Itoa(len(zeroHitRules))))
-	b.WriteString(dimStyle().Render(fmt.Sprintf(" of %d rules (%.0f%%)", totalActive, pct)))
-	b.WriteString("\n\n")
-
-	// List first few zero-hit rules
-	maxShow := min(len(zeroHitRules), 6)
-
-	nameWidth := min(width-12, 30)
-
-	for i := range maxShow {
-		rule := zeroHitRules[i]
-		name := truncateEllipsis(rule.Name, nameWidth)
-
-		var actionStyle lipgloss.Style
-		switch rule.Action {
-		case "allow":
-			actionStyle = highlightStyle()
-		case "deny", "drop":
-			actionStyle = errorStyle()
-		default:
-			actionStyle = dimStyle()
-		}
-
-		b.WriteString(labelStyle().Render(fmt.Sprintf("%3d. ", rule.Position)))
-		b.WriteString(valueStyle().Render(fmt.Sprintf("%-*s ", nameWidth, name)))
-		b.WriteString(actionStyle.Render(rule.Action))
-		if i < maxShow-1 {
-			b.WriteString("\n")
-		}
-	}
-
-	if len(zeroHitRules) > maxShow {
-		b.WriteString("\n")
-		b.WriteString(dimStyle().Render(fmt.Sprintf("... and %d more", len(zeroHitRules)-maxShow)))
-	}
-
-	return panelStyle().Width(width).Render(b.String())
+	return renderZeroHitRulesPanel(m.policies, m.policyErr, m.SpinnerFrame, width, 6, 12)
 }
 
 func (m SecurityDashboardModel) renderMostHitRules(width int) string {
-	var b strings.Builder
-	b.WriteString(titleStyle().Render("Most-Hit Rules"))
-	b.WriteString("\n")
-
-	if m.policyErr != nil {
-		b.WriteString(dimStyle().Render("Not available"))
-		return panelStyle().Width(width).Render(b.String())
-	}
-	if m.policies == nil {
-		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
-		return panelStyle().Width(width).Render(b.String())
-	}
-
-	if len(m.policies) == 0 {
-		b.WriteString(dimStyle().Render("No rules"))
-		return panelStyle().Width(width).Render(b.String())
-	}
-
-	// Sort by hit count (descending)
-	sorted := make([]models.SecurityRule, len(m.policies))
-	copy(sorted, m.policies)
-	slices.SortFunc(sorted, func(a, b models.SecurityRule) int {
-		return cmp.Compare(b.HitCount, a.HitCount)
-	})
-
-	// Show top rules with hits
-	maxShow := 8
-	shown := 0
-	totalWithHits := 0
-	nameWidth := min(width-20, 25)
-
-	for _, rule := range sorted {
-		if rule.HitCount == 0 {
-			continue
-		}
-		totalWithHits++
-		if shown >= maxShow {
-			continue
-		}
-
-		name := truncateEllipsis(rule.Name, nameWidth)
-
-		var actionStyle lipgloss.Style
-		switch rule.Action {
-		case "allow":
-			actionStyle = highlightStyle()
-		case "deny", "drop":
-			actionStyle = errorStyle()
-		default:
-			actionStyle = dimStyle()
-		}
-
-		b.WriteString(valueStyle().Render(fmt.Sprintf("%-*s ", nameWidth, name)))
-		b.WriteString(actionStyle.Render(fmt.Sprintf("%-5s ", rule.Action)))
-		b.WriteString(accentStyle().Render(formatNumberWithCommas(rule.HitCount)))
-		b.WriteString("\n")
-		shown++
-	}
-
-	if shown == 0 {
-		b.WriteString(dimStyle().Render("No rules have been hit"))
-	}
-
-	result := strings.TrimSuffix(b.String(), "\n")
-	if totalWithHits > maxShow {
-		result += "\n" + dimStyle().Render(fmt.Sprintf("... and %d more rules", totalWithHits-maxShow))
-	}
-
-	return panelStyle().Width(width).Render(result)
+	return renderMostHitRulesPanel(m.policiesByHits, m.policyErr, m.SpinnerFrame, width, 8)
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/jp2195/pyre/internal/api"
 	"github.com/jp2195/pyre/internal/auth"
+	"github.com/jp2195/pyre/internal/config"
 	"github.com/jp2195/pyre/internal/models"
 	"github.com/jp2195/pyre/internal/tui/views"
 )
@@ -527,19 +528,26 @@ func (m Model) refreshCurrentView() tea.Cmd {
 	return nil
 }
 
+// saveConfig marshals on the event loop (so no goroutine ever reads the
+// live Config maps) and only performs file I/O in the background.
 func (m Model) saveConfig() tea.Cmd {
-	cfg := m.config
+	data, err := m.config.Marshal()
+	if err != nil {
+		return func() tea.Msg { return ConfigSavedMsg{Err: err} }
+	}
 	return func() tea.Msg {
-		err := cfg.Save()
-		return ConfigSavedMsg{Err: err}
+		return ConfigSavedMsg{Err: config.WriteConfigBytes(data)}
 	}
 }
 
+// saveState follows the same marshal-on-loop / write-in-background split.
 func (m Model) saveState() tea.Cmd {
-	state := m.state
+	data, err := m.state.Marshal()
+	if err != nil {
+		return func() tea.Msg { return StateSavedMsg{Err: err} }
+	}
 	return func() tea.Msg {
-		err := state.Save()
-		return StateSavedMsg{Err: err}
+		return StateSavedMsg{Err: config.WriteStateBytes(data)}
 	}
 }
 
