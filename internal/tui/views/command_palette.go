@@ -1,6 +1,7 @@
 package views
 
 import (
+	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
@@ -335,23 +336,7 @@ func (m CommandPaletteModel) renderCommandList(b *strings.Builder, modalWidth in
 			Align(lipgloss.Right).
 			Width(modalWidth - 4).
 			Render(strings.Repeat(" ", modalWidth-20) +
-				"(" + itoa(m.cursor+1) + "/" + itoa(len(m.filtered)) + ")")
+				"(" + strconv.Itoa(m.cursor+1) + "/" + strconv.Itoa(len(m.filtered)) + ")")
 		b.WriteString(scrollInfo + "\n")
 	}
-}
-
-// Helper function to convert int to string without importing strconv
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	if n < 0 {
-		return "-" + itoa(-n)
-	}
-	var digits []byte
-	for n > 0 {
-		digits = append([]byte{byte('0' + n%10)}, digits...)
-		n /= 10
-	}
-	return string(digits)
 }
