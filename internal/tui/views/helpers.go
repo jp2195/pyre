@@ -8,26 +8,31 @@ import (
 	"github.com/jp2195/pyre/internal/auth"
 )
 
-// truncate truncates a string to maxLen, adding ... if needed
+// truncate truncates a string to maxLen runes, adding ... if needed.
 func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
+	if maxLen <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
 	if maxLen <= 3 {
-		return s[:maxLen]
+		return string(runes[:maxLen])
 	}
-	return s[:maxLen-3] + "..."
+	return string(runes[:maxLen-3]) + "..."
 }
 
-// truncateEllipsis truncates with Unicode ellipsis
+// truncateEllipsis truncates to maxLen runes with a Unicode ellipsis.
 func truncateEllipsis(s string, maxLen int) string {
-	if len(s) <= maxLen {
+	if maxLen <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
-	if maxLen <= 1 {
-		return s[:maxLen]
-	}
-	return s[:maxLen-1] + "…"
+	return string(runes[:maxLen-1]) + "…"
 }
 
 // formatNumberWithCommas formats a number with thousand separators
