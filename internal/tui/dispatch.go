@@ -31,7 +31,7 @@ func (m Model) handleDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case DashboardSelectedMsg, SwitchViewMsg, SwitchDashboardMsg,
 		ShowPickerMsg, ShowConnectionHubMsg, ShowConnectionFormMsg,
 		ConnectionSelectedMsg, ConnectionFormSubmitMsg,
-		ConnectionDeletedMsg, RefreshMsg, ShowHelpMsg, RefreshTickMsg:
+		ConnectionDeletedMsg, RefreshMsg, ShowHelpMsg:
 		return m.handleNavigationMsg(msg)
 
 	case ConfigSavedMsg, StateSavedMsg, ErrorMsg, ErrorDismissMsg:
@@ -264,9 +264,6 @@ func (m Model) handleNavigationMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ShowHelpMsg:
 		m.showHelp = !m.showHelp
 		return m, nil
-
-	case RefreshTickMsg:
-		return m.handleRefresh()
 	}
 
 	return m, nil

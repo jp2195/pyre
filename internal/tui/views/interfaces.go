@@ -162,10 +162,6 @@ func (m InterfacesModel) visibleRows() int {
 	return rows
 }
 
-func (m InterfacesModel) Init() tea.Cmd {
-	return nil
-}
-
 func (m InterfacesModel) Update(msg tea.Msg) (InterfacesModel, tea.Cmd) {
 	if m.FilterMode {
 		return m.updateFilterMode(msg)
