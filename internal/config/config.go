@@ -101,15 +101,24 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-// configForSave represents the format we write to disk (new format only)
-type configForSave struct {
-	Default     string                      `yaml:"default,omitempty"`
-	Connections map[string]ConnectionConfig `yaml:"connections,omitempty"`
-	Settings    Settings                    `yaml:"settings"`
+// Marshal returns the YAML representation Save writes to disk. Credential
+// fields never appear because ConnectionConfig tags them `yaml:"-"`
+// (regression-guarded by TestConfig_DoesNotPersistCredentials).
+//
+// Marshal must be called from the TUI event loop; the returned bytes are
+// safe to hand to a background writer (see WriteConfigBytes).
+func (c *Config) Marshal() ([]byte, error) {
+	data, err := yaml.Marshal(c)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal config: %w", err)
+	}
+	return data, nil
 }
 
-// Save writes the config to ~/.pyre.yaml, creating a backup first
-func (c *Config) Save() error {
+// WriteConfigBytes writes pre-marshaled config data to ~/.pyre.yaml,
+// creating a .bak backup of the previous file first. Safe to call from a
+// background goroutine because it touches no shared in-memory state.
+func WriteConfigBytes(data []byte) error {
 	configPath, err := ConfigPath()
 	if err != nil {
 		return err
@@ -118,33 +127,29 @@ func (c *Config) Save() error {
 	// Create backup if file exists
 	if _, statErr := os.Stat(configPath); statErr == nil {
 		backupPath := configPath + ".bak"
-		data, readErr := os.ReadFile(configPath) // #nosec G304 -- Path is constructed from user's home directory
+		prev, readErr := os.ReadFile(configPath) // #nosec G304 -- Path is constructed from user's home directory
 		if readErr == nil {
 			// #nosec G703 -- backupPath is configPath + ".bak"; configPath
 			// comes from os.UserHomeDir (not user-controlled at this layer)
-			if writeErr := os.WriteFile(backupPath, data, 0600); writeErr != nil {
+			if writeErr := os.WriteFile(backupPath, prev, 0600); writeErr != nil {
 				return fmt.Errorf("failed to create backup: %w", writeErr)
 			}
 		}
 	}
 
-	// Write new format only
-	saveConfig := configForSave{
-		Default:     c.Default,
-		Connections: c.Connections,
-		Settings:    c.Settings,
-	}
-
-	data, err := yaml.Marshal(saveConfig)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-
 	if err := atomicWriteFile(configPath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
-
 	return nil
+}
+
+// Save writes the config to ~/.pyre.yaml, creating a backup first.
+func (c *Config) Save() error {
+	data, err := c.Marshal()
+	if err != nil {
+		return err
+	}
+	return WriteConfigBytes(data)
 }
 
 // atomicWriteFile writes data to a file atomically by writing to a temp file

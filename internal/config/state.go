@@ -60,29 +60,42 @@ func LoadState() (*State, error) {
 	return state, nil
 }
 
-// Save writes the state to disk
-func (s *State) Save() error {
+// Marshal returns the JSON representation Save writes to disk. Must be
+// called from the TUI event loop (see Config.Marshal).
+func (s *State) Marshal() ([]byte, error) {
+	data, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal state: %w", err)
+	}
+	return data, nil
+}
+
+// WriteStateBytes writes pre-marshaled state data to ~/.pyre/state.json.
+// Safe to call from a background goroutine.
+func WriteStateBytes(data []byte) error {
 	statePath, err := StatePath()
 	if err != nil {
 		return err
 	}
 
-	// Ensure directory exists
 	dir := filepath.Dir(statePath)
 	if mkdirErr := os.MkdirAll(dir, 0700); mkdirErr != nil {
 		return fmt.Errorf("failed to create state directory: %w", mkdirErr)
 	}
 
-	data, err := json.MarshalIndent(s, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal state: %w", err)
-	}
-
 	if err := atomicWriteFile(statePath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write state file: %w", err)
 	}
-
 	return nil
+}
+
+// Save writes the state to disk.
+func (s *State) Save() error {
+	data, err := s.Marshal()
+	if err != nil {
+		return err
+	}
+	return WriteStateBytes(data)
 }
 
 // UpdateConnection updates the state for a connection after a successful connection
