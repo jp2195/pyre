@@ -332,7 +332,7 @@ func (m RoutesModel) renderRoutesTab() string {
 		return RenderLoadingInline(m.SpinnerFrame, "Loading routes...")
 	}
 	if m.routeErr != nil {
-		return lipgloss.NewStyle().Foreground(c.Error).Render("Error: " + m.routeErr.Error())
+		return ErrorMsgStyle.Render("Error: " + m.routeErr.Error())
 	}
 	if m.routes == nil {
 		return RenderLoadingInline(m.SpinnerFrame, "Loading routes...")

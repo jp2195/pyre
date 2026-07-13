@@ -115,9 +115,9 @@ func (m LogsModel) SetThreatLogs(logs []models.ThreatLogEntry, err error) LogsMo
 	return m
 }
 
+// SetError sets an error state.
 func (m LogsModel) SetError(err error) LogsModel {
-	m.Err = err
-	m.Loading = false
+	m.TableBase = m.TableBase.SetError(err)
 	return m
 }
 
