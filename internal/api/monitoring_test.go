@@ -80,3 +80,45 @@ func TestGetDiskUsage_SanitizesFields(t *testing.T) {
 		}
 	}
 }
+
+// TestGetDiskUsage_CDATAWrapped reproduces what a real PA-440 returns:
+// `show system disk-space` output arrives inside a CDATA section. Result.Inner
+// is raw innerxml, so the literal "<![CDATA[" marker is glued to the first
+// line and defeats the "Filesystem" header check — which used to surface a
+// bogus filesystem named "Mounted" at 0% on the dashboard.
+func TestGetDiskUsage_CDATAWrapped(t *testing.T) {
+	rawDF := "Filesystem      Size  Used Avail Use% Mounted on\n" +
+		"/dev/mmcblk0p3   21G  5.6G   14G  29% /\n" +
+		"/dev/mmcblk0p5   32G   13G   18G  41% /opt/pancfg\n" +
+		"tmpfs           7.7G  3.7G  4.1G  48% /dev/shm\n"
+
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		fmt.Fprintf(w, `<response status="success"><result><![CDATA[%s]]></result></response>`, rawDF)
+	})
+
+	got, err := c.GetDiskUsage(context.Background(), "")
+	if err != nil {
+		t.Fatalf("GetDiskUsage err: %v", err)
+	}
+
+	if len(got) != 3 {
+		t.Errorf("expected 3 filesystems, got %d: %+v", len(got), got)
+	}
+	for _, du := range got {
+		if du.MountPoint == "Mounted" || strings.Contains(du.Filesystem, "CDATA") {
+			t.Errorf("header row leaked in as data: %+v", du)
+		}
+	}
+	if len(got) > 0 {
+		if got[0].MountPoint != "/" {
+			t.Errorf("first mount point = %q, want %q", got[0].MountPoint, "/")
+		}
+		if got[0].Percent != 29 {
+			t.Errorf("first percent = %v, want 29", got[0].Percent)
+		}
+		if got[0].Filesystem != "/dev/mmcblk0p3" {
+			t.Errorf("first filesystem = %q, want %q", got[0].Filesystem, "/dev/mmcblk0p3")
+		}
+	}
+}

@@ -14,8 +14,13 @@ import (
 )
 
 func (c *Client) GetThreatSummary(ctx context.Context, target string) (*models.ThreatSummary, error) {
-	// Query threat logs for the last hour to get a summary
-	resp, err := c.Op(ctx, "<show><counter><global><name>flow_threat_*</name></global></counter></show>", target)
+	// Fetch the global counters and filter for threat-related ones below.
+	//
+	// This used to pass <name>flow_threat_*</name>, but `show counter global`
+	// has no wildcard <name> filter — PAN-OS 11.2 rejects it outright
+	// ("An error occurred. See dagger.log"), so the threat panels on the
+	// Security dashboard could never populate on a real firewall.
+	resp, err := c.Op(ctx, "<show><counter><global></global></counter></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -198,11 +203,14 @@ func (c *Client) GetDiskUsage(ctx context.Context, target string) ([]models.Disk
 		return nil, err
 	}
 
-	// The response is typically plain text output from 'df -h'
-	output := string(resp.Result.Inner)
+	// The response is plain text output from 'df -h', CDATA-wrapped on real
+	// hardware — decode it as text so the header check below actually fires.
+	output := InnerText(resp.Result.Inner)
 	lines := strings.Split(output, "\n")
 
-	var disks []models.DiskUsage
+	// Non-nil even when empty: the dashboard treats a nil slice as
+	// "still fetching", which would spin its loading indicator forever.
+	disks := []models.DiskUsage{}
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "Filesystem") {
@@ -260,7 +268,8 @@ func (c *Client) GetEnvironmentals(ctx context.Context, target string) ([]models
 
 	// Use a flexible structure that captures slot elements with any name
 	// PAN-OS uses both <slot> and <Slot1>, <Slot2>, etc. depending on model
-	var envs []models.Environmental
+	// Non-nil even when empty — see the note in GetDiskUsage.
+	envs := []models.Environmental{}
 
 	// Parse power section
 	type powerSection struct {

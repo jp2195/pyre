@@ -307,3 +307,80 @@ func TestPollLogJob_RespectsContextCancellation(t *testing.T) {
 		t.Errorf("cancellation took %v, expected <3s", elapsed)
 	}
 }
+
+// TestGetThreatLogs_PANOS11NamedThreatID reproduces a live PA-440 on PAN-OS
+// 11.2: <threatid> carries the threat *name* ("Proxy:mask.apple-dns.net") and
+// the numeric id moved to <tid>. Decoding threatid as int64 failed the whole
+// batch with `strconv.ParseInt: parsing "Proxy:mask.apple-dns.net"`, so the
+// Threat tab showed 0 entries and an error.
+func TestGetThreatLogs_PANOS11NamedThreatID(t *testing.T) {
+	var calls atomic.Int32
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch calls.Add(1) {
+		case 1:
+			fmt.Fprint(w, `<response status="success"><result><job>4</job></result></response>`)
+		default:
+			fmt.Fprint(w, `<response status="success"><result><log><logs><entry>`+
+				`<time_generated>2025/11/15 09:25:42</time_generated>`+
+				`<type>THREAT</type><subtype>spyware</subtype>`+
+				`<src>10.0.40.15</src><dst>1.1.1.1</dst>`+
+				`<sport>37847</sport><dport>53</dport>`+
+				`<app>dns-base</app><action>sinkhole</action>`+
+				`<threatid>Proxy:mask.apple-dns.net</threatid>`+
+				`<tid>109010004</tid>`+
+				`<severity>low</severity>`+
+				`<misc>north-america-mask.wrr.mask.apple-dns.net</misc>`+
+				`</entry></logs></log><job><status>FIN</status></job></result></response>`)
+		}
+	})
+
+	logs, err := c.GetThreatLogs(context.Background(), "", 10, "")
+	if err != nil {
+		t.Fatalf("GetThreatLogs: %v", err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("expected 1 log entry, got %d", len(logs))
+	}
+	if logs[0].ThreatName != "Proxy:mask.apple-dns.net" {
+		t.Errorf("ThreatName = %q, want %q", logs[0].ThreatName, "Proxy:mask.apple-dns.net")
+	}
+	if logs[0].ThreatID != 109010004 {
+		t.Errorf("ThreatID = %d, want 109010004", logs[0].ThreatID)
+	}
+	if logs[0].Severity != "low" {
+		t.Errorf("Severity = %q, want %q", logs[0].Severity, "low")
+	}
+}
+
+// TestGetThreatLogs_LegacyNumericThreatID keeps the pre-11.x shape working:
+// numeric <threatid> with the name in <threat>.
+func TestGetThreatLogs_LegacyNumericThreatID(t *testing.T) {
+	var calls atomic.Int32
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch calls.Add(1) {
+		case 1:
+			fmt.Fprint(w, `<response status="success"><result><job>1</job></result></response>`)
+		default:
+			fmt.Fprint(w, `<response status="success"><result><log><logs><entry>`+
+				`<time_generated>2026/06/12 12:00:00</time_generated>`+
+				`<type>threat</type><subtype>vulnerability</subtype>`+
+				`<threatid>30003</threatid><threat>Trojan.GenericKD</threat>`+
+				`<src>10.0.0.1</src><dst>10.0.0.2</dst>`+
+				`</entry></logs></log><job><status>FIN</status></job></result></response>`)
+		}
+	})
+
+	logs, err := c.GetThreatLogs(context.Background(), "", 10, "")
+	if err != nil {
+		t.Fatalf("GetThreatLogs: %v", err)
+	}
+	if len(logs) != 1 {
+		t.Fatalf("expected 1 log entry, got %d", len(logs))
+	}
+	if logs[0].ThreatID != 30003 {
+		t.Errorf("ThreatID = %d, want 30003", logs[0].ThreatID)
+	}
+	if logs[0].ThreatName != "Trojan.GenericKD" {
+		t.Errorf("ThreatName = %q, want %q", logs[0].ThreatName, "Trojan.GenericKD")
+	}
+}

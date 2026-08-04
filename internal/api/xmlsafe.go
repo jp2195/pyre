@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -46,6 +47,29 @@ func decodeXML(r io.Reader, v any) error {
 // the same hardening: XML directives (DOCTYPE) are rejected.
 func DecodeXML(r io.Reader, v any) error {
 	return decodeXML(r, v)
+}
+
+// InnerText decodes raw innerxml (Result.Inner) as plain text, unwrapping
+// CDATA sections and resolving XML entities.
+//
+// PAN-OS returns free-form command output — `show system disk-space` (df),
+// `show system resources` (top) — wrapped in CDATA. Because Result.Inner is
+// captured with `xml:",innerxml"` it holds the *raw* bytes, so the literal
+// "<![CDATA[" marker is still glued to the first line. Treating those bytes
+// as text makes the first line unrecognizable to header checks. Always route
+// free-form op output through this instead of string(resp.Result.Inner).
+//
+// Decoding goes through decodeXML, so the same DOCTYPE/entity hardening
+// applies. On a decode failure the raw bytes are returned so a malformed
+// response degrades to the previous behavior rather than losing all output.
+func InnerText(inner []byte) string {
+	var v struct {
+		Data string `xml:",chardata"`
+	}
+	if err := decodeXML(bytes.NewReader(WrapInner(inner)), &v); err != nil {
+		return string(inner)
+	}
+	return v.Data
 }
 
 func truncate(s string, n int) string {
