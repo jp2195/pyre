@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.3](https://github.com/jp2195/pyre/compare/v1.5.2...v1.5.3) (2026-08-04)
+
+
+### Bug Fixes
+
+* **deps:** update module charm.land/lipgloss/v2 to v2.0.5 ([#45](https://github.com/jp2195/pyre/issues/45)) ([4b6e393](https://github.com/jp2195/pyre/commit/4b6e393cdd2e2259696494cbd2ee2ccb214c381b))
+* **deps:** update module go.yaml.in/yaml/v4 to v4.0.0-rc.6 ([#42](https://github.com/jp2195/pyre/issues/42)) ([3dffc59](https://github.com/jp2195/pyre/commit/3dffc59e8993dc5087c2f8f5b964d2fa2f81d2b4))
+
 ## [1.5.2](https://github.com/jp2195/pyre/compare/v1.5.1...v1.5.2) (2026-06-13)
 
 
