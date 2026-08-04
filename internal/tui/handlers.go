@@ -458,15 +458,25 @@ func (m Model) currentViewFiltering() bool {
 }
 
 func (m Model) handleViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	// Scrolling applies to whichever dashboard is on screen, so it is handled
+	// before the (Overview-only) Update in updateCurrentView.
+	if m.currentView == ViewDashboard {
+		if delta, ok := m.dashboardScrollDelta(msg); ok {
+			return m.scrollActiveDashboard(delta), nil
+		}
+	}
+
+	return m.updateCurrentView(msg)
+}
+
+// updateCurrentView forwards a message to the active view's Update. Split out
+// of handleViewKeys so non-key messages (bracketed paste) can reach the same
+// views without being retyped as key presses.
+func (m Model) updateCurrentView(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch m.currentView {
 	case ViewDashboard:
-		// Scrolling applies to whichever dashboard is on screen, so it is
-		// handled before the (Overview-only) Update below.
-		if delta, ok := m.dashboardScrollDelta(msg); ok {
-			return m.scrollActiveDashboard(delta), nil
-		}
 		m.dashboard, cmd = m.dashboard.Update(msg)
 	case ViewPolicies:
 		m.policies, cmd = m.policies.Update(msg)
@@ -489,4 +499,41 @@ func (m Model) handleViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, cmd
+}
+
+// handlePasteMsg routes bracketed-paste content to whichever text input is
+// focused.
+//
+// Paste was previously unhandled entirely: the top-level Update matched only
+// KeyPressMsg, so tea.PasteMsg fell through to handleDataMsg and was logged as
+// an unhandled message and dropped. Nothing in the app accepted pasted text —
+// most painfully the login form, where users could not paste a password.
+//
+// bubbles' textinput already handles tea.PasteMsg, so forwarding is enough.
+func (m Model) handlePasteMsg(msg tea.PasteMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	switch m.currentView {
+	case ViewLogin:
+		// Fields are frozen while a keygen is in flight; see handleLoginKeys.
+		if m.login.Submitting() {
+			return m, nil
+		}
+		m.login, cmd = m.login.Update(msg)
+		return m, cmd
+	case ViewConnectionForm:
+		m.connectionForm, cmd = m.connectionForm.Update(msg)
+		return m, cmd
+	case ViewCommandPalette:
+		m.commandPalette, cmd = m.commandPalette.Update(msg)
+		return m, cmd
+	}
+
+	// Table views accept paste only while their filter input is focused —
+	// otherwise pasted text would be read as a burst of navigation keys.
+	if m.currentViewFiltering() {
+		return m.updateCurrentView(msg)
+	}
+
+	return m, nil
 }

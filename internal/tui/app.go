@@ -181,6 +181,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleWindowSize(msg)
 	case tea.KeyPressMsg:
 		return m.handleKeyMsg(msg)
+	case tea.PasteMsg:
+		return m.handlePasteMsg(msg)
+	case tea.PasteStartMsg, tea.PasteEndMsg:
+		// Bracketing markers around a PasteMsg; nothing to do, but match them
+		// so they don't reach handleDataMsg's unhandled-message warning.
+		return m, nil
 	case spinner.TickMsg:
 		return m.handleSpinnerTick(msg)
 	default:
