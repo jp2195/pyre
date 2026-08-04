@@ -338,7 +338,7 @@ func TestSplitSectionsIntoColumns_KeepsSectionsIntact(t *testing.T) {
 
 	left, right := splitSectionsIntoColumns(sections)
 
-	var rebuilt [][]string
+	rebuilt := make([][]string, 0, len(left)+len(right))
 	rebuilt = append(rebuilt, left...)
 	rebuilt = append(rebuilt, right...)
 	if len(rebuilt) != len(sections) {
