@@ -2,6 +2,7 @@ package views
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -230,3 +231,53 @@ func TestLoginModel_Focus(t *testing.T) {
 		t.Error("expected password input to be focused after second NextField")
 	}
 }
+
+// TestLoginView_GeometryIsStableAcrossStates pins that the centered login box
+// keeps identical dimensions whether it is idle, authenticating, or showing an
+// error. The status text used to be rendered inline, so pressing Enter grew
+// the box (the in-flight warning was the widest line in the form) and
+// lipgloss.Place re-centered it — the whole form visibly jumped sideways and
+// up at the exact moment the user was watching for feedback.
+func TestLoginView_GeometryIsStableAcrossStates(t *testing.T) {
+	InitStyles()
+
+	build := func() LoginModel {
+		m := NewLoginModel(&auth.Credentials{Host: "fw.example.com", Username: "admin"})
+		return m.SetSize(120, 40)
+	}
+
+	// View() returns a full-terminal canvas via lipgloss.Place, so measure the
+	// bordered box inside it: its left edge and its extent.
+	dims := func(view string) (left, w, h int) {
+		left = 1 << 30
+		for line := range strings.SplitSeq(view, "\n") {
+			plain := strings.TrimRight(stripANSI(line), " ")
+			if plain == "" {
+				continue
+			}
+			h++
+			indent := len([]rune(plain)) - len([]rune(strings.TrimLeft(plain, " ")))
+			left = min(left, indent)
+			w = max(w, len([]rune(plain)))
+		}
+		return left, w, h
+	}
+
+	idleL, idleW, idleH := dims(build().View())
+
+	authL, authW, authH := dims(build().SetSubmitting(true).SetSpinner("|").View())
+	if authL != idleL || authW != idleW || authH != idleH {
+		t.Errorf("authenticating box: left=%d w=%d h=%d; idle: left=%d w=%d h=%d; "+
+			"the form jumps on Enter", authL, authW, authH, idleL, idleW, idleH)
+	}
+
+	errL, errW, errH := dims(build().SetError(errFakeLogin{}).View())
+	if errL != idleL || errW != idleW || errH != idleH {
+		t.Errorf("error box: left=%d w=%d h=%d; idle: left=%d w=%d h=%d; "+
+			"the form jumps on failure", errL, errW, errH, idleL, idleW, idleH)
+	}
+}
+
+type errFakeLogin struct{}
+
+func (errFakeLogin) Error() string { return "invalid credentials" }
