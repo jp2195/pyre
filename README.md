@@ -47,12 +47,13 @@ for network engineers who want answers fast.
 
 ## Install
 
-Download a binary from [Releases](https://github.com/jp2195/pyre/releases).
+Download from [Releases](https://github.com/jp2195/pyre/releases).
 Archives ship with an SPDX SBOM and a shared `checksums.txt`.
 
 ```bash
-# macOS / Linux
-tar -xzf pyre_<version>_<os>_<arch>.tar.gz
+# macOS / Linux — set VERSION, OS (darwin|linux), ARCH (arm64|amd64)
+VERSION=1.5.3 OS=darwin ARCH=arm64
+curl -sSL "https://github.com/jp2195/pyre/releases/download/v${VERSION}/pyre_${VERSION}_${OS}_${ARCH}.tar.gz" | tar xz
 chmod +x pyre
 sudo mv pyre /usr/local/bin/pyre
 ```
@@ -64,6 +65,26 @@ Or build from source (Go 1.26+):
 ```bash
 go install github.com/jp2195/pyre/cmd/pyre@latest
 ```
+
+### macOS: "cannot be opened because the developer cannot be verified"
+
+pyre isn't notarized with Apple, so macOS may refuse to run it and send
+you to System Settings → Privacy & Security to click "Open Anyway".
+
+**Installing with `curl` (above) avoids this entirely.** The quarantine
+flag that triggers Gatekeeper is applied by the *downloading program* —
+browsers set it, `curl` doesn't — so a curl-installed binary runs with
+no prompt.
+
+If you already downloaded the archive in a browser, clear the flag
+instead of digging through System Settings:
+
+```bash
+xattr -d com.apple.quarantine ./pyre
+```
+
+`go install` is likewise unaffected, since nothing is downloaded through
+a browser.
 
 ## Verifying releases
 
@@ -143,13 +164,17 @@ connection config instead of `--insecure`.
 
 ## Navigation
 
-Three numbered groups: `1` Monitor (dashboards), `2` Analyze (list
-views), `3` Tools (config). Same number again — or `Tab` — cycles
-sub-views in the group. `Ctrl+P` opens a fuzzy command palette that
-jumps anywhere.
+Three levels, three sets of keys:
+
+- `1` Monitor (dashboards), `2` Analyze (list views), `3` Tools (config)
+- `Tab` / `Shift+Tab` move between views in the active group
+- `[` / `]` switch sub-tabs *within* a view (Objects, Routes, Logs)
+
+`Ctrl+P` opens a fuzzy command palette that jumps anywhere.
 
 Inside a list view: `/` filter, `s` cycle sort, `Enter` open detail,
-`r` refresh, `?` help, `q` quit.
+`r` refresh, `?` help, `q` quit. Dashboards taller than your terminal
+scroll with `j`/`k`.
 
 New to pyre? The **"first 60 seconds"** section of
 [Getting Started](docs/getting-started.md) walks the model in one

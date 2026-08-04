@@ -8,12 +8,17 @@ Two sub-tabs with independent filter, sort, cursor, and detail state:
 
 | Key | Action |
 |-----|--------|
-| `Tab` | Cycle Address ↔ Service |
+| `[` / `]` | Cycle Address ↔ Service |
 | `a` | Jump to Address tab |
 | `s` | Jump to Service tab |
 
 The header shows `[Address]  Service` or `Address  [Service]` with a
-`(a/s/Tab to switch)` hint.
+`([/] or a/s to switch)` hint.
+
+`[` and `]` are the sub-tab keys across every view that has sub-tabs
+(see [Navigation model](../keybindings.md#navigation-model)). `Tab` is
+reserved for moving to the next view in the Analyze group, so it leaves
+Objects rather than switching tabs within it.
 
 ## Address tab
 

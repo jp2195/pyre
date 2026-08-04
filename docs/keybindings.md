@@ -2,9 +2,16 @@
 
 ## Navigation model
 
-Views are organized into three numbered groups. Press a number to switch
-groups; press it again (or `Tab`) to cycle through views within the
-current group.
+Navigation has three levels, and each level has its own keys:
+
+| Level | Keys              | Moves between                          |
+|-------|-------------------|----------------------------------------|
+| 1     | `1` / `2` / `3`   | Groups — Monitor, Analyze, Tools        |
+| 2     | `Tab` / `Shift+Tab` | Views within the active group          |
+| 3     | `[` / `]`         | Sub-tabs *within* a view                |
+
+Level 1 — press a number to switch groups; press it again to cycle
+through views in that group.
 
 | Key | Group   | Views                                                                               |
 |-----|---------|-------------------------------------------------------------------------------------|
@@ -12,8 +19,23 @@ current group.
 | `2` | Analyze | Policies · NAT · Objects · Sessions · Interfaces · Routes · IPSec · GP Users · Logs |
 | `3` | Tools   | Config                                                                              |
 
+Level 3 applies only to the views that have sub-tabs — Objects
+(Address / Service), Routes (Routes / Neighbors) and Logs (System /
+Traffic / Threat). `[` and `]` never leave the current view, and `Tab`
+always does, in every view.
+
 The header shows the group tabs on top and the sub-tabs for the active
 group underneath.
+
+## Pasting
+
+Bracketed paste is supported wherever text is entered: the login form,
+the connection form, the command palette, and any view's `/` filter
+input while it is focused. Use your terminal's normal paste shortcut
+(`Cmd+V` on macOS, `Ctrl+Shift+V` on most Linux terminals).
+
+Outside a text input, paste is ignored rather than being interpreted as
+a burst of navigation keys.
 
 ## Filter-mode guard (M8)
 
@@ -31,6 +53,7 @@ Active only when a main view is displayed and no filter input is focused.
 | `1` / `2` / `3`  | Switch (or cycle within) navigation group                 |
 | `Tab`            | Next view in the current group                            |
 | `Shift+Tab`      | Previous view in the current group                        |
+| `[` / `]`        | Previous / next sub-tab (views that have them)            |
 | `Ctrl+P`         | Command palette — fuzzy jump anywhere                     |
 | `:`              | Connection picker (switch between firewalls)              |
 | `d`              | Device picker (Panorama only; falls through to view on standalone firewall) |
@@ -52,6 +75,18 @@ Logs, Interfaces, …).
 | `Ctrl+D` / `PgDn`   | Page down        |
 | `Ctrl+U` / `PgUp`   | Page up          |
 | `Enter`             | Toggle detail panel |
+
+## Dashboard scrolling
+
+Dashboards render a stack of panels that is often taller than the
+terminal. When it doesn't fit, the visible portion is windowed and a
+scroll indicator appears at the bottom (`↓ 15 more   j/k scroll`).
+
+The same keys as table navigation apply — `j`/`k`, `g`/`G`,
+`Ctrl+D`/`Ctrl+U`, `PgDn`/`PgUp` — and they scroll whichever dashboard
+is on screen. Switching dashboards resets the scroll position to the
+top. A dashboard that already fits is never trimmed and shows no
+indicator.
 
 ## Filter
 
@@ -88,11 +123,11 @@ GP Users) and Logs.
 
 ### Objects (group 2)
 
-| Key     | Action                                                              |
-|---------|---------------------------------------------------------------------|
-| `Tab`   | Cycle Address ↔ Service tab                                         |
-| `a`     | Jump to Address tab                                                 |
-| `s`     | Jump to Service tab                                                 |
+| Key         | Action                                                          |
+|-------------|-----------------------------------------------------------------|
+| `[` / `]`   | Cycle Address ↔ Service tab                                     |
+| `a`         | Jump to Address tab                                             |
+| `s`         | Jump to Service tab                                             |
 | `S`     | Cycle sort field for the active tab (always resets to ascending)    |
 | `/`     | Enter filter mode for the active tab                                |
 | `Enter` | Toggle detail panel for the selected object                         |
@@ -221,5 +256,21 @@ While the delete confirmation is shown:
 | `Shift+Tab`   | Previous field                                     |
 | `Space`       | Toggle insecure-skip-verify checkbox               |
 | `Enter`       | Submit (when all required fields are filled)       |
-| `Esc`         | Return to Connection Hub; form buffers are cleared |
+| `Esc`         | Cancel; return to Connection Hub, clearing buffers |
 | `Ctrl+C`      | Quit                                               |
+
+While authenticating, the form shows a spinner and
+`Authenticating…`, and the fields are frozen:
+
+| Key      | Action                                                        |
+|----------|---------------------------------------------------------------|
+| `Enter`  | **Ignored** — see below                                       |
+| `Esc`    | Cancel the in-flight login and return to the Connection Hub   |
+| `Ctrl+C` | Quit                                                          |
+
+> [!IMPORTANT]
+> Enter is deliberately ignored while a login is in flight. PAN-OS
+> counts every keygen request as a login attempt, so repeatedly pressing
+> Enter while waiting on an MFA push burns through the failed-attempt
+> budget and locks the account out. Wait for the MFA prompt, or press
+> `Esc` to cancel.

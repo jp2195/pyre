@@ -101,4 +101,23 @@ columns (left: statistics and pending changes; right: rule analysis).
 ## Keys
 
 Standard navigation applies — see [keybindings.md](../keybindings.md).
-View-specific: none beyond cycling sub-views with `1` / `Tab`.
+Cycle sub-views with `1` (or `3` for Config) and `Tab`.
+
+### Scrolling
+
+A dashboard's panel stack is frequently taller than the terminal. When
+it doesn't fit, the visible portion is windowed and a scroll indicator
+appears on the last line (`↓ 15 more   j/k scroll`).
+
+| Key                 | Action         |
+|---------------------|----------------|
+| `j` / `Down`        | Scroll down    |
+| `k` / `Up`          | Scroll up      |
+| `Ctrl+D` / `PgDn`   | Page down      |
+| `Ctrl+U` / `PgUp`   | Page up        |
+| `g` / `Home`        | Jump to top    |
+| `G` / `End`         | Jump to bottom |
+
+Scrolling applies to whichever dashboard is on screen, and switching
+dashboards resets to the top. A dashboard that already fits its terminal
+is never trimmed and shows no indicator.

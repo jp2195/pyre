@@ -39,6 +39,13 @@ go fix ./...                  # Apply modernizers (safe, behavior-preserving)
 - **Bubble Tea v2 View composition**: only the top-level `tui.Model.View()` returns `tea.View`; every sub-view model returns `string`. The top-level composes sub-view strings and sets program options (alt-screen, mouse mode, window title, cursor) on the returned `tea.View` rather than on `tea.NewProgram`.
 - Use `tea.KeyPressMsg` in key handler type switches (not `tea.KeyMsg`, which in v2 is the union interface of press and release). Construct test messages as `tea.KeyPressMsg{Code: tea.KeyDown}` or `tea.KeyPressMsg{Code: 'j', Text: "j"}` — `Runes`/`Type` from v1 no longer exist.
 - Theme palette fields are `image/color.Color`, not a string alias. Construct concrete values via `lipgloss.Color("#RRGGBB")`.
+- **Three navigation levels, three key sets**: `1`/`2`/`3` switch groups, `Tab`/`Shift+Tab` move between views in a group, `[`/`]` switch sub-tabs *within* a view (Objects, Routes, Logs). A view must never consume `Tab` — Objects used to, and became the one view you could not `Tab` out of.
+- **Free-form op output is CDATA-wrapped on real hardware.** `Result.Inner` is `xml:",innerxml"`, so it keeps the literal `<![CDATA[` marker. Parse text output (`df`, `top`) with `api.InnerText()`, never `string(resp.Result.Inner)`. Tests that feed bare text will pass while hardware fails.
+- **Dashboards clamp to the terminal.** `DashboardBase.ClampToHeight` windows the panel stack and `ScrollBy` moves the offset; each dashboard's `View()` is a thin wrapper over `content()` so `ContentHeight()` can measure the untrimmed stack. Dashboard scrolling is handled in the TUI layer (`dashboard_scroll.go`), not per-dashboard `Update`, because `handleViewKeys` routes `ViewDashboard` keys to `m.dashboard` (Overview) whatever is on screen.
+- **`HasData()` gates the app-wide spinner** via `Model.anyLoading()`. It must report settled only when *every* source has produced data **or** an error; returning true early drops the tick chain and freezes other panels' spinners mid-frame.
+- **Table rows share one column grid.** `TableRowSelectedStyle`/`TableRowDisabledStyle` carry `Padding(0, 1)`; tables that render an unpadded header must use the `TableSelectedRowStyle()`/`TableDisabledRowStyle()` flush variants, or the selected row shifts a column and the table twitches as the cursor moves.
+- **Detail panels size to `contentWidth()`**, not `m.Width` — they render inside the view's bordered, padded panel, and the raw terminal width makes their border wrap.
+- **Paste is routed explicitly.** `tea.PasteMsg` is not a `KeyPressMsg`; `handlePasteMsg` forwards it to the focused input. New text inputs need a case there or paste will silently do nothing.
 
 ## Code Style
 
@@ -97,9 +104,11 @@ logger at a file.
 
 ## Go 1.26 (Current Version)
 
-`go.mod` is pinned to `go 1.26.4`; CI pins `go-version: '1.26.4'` (the six
-`go-version` lines across `.github/workflows/` plus `go.mod` move together).
-The 1.26.x series has shipped three stdlib CVE patches:
+`go.mod` is pinned to `go 1.26.5`; CI pins `go-version: '1.26.5'` (the
+`go-version` lines across `.github/workflows/` plus `go.mod` move together —
+verify the count with `grep -rc "go-version:" .github/workflows/` rather than
+trusting a number written here).
+The 1.26.x series has shipped these stdlib CVE patches:
 
 - **1.26.2** — `crypto/tls` / `crypto/x509` issues from 1.26.0–1.26.1.
 - **1.26.3** — GO-2026-4971 (`net.Dial` / `LookupPort` NUL-byte panic on
@@ -107,9 +116,15 @@ The 1.26.x series has shipped three stdlib CVE patches:
 - **1.26.4** — GO-2026-5039 (`net/textproto` error escaping) and GO-2026-5037
   (`crypto/x509` hostname parsing); both reached this codebase's keygen and
   TLS paths and were caught by `govulncheck`.
+- **1.26.5** — current pin, bumped as part of the remediation pass (#47).
 
 When a new patch lands, bump `go.mod` + the CI pins together and re-run
 `govulncheck ./...`.
+
+**Lint:** CI runs `golangci-lint` (version pinned in `.github/workflows/ci.yml`)
+and it catches things `go vet` does not — `prealloc`, for one. Install the
+pinned version and run `golangci-lint run ./...` before pushing; `go vet` +
+`go test` alone will not predict CI.
 
 **1.26 idioms this project uses:** the ones in Code Style above (`for range N`,
 `for i := range N`, `max()`/`min()`, `wg.Go`), plus `reflect` `Value.Fields()`
