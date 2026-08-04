@@ -55,7 +55,7 @@ func (m Model) handleAuthMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case LoginSuccessMsg:
 		m.loading = false
-		m.login = m.login.ClearPassword()
+		m.login = m.login.SetSubmitting(false).ClearPassword()
 
 		var connConfig *config.ConnectionConfig
 		host := msg.Host
@@ -228,6 +228,7 @@ func (m Model) handleNavigationMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SwitchDashboardMsg:
 		m.currentDashboard = msg.Dashboard
 		m.currentView = ViewDashboard
+		m = m.resetDashboardScroll()
 		m.syncNavbarToCurrentView()
 		return m, tea.Batch(m.fetchCurrentDashboardData(), m.spinner.Tick)
 

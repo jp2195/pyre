@@ -271,6 +271,7 @@ func (m Model) navigateToCurrentItem() (tea.Model, tea.Cmd) {
 	m.currentView = target.view
 	if target.view == ViewDashboard {
 		m.currentDashboard = target.dashboard
+		m = m.resetDashboardScroll()
 	}
 
 	var cmd tea.Cmd

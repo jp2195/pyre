@@ -18,6 +18,63 @@ type DashboardBase struct {
 	Width        int
 	Height       int
 	SpinnerFrame string
+	// Offset is the vertical scroll position, in lines, of the panel stack.
+	// Dashboards render a fixed stack of panels that is routinely taller than
+	// the terminal; without this the overflow ran off the bottom of the screen
+	// (taking the footer with it) and corrupted the display at some sizes.
+	Offset int
+}
+
+// MaxScrollOffset returns the largest valid Offset for content of the given
+// height. It is 0 when the content already fits, which must stay consistent
+// with ClampToHeight's fits-entirely check.
+func (d DashboardBase) MaxScrollOffset(contentHeight int) int {
+	if d.Height <= 0 || contentHeight <= d.Height {
+		return 0
+	}
+	return max(contentHeight-d.visibleLines(), 0)
+}
+
+// visibleLines is how many content lines are shown when scrolling is active;
+// one row is reserved for the scroll indicator.
+func (d DashboardBase) visibleLines() int {
+	return max(d.Height-1, 1)
+}
+
+// ScrollBy moves the scroll offset by delta lines, clamped to the valid range.
+func (d DashboardBase) ScrollBy(delta, contentHeight int) DashboardBase {
+	d.Offset = min(max(d.Offset+delta, 0), d.MaxScrollOffset(contentHeight))
+	return d
+}
+
+// ClampToHeight trims content to the visible height, honouring Offset, and
+// appends a scroll indicator when part of the stack is off-screen. Content
+// that already fits is returned untouched so short dashboards are unaffected.
+func (d DashboardBase) ClampToHeight(content string) string {
+	if d.Height <= 0 {
+		return content
+	}
+	lines := strings.Split(content, "\n")
+	if len(lines) <= d.Height {
+		return content
+	}
+
+	visible := d.visibleLines()
+	start := min(max(d.Offset, 0), len(lines)-visible)
+	window := lines[start : start+visible]
+
+	above, below := start, len(lines)-(start+visible)
+	var hint string
+	switch {
+	case above > 0 && below > 0:
+		hint = fmt.Sprintf("↑ %d more   ↓ %d more   j/k scroll", above, below)
+	case below > 0:
+		hint = fmt.Sprintf("↓ %d more   j/k scroll", below)
+	default:
+		hint = fmt.Sprintf("↑ %d more   j/k scroll", above)
+	}
+
+	return strings.Join(append(window, dimStyle().Render(hint)), "\n")
 }
 
 // ColumnWidths returns the total, left, and right column widths for two-column layout.
