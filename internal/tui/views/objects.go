@@ -285,9 +285,18 @@ func (m ObjectsModel) Update(msg tea.Msg) (ObjectsModel, tea.Cmd) {
 		return m, nil
 	}
 
-	// Tab-switch keys take precedence (active in either tab).
+	// Sub-tab keys take precedence (active in either tab).
+	//
+	// Navigation has three levels and each gets its own keys:
+	//   1/2/3    section        (Monitor / Analyze / Tools)
+	//   Tab      view in section
+	//   [ / ]    sub-tab in view  <- here
+	//
+	// Tab is deliberately NOT handled here: swallowing it made Objects the one
+	// view you could not Tab out of. [ / ] matches Logs and Routes; a/s remain
+	// as direct mnemonics.
 	switch key.String() {
-	case "tab":
+	case "[", "]":
 		if m.tab == ObjectsTabAddress {
 			m.tab = ObjectsTabService
 		} else {
@@ -413,7 +422,7 @@ func (m ObjectsModel) renderTabIndicator() string {
 		addr = StatusMutedStyle.Render(addr)
 		svc = StatusActiveStyle.Render("[Service]")
 	}
-	hint := BannerInfoStyle.Render("  (a/s/Tab to switch)")
+	hint := BannerInfoStyle.Render("  ([/] or a/s to switch)")
 	return addr + "  " + svc + hint
 }
 
@@ -490,7 +499,7 @@ func (m ObjectsModel) renderServiceTab() string {
 func (m ObjectsModel) renderAddressTable() string {
 	t := m.addressTab
 	headerStyle := DetailLabelStyle.Bold(true)
-	selectedStyle := TableRowSelectedStyle.Bold(true)
+	selectedStyle := TableSelectedRowStyle().Bold(true)
 	dimStyle := DetailDimStyle
 	availableWidth := m.width - 12
 
@@ -556,7 +565,7 @@ func (m ObjectsModel) renderServiceDetail(s models.ServiceObject) string {
 func (m ObjectsModel) renderServiceTable() string {
 	t := m.serviceTab
 	headerStyle := DetailLabelStyle.Bold(true)
-	selectedStyle := TableRowSelectedStyle.Bold(true)
+	selectedStyle := TableSelectedRowStyle().Bold(true)
 	dimStyle := DetailDimStyle
 	availableWidth := m.width - 12
 

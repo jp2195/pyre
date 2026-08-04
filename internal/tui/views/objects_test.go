@@ -53,16 +53,11 @@ func TestObjectsModel_TabSwitching(t *testing.T) {
 	m := NewObjectsModel()
 	m = m.SetSize(120, 30)
 
-	// Tab key advances Address -> Service.
-	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
-	if m.ActiveTab() != ObjectsTabService {
-		t.Errorf("after Tab, expected ObjectsTabService, got %v", m.ActiveTab())
-	}
-
-	// Tab again wraps Service -> Address.
+	// Tab is reserved for global navigation and must not switch sub-tabs —
+	// see TestObjects_TabNoLongerSwitchesSubTabs.
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	if m.ActiveTab() != ObjectsTabAddress {
-		t.Errorf("after second Tab, expected ObjectsTabAddress, got %v", m.ActiveTab())
+		t.Errorf("Tab must not switch sub-tabs, got %v", m.ActiveTab())
 	}
 
 	// 's' jumps to Service tab from Address.
@@ -225,5 +220,57 @@ func TestObjectsModel_DetailPanel_EnterOpensEscCloses(t *testing.T) {
 	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	if m.addressTab.Expanded {
 		t.Error("expected addressTab.Expanded=false after Esc")
+	}
+}
+
+// TestObjects_TabNoLongerSwitchesSubTabs pins that Tab is reserved for global
+// navigation. Objects used to swallow Tab to toggle Address <-> Service, so the
+// footer's advertised "Tab/S-Tab next/prev" silently did nothing there and Tab
+// could not move you to the next Analyze view. a/s still select sub-tabs.
+func TestObjects_TabNoLongerSwitchesSubTabs(t *testing.T) {
+	m := NewObjectsModel()
+	if m.ActiveTab() != ObjectsTabAddress {
+		t.Fatal("expected Address tab initially")
+	}
+
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	if m.ActiveTab() != ObjectsTabAddress {
+		t.Error("Tab must not switch sub-tabs; it belongs to global navigation")
+	}
+
+	// a/s remain the way to switch.
+	m, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
+	if m.ActiveTab() != ObjectsTabService {
+		t.Error("'s' should select the Service tab")
+	}
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	if m.ActiveTab() != ObjectsTabAddress {
+		t.Error("'a' should select the Address tab")
+	}
+}
+
+// TestObjects_BracketKeysSwitchSubTabs pins the three-level navigation model:
+// number keys pick the section, Tab/S-Tab move between views in that section,
+// and [ / ] switch sub-tabs *within* a view. Logs and Routes already used
+// [ / ] for their sub-tabs; Objects was the outlier.
+func TestObjects_BracketKeysSwitchSubTabs(t *testing.T) {
+	m := NewObjectsModel()
+	if m.ActiveTab() != ObjectsTabAddress {
+		t.Fatal("expected Address tab initially")
+	}
+
+	m, _ = m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
+	if m.ActiveTab() != ObjectsTabService {
+		t.Error("']' should advance to the Service sub-tab")
+	}
+
+	m, _ = m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
+	if m.ActiveTab() != ObjectsTabAddress {
+		t.Error("']' should wrap back to the Address sub-tab")
+	}
+
+	m, _ = m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
+	if m.ActiveTab() != ObjectsTabService {
+		t.Error("'[' should move back to the Service sub-tab")
 	}
 }
