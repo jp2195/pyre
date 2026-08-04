@@ -111,8 +111,12 @@ func TestConfig_ApplyFlags(t *testing.T) {
 }
 
 func TestLoad_NoConfigFile(t *testing.T) {
-	// This test relies on the config file not existing at the default location
-	// or the test running in an environment without ~/.pyre.yaml
+	// Point HOME at an empty dir so this exercises the "no config file"
+	// path regardless of the developer's real ~/.pyre.yaml. Without this
+	// the test reads the running user's actual config and fails for anyone
+	// who has ever changed their theme.
+	t.Setenv("HOME", t.TempDir())
+
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
