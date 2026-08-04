@@ -111,3 +111,70 @@ func TestRuleList_ShiftSTogglesSortDirection(t *testing.T) {
 		t.Errorf("expected ascending order after S (alpha first):\n%s", out)
 	}
 }
+
+// stripANSI removes SGR escape sequences so column positions can be measured
+// on the visible text alone.
+func stripANSI(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] == 0x1b {
+			for i < len(s) && s[i] != 'm' {
+				i++
+			}
+			continue
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
+}
+
+// columnOf returns the column at which token appears on the line containing it.
+func columnOf(t *testing.T, rendered, token string) int {
+	t.Helper()
+	for line := range strings.SplitSeq(stripANSI(rendered), "\n") {
+		if idx := strings.Index(line, token); idx >= 0 {
+			return idx
+		}
+	}
+	t.Fatalf("token %q not found in:\n%s", token, stripANSI(rendered))
+	return -1
+}
+
+// TestRuleList_ColumnsDoNotShiftWithCursor pins the fix for a misalignment
+// where the selected row carried horizontal padding the header and unselected
+// rows did not. Every row visibly jumped one column right as the cursor landed
+// on it and snapped back when it left, so the whole table twitched while
+// scrolling. Column positions must not depend on which row is selected.
+func TestRuleList_ColumnsDoNotShiftWithCursor(t *testing.T) {
+	items := []rlItem{
+		{Name: "alpha", State: "up"},
+		{Name: "bravo", State: "down"},
+		{Name: "charlie", State: "up"},
+	}
+
+	m := NewRuleListModel(testRuleListConfig())
+	m = m.SetSize(120, 40)
+	m = m.SetItems(items, nil)
+
+	// Column of each row's State field, measured with the cursor on row 0.
+	m.Cursor = 0
+	base := map[string]int{}
+	out := m.View()
+	for _, it := range items {
+		base[it.Name] = columnOf(t, out, it.Name)
+	}
+
+	// Moving the cursor must not move any column.
+	for cursor := 1; cursor < len(items); cursor++ {
+		m.Cursor = cursor
+		out = m.View()
+		for _, it := range items {
+			got := columnOf(t, out, it.Name)
+			if got != base[it.Name] {
+				t.Errorf("cursor=%d: row %q moved from column %d to %d; "+
+					"columns must not shift as the selection moves",
+					cursor, it.Name, base[it.Name], got)
+			}
+		}
+	}
+}

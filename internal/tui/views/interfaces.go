@@ -216,8 +216,19 @@ func renderInterfaceDetail(iface models.Interface, width int, arpTable []models.
 		return labelStyle.Render(label) + valueStyle.Render(v)
 	}
 
+	// Sections are kept as discrete blocks (heading + its rows) so the
+	// two-column layout can never split a heading from its fields.
+	title := titleStyle.Render("Interface Details: " + iface.Name)
+	var sections [][]string
 	var lines []string
-	lines = append(lines, titleStyle.Render("Interface Details: "+iface.Name))
+
+	// flush closes the section being accumulated in lines.
+	flush := func() {
+		if len(lines) > 1 {
+			sections = append(sections, lines)
+		}
+		lines = nil
+	}
 
 	// Basic Info
 	lines = append(lines, sectionStyle.Render("Basic Information"))
@@ -234,6 +245,7 @@ func renderInterfaceDetail(iface models.Interface, width int, arpTable []models.
 	}
 
 	// Network
+	flush()
 	lines = append(lines, sectionStyle.Render("Network"))
 	lines = append(lines, row("IP Address", iface.IP))
 	lines = append(lines, row("MAC Address", iface.MAC))
@@ -246,12 +258,14 @@ func renderInterfaceDetail(iface models.Interface, width int, arpTable []models.
 	}
 
 	// Physical
+	flush()
 	lines = append(lines, sectionStyle.Render("Physical"))
 	lines = append(lines, row("Speed", iface.Speed))
 	lines = append(lines, row("Duplex", iface.Duplex))
 
 	// Traffic Stats (if available)
 	if iface.BytesIn > 0 || iface.BytesOut > 0 || iface.PacketsIn > 0 || iface.PacketsOut > 0 {
+		flush()
 		lines = append(lines, sectionStyle.Render("Traffic Statistics"))
 		lines = append(lines, labelStyle.Render("Bytes In")+valueStyle.Render(formatBytes(iface.BytesIn)))
 		lines = append(lines, labelStyle.Render("Bytes Out")+valueStyle.Render(formatBytes(iface.BytesOut)))
@@ -269,6 +283,7 @@ func renderInterfaceDetail(iface models.Interface, width int, arpTable []models.
 	// ARP Entries for this interface
 	arpEntries := arpEntriesForInterface(arpTable, iface.Name)
 	if len(arpEntries) > 0 {
+		flush()
 		lines = append(lines, sectionStyle.Render("ARP Entries"))
 		maxShow := min(len(arpEntries), 5)
 		for i := range maxShow {
@@ -289,19 +304,61 @@ func renderInterfaceDetail(iface models.Interface, width int, arpTable []models.
 		}
 	}
 
+	flush()
+
 	// Use two-column layout if wide enough
 	if width >= 100 {
-		// Split lines into two columns
-		leftLines := lines[:len(lines)/2+1]
-		rightLines := lines[len(lines)/2+1:]
+		left, right := splitSectionsIntoColumns(sections)
 
 		colWidth := (width - 8) / 2
 		colStyle := lipgloss.NewStyle().Width(colWidth)
-		leftCol := colStyle.Render(lipgloss.JoinVertical(lipgloss.Left, leftLines...))
-		rightCol := colStyle.Render(lipgloss.JoinVertical(lipgloss.Left, rightLines...))
+		leftCol := colStyle.Render(lipgloss.JoinVertical(lipgloss.Left, flattenSections(left)...))
+		rightCol := colStyle.Render(lipgloss.JoinVertical(lipgloss.Left, flattenSections(right)...))
 
-		return panelStyle.Render(lipgloss.JoinHorizontal(lipgloss.Top, leftCol, "  ", rightCol))
+		body := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, "  ", rightCol)
+		return panelStyle.Render(lipgloss.JoinVertical(lipgloss.Left, title, body))
 	}
 
-	return panelStyle.Render(lipgloss.JoinVertical(lipgloss.Left, lines...))
+	return panelStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
+		append([]string{title}, flattenSections(sections)...)...))
+}
+
+// flattenSections concatenates section blocks back into a flat line list.
+func flattenSections(sections [][]string) []string {
+	var out []string
+	for _, s := range sections {
+		out = append(out, s...)
+	}
+	return out
+}
+
+// splitSectionsIntoColumns distributes whole sections across two columns,
+// balancing their heights.
+//
+// The previous implementation cut the flat line list at its midpoint, which
+// routinely separated a section heading from its own fields — "Network" would
+// render as the last line of the left column while IP/MAC/Virtual Router
+// started the right column, so the heading looked empty and those fields
+// looked orphaned. Sections are indivisible here.
+func splitSectionsIntoColumns(sections [][]string) (left, right [][]string) {
+	if len(sections) < 2 {
+		return sections, nil
+	}
+
+	total := 0
+	for _, s := range sections {
+		total += len(s)
+	}
+
+	// Choose the boundary that leaves the two columns closest in height.
+	best, bestDiff := 1, -1
+	acc := 0
+	for i, s := range sections[:len(sections)-1] {
+		acc += len(s)
+		diff := max(acc, total-acc) - min(acc, total-acc)
+		if bestDiff < 0 || diff < bestDiff {
+			best, bestDiff = i+1, diff
+		}
+	}
+	return sections[:best], sections[best:]
 }
