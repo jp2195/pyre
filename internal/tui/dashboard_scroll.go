@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/tui/views"
@@ -51,22 +52,26 @@ func (m Model) resetDashboardScroll() Model {
 
 // dashboardScrollDelta maps a key press to a scroll distance in lines,
 // reporting false when the key is not a scroll key.
+//
+// Bindings come from the shared KeyMap rather than literal strings so
+// dashboard scrolling stays identical to table navigation — j/k, g/G,
+// Ctrl+D/Ctrl+U and the page keys all behave the same in both places.
 func (m Model) dashboardScrollDelta(msg tea.KeyPressMsg) (int, bool) {
 	// One screenful minus a line of overlap for context.
 	page := max(m.height-5, 1)
 
-	switch msg.String() {
-	case "j", "down":
+	switch {
+	case key.Matches(msg, m.keys.Down):
 		return 1, true
-	case "k", "up":
+	case key.Matches(msg, m.keys.Up):
 		return -1, true
-	case "pgdown", "ctrl+f":
+	case key.Matches(msg, m.keys.PageDown):
 		return page, true
-	case "pgup", "ctrl+b":
+	case key.Matches(msg, m.keys.PageUp):
 		return -page, true
-	case "G", "end":
+	case key.Matches(msg, m.keys.End):
 		return scrollJump, true
-	case "home":
+	case key.Matches(msg, m.keys.Home):
 		return -scrollJump, true
 	}
 	return 0, false
