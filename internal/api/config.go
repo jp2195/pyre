@@ -1,17 +1,16 @@
 package api
 
 import (
+	"bytes"
 	"context"
-	"encoding/xml"
 	"strings"
-	"time"
 
 	"github.com/jp2195/pyre/internal/models"
 )
 
 // GetPendingChanges retrieves pending configuration changes
-func (c *Client) GetPendingChanges(ctx context.Context) ([]models.PendingChange, error) {
-	resp, err := c.Op(ctx, "<show><config><list><changes></changes></list></config></show>")
+func (c *Client) GetPendingChanges(ctx context.Context, target string) ([]models.PendingChange, error) {
+	resp, err := c.Op(ctx, "<show><config><list><changes></changes></list></config></show>", target)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +32,7 @@ func (c *Client) GetPendingChanges(ctx context.Context) ([]models.PendingChange,
 		} `xml:"journal>entry"`
 	}
 
-	if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &result); err != nil {
+	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
 		// Try alternate structure
 		var alt struct {
 			Entry []struct {
@@ -44,7 +43,7 @@ func (c *Client) GetPendingChanges(ctx context.Context) ([]models.PendingChange,
 				Time        string `xml:"time"`
 			} `xml:"entry"`
 		}
-		if err := xml.Unmarshal(WrapInner(resp.Result.Inner), &alt); err != nil {
+		if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &alt); err != nil {
 			return []models.PendingChange{}, nil
 		}
 		result.Entry = alt.Entry
@@ -60,11 +59,8 @@ func (c *Client) GetPendingChanges(ctx context.Context) ([]models.PendingChange,
 		}
 
 		// Parse time
-		for _, layout := range []string{"2006/01/02 15:04:05", "Mon Jan 2 15:04:05 2006"} {
-			if t, err := time.Parse(layout, e.Time); err == nil {
-				change.Time = t
-				break
-			}
+		if t, err := parsePANTime(e.Time); err == nil {
+			change.Time = t
 		}
 
 		changes = append(changes, change)
@@ -74,7 +70,7 @@ func (c *Client) GetPendingChanges(ctx context.Context) ([]models.PendingChange,
 }
 
 // GetNATPoolInfo retrieves NAT IP pool utilization information
-func (c *Client) GetNATPoolInfo(ctx context.Context) ([]models.NATPoolInfo, error) {
+func (c *Client) GetNATPoolInfo(ctx context.Context, target string) ([]models.NATPoolInfo, error) {
 	// Try multiple API commands - different PAN-OS versions use different paths
 	// nat-rule-ippool works for both dedicated pools AND interface-based DIPP
 	commands := []string{
@@ -86,7 +82,7 @@ func (c *Client) GetNATPoolInfo(ctx context.Context) ([]models.NATPoolInfo, erro
 	var resp *XMLResponse
 	var err error
 	for _, cmd := range commands {
-		resp, err = c.Op(ctx, cmd)
+		resp, err = c.Op(ctx, cmd, target)
 		if err == nil && resp.IsSuccess() && len(resp.Result.Inner) > 0 {
 			break
 		}
@@ -139,7 +135,7 @@ func (c *Client) GetNATPoolInfo(ctx context.Context) ([]models.NATPoolInfo, erro
 			var r struct {
 				Entry []poolEntry `xml:"entry"`
 			}
-			if xml.Unmarshal(WrapInner(resp.Result.Inner), &r) == nil {
+			if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &r) == nil {
 				return r.Entry
 			}
 			return nil
@@ -149,7 +145,7 @@ func (c *Client) GetNATPoolInfo(ctx context.Context) ([]models.NATPoolInfo, erro
 			var r struct {
 				Entry []poolEntry `xml:"ippool>entry"`
 			}
-			if xml.Unmarshal(WrapInner(resp.Result.Inner), &r) == nil {
+			if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &r) == nil {
 				return r.Entry
 			}
 			return nil
@@ -159,7 +155,7 @@ func (c *Client) GetNATPoolInfo(ctx context.Context) ([]models.NATPoolInfo, erro
 			var r struct {
 				Entry []poolEntry `xml:"nat-rule-ippool>entry"`
 			}
-			if xml.Unmarshal(WrapInner(resp.Result.Inner), &r) == nil {
+			if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &r) == nil {
 				return r.Entry
 			}
 			return nil
@@ -169,7 +165,7 @@ func (c *Client) GetNATPoolInfo(ctx context.Context) ([]models.NATPoolInfo, erro
 			var r struct {
 				Entry []poolEntry `xml:"rules>entry"`
 			}
-			if xml.Unmarshal(WrapInner(resp.Result.Inner), &r) == nil {
+			if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &r) == nil {
 				return r.Entry
 			}
 			return nil
@@ -181,7 +177,7 @@ func (c *Client) GetNATPoolInfo(ctx context.Context) ([]models.NATPoolInfo, erro
 					Entry []poolEntry `xml:"entry"`
 				} `xml:"dp"`
 			}
-			if xml.Unmarshal(WrapInner(resp.Result.Inner), &r) == nil && len(r.DP) > 0 {
+			if decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &r) == nil && len(r.DP) > 0 {
 				return r.DP[0].Entry
 			}
 			return nil

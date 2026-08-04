@@ -4,7 +4,7 @@ package models
 type ManagedDevice struct {
 	Serial      string // For API target= parameter
 	Hostname    string // Display name
-	IPAddress   string // Management IP for direct SSH
+	IPAddress   string // Management IP
 	Model       string // PA-3260, PA-5260, etc.
 	SWVersion   string // PAN-OS version
 	HAState     string // active, passive, suspended

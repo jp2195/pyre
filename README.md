@@ -1,169 +1,177 @@
-# pyre
+<h1 align="center">pyre</h1>
 
-[![Go Version](https://img.shields.io/github/go-mod/go-version/jp2195/pyre)](https://go.dev/)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/jp2195/pyre)](https://github.com/jp2195/pyre/releases)
+<p align="center">
+  <!-- TODO: drop a logo PNG here once one exists (suggested width=350) -->
+  <!-- <img src="docs/assets/logo.png" width="350" alt="pyre"><br> -->
+  <a href="https://go.dev/"><img src="https://img.shields.io/github/go-mod/go-version/jp2195/pyre" alt="Go Version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
+  <a href="https://github.com/jp2195/pyre/releases"><img src="https://img.shields.io/github/v/release/jp2195/pyre" alt="Release"></a>
+</p>
 
-A terminal user interface (TUI) for managing and monitoring Palo Alto firewalls.
+<p align="center">
+  A terminal UI for Palo Alto firewalls. Answers the questions you'd
+  otherwise click through thirty tabs of the PAN-OS web UI to find.
+</p>
+
+<p align="center">
+  <!-- TODO: drop a demo GIF / hero screenshot here -->
+  <!-- <img src="docs/assets/demo.gif" width="100%" alt="pyre in action"> -->
+</p>
 
 ## Why pyre?
 
-The Palo Alto web interface requires clicking through multiple menus to gather basic information—checking system health, then navigating to policies, then sessions, then logs. Each view is a separate page load and context switch.
+The PAN-OS web interface turns every question into a sequence of clicks
+— system info, then policies, then sessions, then logs. Each view is a
+separate page load.
 
-pyre solves this by combining multiple API calls into unified terminal views. Get system info, HA status, resource usage, and session counts in a single dashboard. Filter policies and sessions instantly with keyboard shortcuts. No more clicking through menus to get the information you need.
-
-**Built for network engineers who want answers fast.**
+pyre combines those calls into unified terminal views: system health,
+HA, resource usage, and sessions in one dashboard; instant filter and
+sort on policies, sessions, and objects; no context switches. Built
+for network engineers who want answers fast.
 
 ## Features
 
-- **Dashboard** - Real-time system info, resource usage, HA status, network, security, and VPN monitoring
-- **Security Policies** - Browse, filter, and sort security rules with hit count analysis
-- **NAT Policies** - View NAT translation rules and hit counts
-- **Active Sessions** - View and filter live sessions with detailed traffic information
-- **Logs** - Browse system, traffic, and threat logs with filtering
-- **Interfaces** - Monitor interface status, traffic counters, and errors
-- **Panorama Support** - Manage multiple firewalls through Panorama device targeting
-- **Multi-Firewall** - Switch between multiple firewall connections
-- **Command Palette** - Quick access to any view or action with `Ctrl+P`
-- **Theming** - 10 built-in color themes including nord, dracula, catppuccin, and more
+- **Dashboards** — system, network, security, VPN at-a-glance
+- **Policies, NAT, objects** — browse, filter, sort, hit-count analysis,
+  inline detail
+- **Sessions, routes, interfaces** — live state with substring filter and
+  per-view sort
+- **VPN** — IPSec tunnel status + GlobalProtect connected users
+- **Logs** — system / traffic / threat with cycle-on-key
+- **Panorama** — connect to Panorama and target managed firewalls; the
+  same views, scoped per device
+- **Multi-firewall** — connection hub + quick picker (`:`)
+- **Command palette** — `Ctrl+P` fuzzy-jumps to any view
+- **10 themes** — dark, light, nord, dracula, solarized, gruvbox,
+  tokyonight, catppuccin, onedark, monokai (see [docs/configuration.md](docs/configuration.md#global-settings))
 
-## Installation
+## Install
 
-### Download Binary
+Download a binary from [Releases](https://github.com/jp2195/pyre/releases).
+Archives ship with an SPDX SBOM and a shared `checksums.txt`.
 
-Download the latest release for your platform from the [Releases](https://github.com/jp2195/pyre/releases) page.
-
-**macOS/Linux:**
 ```bash
-chmod +x pyre-darwin-arm64
-sudo mv pyre-darwin-arm64 /usr/local/bin/pyre
+# macOS / Linux
+tar -xzf pyre_<version>_<os>_<arch>.tar.gz
+chmod +x pyre
+sudo mv pyre /usr/local/bin/pyre
 ```
 
-**Windows:**
-1. Download `pyre-windows-amd64.exe`
-2. Rename to `pyre.exe` and move to a directory in your PATH, or run directly:
-```powershell
-.\pyre-windows-amd64.exe --host firewall.example.com --api-key YOUR_API_KEY
-```
+Windows: extract the `.zip`, drop `pyre.exe` on your `PATH`.
 
-### Build from Source
-
-Requires Go 1.25 or later.
+Or build from source (Go 1.26+):
 
 ```bash
 go install github.com/jp2195/pyre/cmd/pyre@latest
 ```
 
-## Quick Start
+## Verifying releases
 
-### CLI Flags
+Every release is checksummed, signed, and attested at build time:
+
+- `checksums.txt` — SHA-256 checksums covering every archive.
+- `checksums.txt.bundle` — [Sigstore cosign](https://docs.sigstore.dev/) keyless signature bundle (signature, certificate, and transparency-log entry in one file), tied to this repo's release workflow identity.
+- GitHub build provenance (SLSA) — ties each archive to the exact Actions run that built it.
 
 ```bash
+# 1. Verify the checksum file's signature (requires cosign 2.6+ for the
+#    Sigstore bundle format)
+cosign verify-blob \
+  --bundle checksums.txt.bundle \
+  --certificate-identity-regexp 'https://github.com/jp2195/pyre/.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  checksums.txt
+
+# 2. Verify your downloaded archive against the signed checksums
+sha256sum --check --ignore-missing checksums.txt
+
+# 3. (Optional) Verify build provenance with the GitHub CLI
+gh attestation verify pyre_<version>_<os>_<arch>.tar.gz --repo jp2195/pyre
+```
+
+## Quick start
+
+```bash
+# one-off
 pyre --host firewall.example.com --api-key YOUR_API_KEY
-```
 
-### Environment Variables
+# env var
+export PYRE_API_KEY=...
+pyre --host firewall.example.com
 
-```bash
-export PYRE_HOST=firewall.example.com
-export PYRE_API_KEY=YOUR_API_KEY
-pyre
-```
-
-### Configuration File
-
-Create `~/.pyre.yaml`:
-
-```yaml
+# saved connection
+cat > ~/.pyre.yaml <<'YAML'
 default: 10.0.0.1
-
 connections:
   10.0.0.1:
     insecure: true
-
-settings:
-  theme: dark
-```
-
-Then set your API key and run:
-
-```bash
-export PYRE_API_KEY=YOUR_API_KEY
-pyre
-```
-
-Or use the `-c` flag to connect to a saved connection:
-
-```bash
+YAML
 pyre -c 10.0.0.1
 ```
 
-See [Getting Started](docs/getting-started.md) for more options.
+> [!IMPORTANT]
+> **pyre does not persist credentials.** Supply an API key at each
+> invocation via `--api-key`, `PYRE_API_KEY`, or per-host
+> `PYRE_<HOST>_API_KEY`. If none is provided, pyre prompts for
+> username + password, runs keygen, and uses the resulting key for
+> the current session only. `~/.pyre.yaml` never contains credentials.
+
+For private-CA firewalls, use `ca_cert_path: /path/to/ca.pem` in the
+connection config instead of `--insecure`.
+
+## What it looks like
+
+<!-- TODO: add per-view screenshots. Suggested set:
+     - dashboard.png   (Monitor → Overview, ideally with HA + resources visible)
+     - policies.png    (Analyze → Policies with hit counts + a filter active)
+     - sessions.png    (Analyze → Sessions with a session detail panel open)
+     - objects.png     (Analyze → Objects, ideally on the Service tab)
+     - logs.png        (Analyze → Logs, threat tab, with detail expanded)
+     - palette.png     (Ctrl+P open with a filter typed)
+-->
+
+<!--
+<p align="center">
+  <img src="docs/assets/dashboard.png" width="48%" alt="Dashboard">
+  <img src="docs/assets/policies.png" width="48%" alt="Policies">
+</p>
+<p align="center">
+  <img src="docs/assets/sessions.png" width="48%" alt="Sessions">
+  <img src="docs/assets/logs.png"     width="48%" alt="Logs">
+</p>
+-->
 
 ## Navigation
 
-pyre uses a group-based navigation system:
+Three numbered groups: `1` Monitor (dashboards), `2` Analyze (list
+views), `3` Tools (config). Same number again — or `Tab` — cycles
+sub-views in the group. `Ctrl+P` opens a fuzzy command palette that
+jumps anywhere.
 
-| Key | Group | Views |
-|-----|-------|-------|
-| `1` | Monitor | Overview, Network, Security, VPN |
-| `2` | Analyze | Policies, NAT, Sessions, Interfaces, Logs |
-| `3` | Tools | Config |
-| `4` | Connections | Switch Device |
+Inside a list view: `/` filter, `s` cycle sort, `Enter` open detail,
+`r` refresh, `?` help, `q` quit.
 
-- Press the same number to cycle through views in that group
-- Press `Tab` to move to the next view in the current group
-- Press `Ctrl+P` to open the command palette
-
-See [Navigation](docs/navigation.md) for details.
-
-## Keybindings
-
-### Global
-
-| Key | Action |
-|-----|--------|
-| `1-4` | Switch navigation groups |
-| `Tab` | Next view in group |
-| `Ctrl+P` | Command palette |
-| `:` | Connection picker |
-| `D` | Device picker (Panorama) |
-| `r` | Refresh |
-| `?` | Help |
-| `q` | Quit |
-
-### View Navigation
-
-| Key | Action |
-|-----|--------|
-| `j` / `k` | Move up/down |
-| `/` | Filter |
-| `s` | Cycle sort |
-| `Enter` | Expand details |
-
-See [Keybindings](docs/keybindings.md) for the complete reference.
+New to pyre? The **"first 60 seconds"** section of
+[Getting Started](docs/getting-started.md) walks the model in one
+read. Full key reference: [docs/keybindings.md](docs/keybindings.md).
 
 ## Documentation
 
-- [Getting Started](docs/getting-started.md) - Installation and first connection
-- [Navigation](docs/navigation.md) - How to navigate pyre
-- [Keybindings](docs/keybindings.md) - Complete keyboard shortcut reference
-- [Configuration](docs/configuration.md) - Configuration file reference
-- [Panorama](docs/panorama.md) - Panorama-specific features
-
-### View Reference
-
-- [Dashboard](docs/views/dashboard.md) - Monitor sub-views
-- [Policies](docs/views/policies.md) - Security policies
-- [NAT](docs/views/nat.md) - NAT policies
-- [Sessions](docs/views/sessions.md) - Active sessions
-- [Interfaces](docs/views/interfaces.md) - Interface status
-- [Logs](docs/views/logs.md) - Log viewer
+- [Getting Started](docs/getting-started.md) — install, first
+  connection, and a 60-second navigation walkthrough
+- [Configuration](docs/configuration.md) — `~/.pyre.yaml`, env vars,
+  CLI flags, credential resolution
+- [Keybindings & Navigation](docs/keybindings.md) — every key in
+  every view
+- [Panorama](docs/panorama.md) — managing devices through Panorama
+- [View reference](docs/views/README.md) — what each view shows and how
+  its filter / sort / detail panel work
 
 ## Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+Bug reports, feature ideas, and docs PRs all welcome. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the setup and PR process.
 
 ## License
 
-Apache License 2.0 - see [LICENSE](LICENSE) for details.
+Apache 2.0. See [LICENSE](LICENSE).

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 )
@@ -164,13 +164,13 @@ func TestLogsModel_Update_Navigation(t *testing.T) {
 	m = m.SetSystemLogs(logs, nil)
 
 	// Move down
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if m.Cursor != 1 {
 		t.Errorf("expected Cursor=1 after j, got %d", m.Cursor)
 	}
 
 	// Move up
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if m.Cursor != 0 {
 		t.Errorf("expected Cursor=0 after k, got %d", m.Cursor)
 	}
@@ -233,19 +233,19 @@ func TestLogsModel_Update_LogTypeCycleForward(t *testing.T) {
 	}
 
 	// Press ] to cycle forward: System -> Traffic
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("]")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
 	if m.activeLogType != models.LogTypeTraffic {
 		t.Errorf("expected Traffic after ], got %v", m.activeLogType)
 	}
 
 	// Press ] again: Traffic -> Threat
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("]")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
 	if m.activeLogType != models.LogTypeThreat {
 		t.Errorf("expected Threat after ], got %v", m.activeLogType)
 	}
 
 	// Press ] again: Threat -> System (wraps around)
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("]")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
 	if m.activeLogType != models.LogTypeSystem {
 		t.Errorf("expected System after ] (wrap), got %v", m.activeLogType)
 	}
@@ -261,19 +261,19 @@ func TestLogsModel_Update_LogTypeCycleBackward(t *testing.T) {
 	}
 
 	// Press [ to cycle backward: System -> Threat
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
 	if m.activeLogType != models.LogTypeThreat {
 		t.Errorf("expected Threat after [, got %v", m.activeLogType)
 	}
 
 	// Press [ again: Threat -> Traffic
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
 	if m.activeLogType != models.LogTypeTraffic {
 		t.Errorf("expected Traffic after [, got %v", m.activeLogType)
 	}
 
 	// Press [ again: Traffic -> System (wraps around)
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: '[', Text: "["})
 	if m.activeLogType != models.LogTypeSystem {
 		t.Errorf("expected System after [ (wrap), got %v", m.activeLogType)
 	}
@@ -309,5 +309,85 @@ func TestLogsModel_SetSize_ClampsCursor(t *testing.T) {
 	// Cursor should be clamped to valid range
 	if m.Cursor >= m.filteredCount() {
 		t.Errorf("cursor %d should be less than filtered count %d after resize", m.Cursor, m.filteredCount())
+	}
+}
+
+func TestLogsModel_SetSystemLogs_ClearsPreviousError(t *testing.T) {
+	m := NewLogsModel()
+	m = m.SetSystemLogs(nil, errors.New("fetch failed"))
+	m = m.SetSystemLogs([]models.SystemLogEntry{{Severity: "info", Description: "ok"}}, nil)
+	if m.Err != nil {
+		t.Errorf("Err = %v, want nil after successful refresh", m.Err)
+	}
+}
+
+func TestLogsModel_SetTrafficLogs_ClearsPreviousError(t *testing.T) {
+	m := NewLogsModel()
+	m = m.SetTrafficLogs(nil, errors.New("fetch failed"))
+	m = m.SetTrafficLogs([]models.TrafficLogEntry{{Action: "allow", SourceIP: "10.0.0.1"}}, nil)
+	if m.Err != nil {
+		t.Errorf("Err = %v, want nil after successful refresh", m.Err)
+	}
+}
+
+func TestLogsModel_SetThreatLogs_ClearsPreviousError(t *testing.T) {
+	m := NewLogsModel()
+	m = m.SetThreatLogs(nil, errors.New("fetch failed"))
+	m = m.SetThreatLogs([]models.ThreatLogEntry{{Severity: "high", ThreatName: "X"}}, nil)
+	if m.Err != nil {
+		t.Errorf("Err = %v, want nil after successful refresh", m.Err)
+	}
+}
+
+func TestLogsModel_View_SystemRowContent(t *testing.T) {
+	InitStyles()
+	m := NewLogsModel()
+	m = m.SetSize(120, 30)
+	m = m.SetSystemLogs([]models.SystemLogEntry{
+		{Time: time.Now(), Severity: "critical", Type: "general", Description: "fan failure imminent"},
+		{Time: time.Now(), Severity: "informational", Type: "auth", Description: "admin login ok"},
+	}, nil)
+
+	out := m.View()
+	// CRIT and INFO are the abbreviated forms produced by abbreviateSeverity;
+	// this asserts abbreviation is applied in the rendered output.
+	for _, want := range []string{"fan failure imminent", "admin login ok", "CRIT", "INFO"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in system log view:\n%s", want, out)
+		}
+	}
+}
+
+func TestLogsModel_View_TrafficRowContent(t *testing.T) {
+	InitStyles()
+	m := NewLogsModel()
+	m = m.SetSize(120, 30)
+	m = m.SetTrafficLogs([]models.TrafficLogEntry{
+		{Time: time.Now(), Action: "allow", SourceIP: "10.1.2.3", DestIP: "8.8.4.4", Application: "dns"},
+	}, nil)
+	m, _ = m.Update(tea.KeyPressMsg{Code: ']', Text: "]"}) // System -> Traffic
+
+	out := m.View()
+	for _, want := range []string{"10.1.2.3", "8.8.4.4", "dns"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in traffic log view:\n%s", want, out)
+		}
+	}
+}
+
+func TestLogsModel_View_ThreatRowContent(t *testing.T) {
+	InitStyles()
+	m := NewLogsModel()
+	m = m.SetSize(120, 30)
+	m = m.SetThreatLogs([]models.ThreatLogEntry{
+		{Time: time.Now(), Severity: "high", ThreatName: "Trojan.GenericKD", SourceIP: "203.0.113.5"},
+	}, nil)
+	m, _ = m.Update(tea.KeyPressMsg{Code: '[', Text: "["}) // System -> Threat
+
+	out := m.View()
+	for _, want := range []string{"Trojan.GenericKD", "203.0.113.5"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in threat log view:\n%s", want, out)
+		}
 	}
 }

@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -13,32 +14,32 @@ type Config struct {
 	Default     string                      `yaml:"default,omitempty"`
 	Connections map[string]ConnectionConfig `yaml:"connections,omitempty"`
 	Settings    Settings                    `yaml:"settings"`
-	Warnings    []string                    `yaml:"-"` // Security warnings from config validation
 }
 
-type SSHConfig struct {
-	Port           int    `yaml:"port"` // Default: 22
-	Username       string `yaml:"username"`
-	Password       string `yaml:"password,omitempty"` // Deprecated: use env vars instead
-	PrivateKeyPath string `yaml:"private_key_path"`
-	Timeout        int    `yaml:"timeout"`          // Seconds, default: 30
-	KnownHostsPath string `yaml:"known_hosts_path"` // Default: ~/.ssh/known_hosts
-	Insecure       bool   `yaml:"insecure"`         // Skip host key verification (not recommended)
-}
-
-// ConnectionConfig represents a firewall or Panorama connection configuration
-// Note: The host/IP is used as the map key in Config.Connections, not stored here
+// ConnectionConfig describes a single PAN-OS endpoint.
+// SSH is intentionally unsupported; access is XML API only.
+// Note: The host/IP is used as the map key in Config.Connections, not stored here.
+//
+// Credential fields (APIKey, Password) are tagged `yaml:"-"` so they are
+// NEVER round-tripped to ~/.pyre.yaml. pyre does not persist credentials.
+// At runtime they come from CLI flags, environment variables, or the
+// interactive login flow (session-only); at disconnect they are zeroed
+// (see internal/auth).
 type ConnectionConfig struct {
-	Username string    `yaml:"username,omitempty"` // Username for API authentication
-	Type     string    `yaml:"type,omitempty"`     // "firewall" (default) or "panorama"
-	Insecure bool      `yaml:"insecure,omitempty"`
-	SSH      SSHConfig `yaml:"ssh,omitempty"`
+	Username   string `yaml:"username,omitempty"`     // Username for API authentication
+	Type       string `yaml:"type,omitempty"`         // "firewall" (default) or "panorama"
+	Insecure   bool   `yaml:"insecure,omitempty"`     // Skip TLS verification (self-signed certs)
+	CACertPath string `yaml:"ca_cert_path,omitempty"` // Optional PEM-encoded CA bundle for TLS verification
+
+	// APIKey is the per-host PAN-OS API key. Never persisted to disk.
+	APIKey string `yaml:"-"`
+	// Password is the cleartext password used for initial keygen. Never
+	// persisted to disk; only present in memory during the login flow.
+	Password string `yaml:"-"`
 }
 
 type Settings struct {
-	SessionPageSize int    `yaml:"session_page_size"`
-	Theme           string `yaml:"theme"`
-	DefaultView     string `yaml:"default_view"`
+	Theme string `yaml:"theme"`
 }
 
 // ConfigPath returns the path to the config file (~/.pyre.yaml)
@@ -54,9 +55,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		Connections: make(map[string]ConnectionConfig),
 		Settings: Settings{
-			SessionPageSize: 50,
-			Theme:           "default",
-			DefaultView:     "dashboard",
+			Theme: "default",
 		},
 	}
 }
@@ -67,6 +66,16 @@ func Load() (*Config, error) {
 	configPath, err := ConfigPath()
 	if err != nil {
 		return cfg, nil
+	}
+
+	// Warn if the config file is readable by group/other. Plan A removed
+	// the Warnings slice in favour of direct log.Printf at startup, which
+	// prints before the TUI initialises and is therefore user-visible.
+	if info, statErr := os.Stat(configPath); statErr == nil {
+		if info.Mode().Perm()&0o077 != 0 {
+			log.Printf("warning: %s has permissive mode %#o; run `chmod 600 %s`",
+				configPath, info.Mode().Perm(), configPath)
+		}
 	}
 
 	data, err := os.ReadFile(configPath) // #nosec G304 -- Path is constructed from user's home directory
@@ -88,15 +97,24 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-// configForSave represents the format we write to disk (new format only)
-type configForSave struct {
-	Default     string                      `yaml:"default,omitempty"`
-	Connections map[string]ConnectionConfig `yaml:"connections,omitempty"`
-	Settings    Settings                    `yaml:"settings"`
+// Marshal returns the YAML representation Save writes to disk. Credential
+// fields never appear because ConnectionConfig tags them `yaml:"-"`
+// (regression-guarded by TestConfig_DoesNotPersistCredentials).
+//
+// Marshal must be called from the TUI event loop; the returned bytes are
+// safe to hand to a background writer (see WriteConfigBytes).
+func (c *Config) Marshal() ([]byte, error) {
+	data, err := yaml.Marshal(c)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal config: %w", err)
+	}
+	return data, nil
 }
 
-// Save writes the config to ~/.pyre.yaml, creating a backup first
-func (c *Config) Save() error {
+// WriteConfigBytes writes pre-marshaled config data to ~/.pyre.yaml,
+// creating a .bak backup of the previous file first. Safe to call from a
+// background goroutine because it touches no shared in-memory state.
+func WriteConfigBytes(data []byte) error {
 	configPath, err := ConfigPath()
 	if err != nil {
 		return err
@@ -105,30 +123,74 @@ func (c *Config) Save() error {
 	// Create backup if file exists
 	if _, statErr := os.Stat(configPath); statErr == nil {
 		backupPath := configPath + ".bak"
-		data, readErr := os.ReadFile(configPath) // #nosec G304 -- Path is constructed from user's home directory
+		prev, readErr := os.ReadFile(configPath) // #nosec G304 -- Path is constructed from user's home directory
 		if readErr == nil {
-			if writeErr := os.WriteFile(backupPath, data, 0600); writeErr != nil {
+			if writeErr := atomicWriteFile(backupPath, prev, 0600); writeErr != nil {
 				return fmt.Errorf("failed to create backup: %w", writeErr)
 			}
 		}
 	}
 
-	// Write new format only
-	saveConfig := configForSave{
-		Default:     c.Default,
-		Connections: c.Connections,
-		Settings:    c.Settings,
-	}
-
-	data, err := yaml.Marshal(saveConfig)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-
-	if err := os.WriteFile(configPath, data, 0600); err != nil {
+	if err := atomicWriteFile(configPath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
+	return nil
+}
 
+// Save writes the config to ~/.pyre.yaml, creating a backup first.
+func (c *Config) Save() error {
+	data, err := c.Marshal()
+	if err != nil {
+		return err
+	}
+	return WriteConfigBytes(data)
+}
+
+// atomicWriteFile writes data to a file atomically by writing to a temp file
+// in the same directory and renaming it. This prevents corruption from crashes
+// or concurrent writes since rename is atomic on Unix.
+func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+	f, err := os.CreateTemp(dir, filepath.Base(path)+".tmp")
+	if err != nil {
+		return fmt.Errorf("creating temp file: %w", err)
+	}
+	tmpPath := f.Name()
+
+	// Clean up temp file on any error. Best-effort: if Remove fails here
+	// there's nothing useful we can do (the primary error is already on
+	// its way to the caller).
+	success := false
+	defer func() {
+		if !success {
+			_ = os.Remove(tmpPath) //nolint:errcheck // best-effort cleanup of partially-written temp file
+		}
+	}()
+
+	if err := f.Chmod(perm); err != nil {
+		_ = f.Close() //nolint:errcheck // cleanup on error path
+		return fmt.Errorf("setting permissions: %w", err)
+	}
+
+	if _, err := f.Write(data); err != nil {
+		_ = f.Close() //nolint:errcheck // cleanup on error path
+		return fmt.Errorf("writing data: %w", err)
+	}
+
+	if err := f.Sync(); err != nil {
+		_ = f.Close() //nolint:errcheck // cleanup on error path
+		return fmt.Errorf("syncing file: %w", err)
+	}
+
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("closing temp file: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("renaming temp file: %w", err)
+	}
+
+	success = true
 	return nil
 }
 
@@ -233,22 +295,7 @@ func LoadWithFlags(flags CLIFlags) (*Config, error) {
 	}
 
 	cfg.ApplyFlags(flags)
-	cfg.validateSecuritySettings()
 	return cfg, nil
-}
-
-// validateSecuritySettings checks for deprecated or insecure configuration settings
-// and adds warnings to the config.
-func (c *Config) validateSecuritySettings() {
-	for host, conn := range c.Connections {
-		// Warn about SSH password in config file (deprecated)
-		if conn.SSH.Password != "" {
-			c.Warnings = append(c.Warnings, fmt.Sprintf(
-				"SECURITY WARNING: Connection %q has SSH password in config file. "+
-					"Use PYRE_SSH_PASSWORD environment variable instead.",
-				host))
-		}
-	}
 }
 
 // HasConnections returns true if there are any configured connections

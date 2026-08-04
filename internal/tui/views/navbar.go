@@ -27,45 +27,12 @@ type NavbarModel struct {
 	width       int
 }
 
-// NewNavbarModel creates a new navigation bar model
-func NewNavbarModel() NavbarModel {
+// NewNavbarModel creates a navigation bar model rendering the given groups.
+// The widget owns no layout: pyre's production groups are derived from the
+// navDefs table in internal/tui/navigation.go.
+func NewNavbarModel(groups []NavGroup) NavbarModel {
 	return NavbarModel{
-		groups: []NavGroup{
-			{
-				ID:    "monitor",
-				Label: "Monitor",
-				Key:   "1",
-				Items: []NavItem{
-					{ID: "overview", Label: "Overview", Key: "1"},
-					{ID: "network", Label: "Network", Key: "2"},
-					{ID: "security", Label: "Security", Key: "3"},
-					{ID: "vpn", Label: "VPN", Key: "4"},
-				},
-			},
-			{
-				ID:    "analyze",
-				Label: "Analyze",
-				Key:   "2",
-				Items: []NavItem{
-					{ID: "policies", Label: "Policies", Key: "1"},
-					{ID: "nat", Label: "NAT", Key: "2"},
-					{ID: "sessions", Label: "Sessions", Key: "3"},
-					{ID: "interfaces", Label: "Interfaces", Key: "4"},
-					{ID: "routes", Label: "Routes", Key: "5"},
-					{ID: "ipsec", Label: "IPSec", Key: "6"},
-					{ID: "gpusers", Label: "GP Users", Key: "7"},
-					{ID: "logs", Label: "Logs", Key: "8"},
-				},
-			},
-			{
-				ID:    "tools",
-				Label: "Tools",
-				Key:   "3",
-				Items: []NavItem{
-					{ID: "config", Label: "Config", Key: "1"},
-				},
-			},
-		},
+		groups:      groups,
 		activeGroup: 0,
 		activeItem:  0,
 	}
@@ -151,7 +118,7 @@ func (m NavbarModel) GetItemID() string {
 }
 
 // RenderTabs renders the navigation tabs for the header
-// Returns: "1:Monitor  2:Analyze  3:Tools  4:Conn" with active group highlighted
+// Returns: "1:Monitor  2:Analyze  3:Tools" with active group highlighted
 func (m NavbarModel) RenderTabs() string {
 	// Styles
 	tabInactive := StatusMutedStyle.Padding(0, 1)

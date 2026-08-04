@@ -8,105 +8,91 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
-permissions:
-  contents: write
-  pull-requests: write
+# Deny-by-default at the workflow level; each job escalates only what it needs.
+permissions: {}
 
 jobs:
   release-please:
     name: Release Please
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write       # create the tag + GitHub release
+      pull-requests: write  # open/update the release PR
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
-      upload_url: ${{ steps.release.outputs.upload_url }}
 
     steps:
-      - uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
+      # Mint a short-lived installation token from the release GitHub App.
+      # The default GITHUB_TOKEN can't be used here: PRs/tags it creates
+      # don't trigger other workflows, so the release PR would get no CI.
+      - name: Mint app token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          # Downscope the minted token to exactly what release-please needs,
+          # even if the app itself is ever granted broader permissions.
+          permission-contents: write
+          permission-pull-requests: write
+
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
         id: release
         with:
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-  build-release:
-    name: Build Release (${{ matrix.goos }}/${{ matrix.goarch }})
+  goreleaser:
+    name: GoReleaser
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - goos: darwin
-            goarch: arm64
-            output: pyre-darwin-arm64
-          - goos: darwin
-            goarch: amd64
-            output: pyre-darwin-amd64
-          - goos: linux
-            goarch: amd64
-            output: pyre-linux-amd64
-          - goos: linux
-            goarch: arm64
-            output: pyre-linux-arm64
-          - goos: windows
-            goarch: amd64
-            output: pyre-windows-amd64.exe
-
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Set up Go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
-        with:
-          go-version: '1.25.7'
-          cache: true
-
-      - name: Build
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 0
-        run: |
-          go build -ldflags="-s -w -X main.version=${{ needs.release-please.outputs.tag_name }}" -o ${{ matrix.output }} ./cmd/pyre
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: ${{ matrix.output }}
-          path: ${{ matrix.output }}
-
-  upload-assets:
-    name: Upload Release Assets
-    needs: [release-please, build-release]
-    if: ${{ needs.release-please.outputs.release_created }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     permissions:
       contents: write
+      id-token: write      # cosign keyless OIDC + attestation signing
+      attestations: write  # actions/attest-build-provenance
 
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          path: artifacts
-          pattern: pyre-*
-          merge-multiple: true
+          fetch-depth: 0
+          # goreleaser reads tags/history locally and uses GITHUB_TOKEN from
+          # the env for the release API; it never pushes to the repo, so the
+          # token does not need to persist in .git/config.
+          persist-credentials: false
 
-      - name: Generate checksums
-        run: |
-          cd artifacts
-          sha256sum * > checksums.txt
-          cat checksums.txt
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.5'
+          cache: true
 
-      - name: Upload assets to release
+      - name: Install syft (for SBOM generation)
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+
+      - name: Install cosign (for keyless signing)
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          cd artifacts
-          for file in *; do
-            gh release upload ${{ needs.release-please.outputs.tag_name }} "$file" --repo ${{ github.repository }}
-          done
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ needs.release-please.outputs.tag_name }}
+        with:
+          distribution: goreleaser
+          # Pinned distribution version (the action itself is SHA-pinned
+          # above). Review when Renovate bumps the action, or quarterly.
+          version: "v2.16.0"
+          args: release --clean
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt

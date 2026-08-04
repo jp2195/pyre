@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/auth"
 )
@@ -54,7 +54,7 @@ func (m PickerModel) Selected() string {
 
 func (m PickerModel) Update(msg tea.Msg) (PickerModel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "j", "down":
 			if m.cursor < len(m.connections)-1 {
@@ -63,6 +63,12 @@ func (m PickerModel) Update(msg tea.Msg) (PickerModel, tea.Cmd) {
 		case "k", "up":
 			if m.cursor > 0 {
 				m.cursor--
+			}
+		case "g", "home":
+			m.cursor = 0
+		case "G", "end":
+			if len(m.connections) > 0 {
+				m.cursor = len(m.connections) - 1
 			}
 		}
 	}
@@ -110,9 +116,9 @@ func (m PickerModel) View() string {
 			line := indicator + style.Render(conn.Host)
 
 			// Add Panorama indicator with device count
-			if conn.IsPanorama {
+			if conn.PanoramaInfo() {
 				connCount := conn.ConnectedDeviceCount()
-				totalCount := len(conn.ManagedDevices)
+				totalCount := len(conn.ManagedDevicesSnapshot())
 				line += " " + panoramaStyle.Render(fmt.Sprintf("[Panorama: %d/%d devices]", connCount, totalCount))
 
 				// Show current target if set
@@ -132,7 +138,7 @@ func (m PickerModel) View() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("j/k: navigate  enter: select  a: add new  esc: back"))
+	b.WriteString(helpStyle.Render("j/k: navigate  g/G: first/last  enter: select  a: add new  esc: back"))
 
 	content := b.String()
 

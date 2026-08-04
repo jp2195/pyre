@@ -2,12 +2,14 @@ package views
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/models"
+	"github.com/jp2195/pyre/internal/tui/theme"
 )
 
 // containsAny returns true if any item in the list contains the query (case-insensitive).
@@ -73,9 +75,9 @@ func formatListCompact(items []string, maxLen int) string {
 		return "any"
 	}
 	if len(items) == 1 {
-		return truncateStr(items[0], maxLen)
+		return truncateEllipsis(items[0], maxLen)
 	}
-	first := truncateStr(items[0], maxLen-4)
+	first := truncateEllipsis(items[0], maxLen-4)
 	return fmt.Sprintf("%s+%d", first, len(items)-1)
 }
 
@@ -113,48 +115,47 @@ func formatHitCount(count int64) string {
 	if count >= 1_000 {
 		return fmt.Sprintf("%.1fK", float64(count)/1_000)
 	}
-	return fmt.Sprintf("%d", count)
+	return strconv.FormatInt(count, 10)
 }
 
-// formatHitCountFull formats a hit count with thousand separators.
-func formatHitCountFull(count int64) string {
-	if count == 0 {
-		return "0"
-	}
-	s := fmt.Sprintf("%d", count)
-	n := len(s)
-	if n <= 3 {
-		return s
-	}
-	var result strings.Builder
-	for i, c := range s {
-		if i > 0 && (n-i)%3 == 0 {
-			result.WriteRune(',')
-		}
-		result.WriteRune(c)
-	}
-	return result.String()
-}
-
-// formatLastHit formats a time as a relative duration for table display.
-func formatLastHit(t time.Time) string {
+// formatTimeAgo formats a time as a human-readable relative duration.
+// It is the single canonical "time ago" formatter used across views
+// (policy hit counts, dashboard login times, connection hub, etc.).
+func formatTimeAgo(t time.Time) string {
 	if t.IsZero() {
 		return "never"
 	}
 	d := time.Since(t)
-	if d < time.Minute {
+	switch {
+	case d < time.Minute:
 		return "just now"
+	case d < time.Hour:
+		mins := int(d.Minutes())
+		if mins == 1 {
+			return "1m ago"
+		}
+		return fmt.Sprintf("%dm ago", mins)
+	case d < 24*time.Hour:
+		hours := int(d.Hours())
+		if hours == 1 {
+			return "1h ago"
+		}
+		return fmt.Sprintf("%dh ago", hours)
+	case d < 7*24*time.Hour:
+		days := int(d.Hours() / 24)
+		if days == 1 {
+			return "1d ago"
+		}
+		return fmt.Sprintf("%dd ago", days)
+	case d < 30*24*time.Hour:
+		weeks := int(d.Hours() / 24 / 7)
+		if weeks == 1 {
+			return "1w ago"
+		}
+		return fmt.Sprintf("%dw ago", weeks)
+	default:
+		return t.Format("Jan 2, 2006")
 	}
-	if d < time.Hour {
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	}
-	if d < 24*time.Hour {
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	}
-	if d < 7*24*time.Hour {
-		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-	}
-	return t.Format("Jan 2")
 }
 
 // formatTimestamp formats a time as a full timestamp.
@@ -165,14 +166,120 @@ func formatTimestamp(t time.Time) string {
 	return t.Format("2006-01-02 15:04:05")
 }
 
-// truncateStr truncates a string using unicode ellipsis.
-func truncateStr(s string, maxLen int) string {
-	return truncateEllipsis(s, maxLen)
-}
-
 // hasProfiles returns true if the security rule has any individual profiles set.
 func hasProfiles(p models.SecurityRule) bool {
 	return p.AntivirusProfile != "" || p.VulnerabilityProfile != "" ||
 		p.SpywareProfile != "" || p.URLFilteringProfile != "" ||
 		p.FileBlockingProfile != "" || p.WildFireProfile != ""
+}
+
+// DetailRenderer is a builder for constructing detail panels with consistent styling.
+// It eliminates the repeated style setup and field rendering boilerplate across views.
+type DetailRenderer struct {
+	b          strings.Builder
+	labelWidth int
+	boxWidth   int
+	labelStyle lipgloss.Style
+	valueStyle lipgloss.Style
+	dimStyle   lipgloss.Style
+	section    lipgloss.Style
+}
+
+// NewDetailRenderer creates a detail renderer with standard styling.
+func NewDetailRenderer(width, labelWidth int) *DetailRenderer {
+	c := theme.Colors()
+	return &DetailRenderer{
+		boxWidth:   width - 10,
+		labelWidth: labelWidth,
+		labelStyle: DetailLabelStyle.Width(labelWidth),
+		valueStyle: DetailValueStyle,
+		dimStyle:   DetailDimStyle,
+		section:    DetailSectionStyle.Foreground(c.Primary),
+	}
+}
+
+// Title writes a styled title line.
+func (dr *DetailRenderer) Title(text string) *DetailRenderer {
+	dr.b.WriteString(ViewTitleStyle.Render(text))
+	dr.b.WriteString("\n")
+	return dr
+}
+
+// Subtitle writes a dim info line below the title.
+func (dr *DetailRenderer) Subtitle(text string) *DetailRenderer {
+	dr.b.WriteString(dr.dimStyle.Render(text))
+	dr.b.WriteString("\n")
+	return dr
+}
+
+// Section writes a section header with spacing.
+func (dr *DetailRenderer) Section(name string) *DetailRenderer {
+	dr.b.WriteString("\n")
+	dr.b.WriteString(dr.section.Render(name))
+	dr.b.WriteString("\n")
+	return dr
+}
+
+// Field writes a label-value pair.
+func (dr *DetailRenderer) Field(label, value string) *DetailRenderer {
+	dr.b.WriteString(dr.labelStyle.Render(label) + " " + dr.valueStyle.Render(value) + "\n")
+	return dr
+}
+
+// FieldIf writes a label-value pair only if value is non-empty.
+func (dr *DetailRenderer) FieldIf(label, value string) *DetailRenderer {
+	if value != "" {
+		return dr.Field(label, value)
+	}
+	return dr
+}
+
+// FieldStyled writes a label with a pre-styled value string.
+func (dr *DetailRenderer) FieldStyled(label, styledValue string) *DetailRenderer {
+	dr.b.WriteString(dr.labelStyle.Render(label) + " " + styledValue + "\n")
+	return dr
+}
+
+// FieldDim writes a label with a dimmed value.
+func (dr *DetailRenderer) FieldDim(label, value string) *DetailRenderer {
+	dr.b.WriteString(dr.labelStyle.Render(label) + " " + dr.dimStyle.Render(value) + "\n")
+	return dr
+}
+
+// Tags writes a tag line if tags are present.
+func (dr *DetailRenderer) Tags(tags []string) *DetailRenderer {
+	if len(tags) > 0 {
+		dr.b.WriteString(TagStyle.Render("Tags: " + strings.Join(tags, ", ")))
+		dr.b.WriteString("\n")
+	}
+	return dr
+}
+
+// Description writes a dim description line if non-empty.
+func (dr *DetailRenderer) Description(desc string) *DetailRenderer {
+	if desc != "" {
+		dr.b.WriteString(dr.dimStyle.Render(desc))
+		dr.b.WriteString("\n")
+	}
+	return dr
+}
+
+// Newline writes a blank line for spacing.
+func (dr *DetailRenderer) Newline() *DetailRenderer {
+	dr.b.WriteString("\n")
+	return dr
+}
+
+// Raw writes an arbitrary string directly.
+func (dr *DetailRenderer) Raw(s string) *DetailRenderer {
+	dr.b.WriteString(s)
+	return dr
+}
+
+// Render returns the detail panel wrapped in the standard box style.
+func (dr *DetailRenderer) Render() string {
+	boxStyle := ViewPanelStyle.
+		BorderForeground(theme.Colors().Primary).
+		Width(dr.boxWidth)
+	return boxStyle.Render(dr.b.String())
 }

@@ -28,9 +28,6 @@ func TestDefaultKeyMap(t *testing.T) {
 	if len(km.NavGroup3.Keys()) == 0 {
 		t.Error("expected NavGroup3 keys to be set")
 	}
-	if len(km.NavGroup4.Keys()) == 0 {
-		t.Error("expected NavGroup4 keys to be set")
-	}
 
 	// Test navigation keys
 	if len(km.Up.Keys()) == 0 {

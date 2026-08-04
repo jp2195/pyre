@@ -1,146 +1,154 @@
-# Logs
+# Logs View
 
-The Logs view displays system, traffic, and threat logs from the firewall. Access it through the Analyze group (press `2`, then cycle to Logs).
+System, traffic, and threat logs. Analyze group (`2`).
 
-## Log Types
+## Tab bar
 
-Use `]` to cycle forward or `[` to cycle backward between log types:
+Three tabs cycled with `]` (forward) and `[` (backward):
 
-### System Logs
+```
+System (N)   Traffic (N)   Threat (N)          Sort: <field> <dir>  |  Updated Xs ago
+```
 
-System events including:
-- Configuration changes
-- HA state changes
-- System errors and warnings
-- Authentication events
-- License events
+Each tab label shows the live filtered count for that log type. The
+right side of the tab bar shows the current sort field/direction and
+how long ago the data was last fetched. The tab bar updates in place
+as the filter changes.
 
-### Traffic Logs
+## System logs
 
-Session traffic logging showing:
-- Source and destination
-- Application identified
-- Action (allow, deny, drop)
-- Rule matched
-- Bytes transferred
-- Session duration
+Config changes, HA state, auth events, license events, etc.
 
-### Threat Logs
-
-Security events including:
-- Threat name and type
-- Severity level
-- Action taken
-- Source of threat
-- Affected destination
-- URL/file information
-
-## Display
-
-### System Log Columns
+### Columns (fixed layout)
 
 | Column | Description |
 |--------|-------------|
-| Time | When the event occurred |
-| Severity | Info, Warning, Error, Critical |
-| Event Type | Category of event |
-| Description | Event details |
+| Time | `2006-01-02 15:04:05` |
+| Sev | Abbreviated severity: `CRIT`, `HIGH`, `MED`, `LOW`, `INFO` |
+| Type | Event type / category (truncated to 18 chars) |
+| Description | Event description (width-adjusted) |
 
-### Traffic Log Columns
+Non-selected rows: Time in label style, Sev colored by severity, Type
+muted, Description in value style.
+
+### Filter scope
+
+Matches against: description, type, severity.
+
+### Sort fields
+
+| Label | Notes |
+|-------|-------|
+| Time | Default; newest first (descending) |
+| Severity | By severity rank |
+
+(Source and Action sort labels exist in the sort cycle but system logs
+fall through to Time for those fields.)
+
+### Detail panel (`enter`)
+
+Time, Severity (colored), Type, and the full description word-wrapped
+to the panel width.
+
+## Traffic logs
+
+Session traffic events.
+
+### Columns (fixed layout)
 
 | Column | Description |
 |--------|-------------|
-| Time | Session end time |
-| Source | Source IP address |
-| Destination | Destination IP address |
-| App | Identified application |
-| Action | Allow, Deny, Drop, Reset |
-| Rule | Matched security rule |
-| Bytes | Data transferred |
+| Time | `2006-01-02 15:04:05` |
+| Action | `allow`, `deny`, `drop`, etc. (truncated to 7 chars) |
+| Source | Source IP (truncated to 15 chars) |
+| Dest | Destination IP (truncated to 15 chars) |
+| App | Application (truncated to 12 chars) |
+| Rule | Matched rule (truncated to 15 chars) |
+| Bytes | Total bytes formatted |
 
-### Threat Log Columns
+Non-selected rows are colored by action (allow = green, deny/drop = red).
+
+### Filter scope
+
+Matches against: source IP, destination IP, application, rule, action,
+user.
+
+### Sort fields
+
+| Label | Notes |
+|-------|-------|
+| Time | Default; newest first (descending) |
+| Source | Source IP alphabetical |
+| Action | Action alphabetical |
+
+### Detail panel (`enter`)
+
+**Session**: Time, Action (colored), Session ID, Duration.
+**Source / Destination**: Source `IP:port (zone)`, Destination
+`IP:port (zone)`, NAT Source (if translated), NAT Dest (if translated).
+**Application**: Application, Protocol, Rule, User (if set).
+**Traffic**: Bytes (total + sent/recv), Packets (total + sent/recv).
+
+## Threat logs
+
+Security events from threat profiles.
+
+### Columns (fixed layout)
 
 | Column | Description |
 |--------|-------------|
-| Time | When threat was detected |
-| Threat | Threat name/signature |
-| Severity | Critical, High, Medium, Low, Info |
-| Source | Threat source IP |
-| Destination | Target IP |
-| Action | Alert, Block, Reset, etc. |
+| Time | `2006-01-02 15:04:05` |
+| Severity | Full severity string (truncated to 9 chars) |
+| Threat | Threat name / signature (truncated to 20 chars) |
+| Source | Source IP (truncated to 15 chars) |
+| Action | Action (truncated to 7 chars) |
+| Category | Threat category (truncated to 15 chars) |
 
-## Filtering
+There is no Destination column. Non-selected rows are colored by
+severity.
 
-Press `/` to enter filter mode. The filter matches against all displayed columns.
+### Filter scope
 
-Filter examples:
-- `10.0.1.50` - Events involving this IP
-- `deny` - Denied traffic
-- `critical` - Critical severity events
-- `config` - Configuration changes
+Matches against: source IP, destination IP, threat name, severity,
+action, threat category.
 
-Press `Esc` to clear the filter.
+### Sort fields
 
-## Sorting
+| Label | Notes |
+|-------|-------|
+| Time | Default; newest first (descending) |
+| Severity | By severity rank (critical > high > medium > low > informational) |
+| Source | Source IP alphabetical |
+| Action | Action alphabetical |
 
-Press `s` to cycle through sort fields (varies by log type).
+### Detail panel (`enter`)
 
-Press `S` (shift+s) to toggle sort direction.
+**Threat**: Time, Severity (colored), Threat Name, Threat ID, Category,
+Subtype, Action (colored), Direction.
+**Source / Destination**: Source `IP:port (zone)`, Destination
+`IP:port (zone)`.
+**Context**: Application, Rule, User (if set), URL (if set), Filename
+(if set).
 
-By default, logs are sorted by time (newest first).
-
-## Log Details
-
-Press `Enter` on a log entry to expand its details. The expanded view shows all available fields for that log type.
-
-Press `Enter` again or `Esc` to collapse.
-
-## Keybindings
+## Keys
 
 | Key | Action |
 |-----|--------|
-| `]` | Next log type (System -> Traffic -> Threat) |
-| `[` | Previous log type (System -> Threat -> Traffic) |
-| `j` / `Down` | Move cursor down |
-| `k` / `Up` | Move cursor up |
-| `g` / `Home` | Jump to first entry |
-| `G` / `End` | Jump to last entry |
-| `Ctrl+d` / `PgDn` | Page down |
-| `Ctrl+u` / `PgUp` | Page up |
-| `/` | Enter filter mode |
-| `Esc` | Clear filter |
-| `s` | Cycle sort field |
+| `]` | Next log type (System → Traffic → Threat → System) |
+| `[` | Previous log type (System → Threat → Traffic → System) |
+| `s` | Cycle sort field (resets cursor) |
 | `S` | Toggle sort direction |
-| `Enter` | Toggle log details |
-| `r` | Refresh logs |
+| `/` | Open filter input |
+| `enter` | Toggle detail panel |
+| `esc` | Clear active filter (no detail-collapse behavior — `esc` only clears filter in Logs) |
+| `r` | Refresh (app-level) |
 
-## Tips
+Switching tabs resets the cursor and collapses any open detail panel.
 
-### Investigating Security Events
+## Filter behavior
 
-1. Switch to Threat logs with `]` (press twice from System)
-2. Sort by Severity to see critical threats first
-3. Expand entries to see full threat details
-4. Note the source IP and rule that triggered
-
-### Tracking Configuration Changes
-
-1. Use System logs
-2. Filter by `config` or `commit`
-3. See who made changes and when
-
-### Analyzing Denied Traffic
-
-1. Switch to Traffic logs
-2. Filter by `deny` or `drop`
-3. Check which rule is blocking
-4. Verify it's expected behavior
-
-### Understanding Threat Actions
-
-- **Alert** - Threat logged but allowed
-- **Block** - Connection blocked
-- **Reset client** - RST sent to client
-- **Reset server** - RST sent to server
-- **Reset both** - RST sent to both sides
-- **Drop** - Silently dropped
+While the filter input is focused, `enter` commits the filter and
+resets the cursor; `esc` exits the input without clearing the typed
+text (text is preserved but not committed — the filter does not update
+until `enter`). This differs from the standard chrome: Logs re-applies
+the filter only on `enter`, not on `esc`.

@@ -5,6 +5,7 @@
   ],
   "labels": ["dependencies"],
   "postUpdateOptions": ["gomodTidy"],
+  "minimumReleaseAge": "3 days",
   "packageRules": [
     {
       "matchManagers": ["gomod"],
@@ -23,5 +24,9 @@
       "minimumReleaseAge": "14 days"
     }
   ],
-  "schedule": ["before 9am on monday"]
+  "schedule": ["before 9am on monday"],
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "minimumReleaseAge": "0 days"
+  }
 }

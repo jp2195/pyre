@@ -1,131 +1,50 @@
-# Interfaces
+# Interfaces View
 
-The Interfaces view displays network interface status and statistics. Access it through the Analyze group (press `2`, then cycle to Interfaces).
+Interface status and counters. Uses the
+[standard view chrome](README.md#standard-view-chrome).
 
-## Display
+## Columns
 
-Interfaces are displayed as cards showing:
+The `St` prefix column is a colored state bullet: `●` green = up,
+`○` red = down.
 
-| Field | Description |
-|-------|-------------|
-| Name | Interface name (e.g., ethernet1/1) |
-| State | Up or Down |
-| Zone | Assigned security zone |
-| IP Address | Configured IP address |
-| MAC Address | Hardware address |
-| Virtual Router | Assigned virtual router |
-| Speed/Duplex | Link speed and duplex mode |
-| Bytes In/Out | Traffic counters |
-| Packets In/Out | Packet counters |
-| Errors | Error counts (if any) |
+| Breakpoint | Columns |
+|------------|---------|
+| ≥ 120 | `St`, `Name`, `Type`, `Zone`, `IP`, `MAC`, `VR` |
+| ≥ 90 | `St`, `Name`, `Type`, `Zone`, `IP`, `VR` |
+| < 90 | `St`, `Name`, `Zone`, `IP` |
 
-### State Indicators
+`MAC` and `VR` are dropped at narrower widths. `Type` is dropped at the
+narrowest breakpoint. Speed, duplex, counters, and ARP entries are in
+the detail panel — they are not columns.
 
-- **Green/Up** - Interface is operational
-- **Red/Down** - Interface is down
-- **Yellow** - Interface has errors or warnings
+## Sort fields
 
-### Interface Types
+Cycled with `s`; direction toggled with `S`. All fields default to
+ascending.
 
-The view shows various interface types:
-- **Physical** (ethernet1/1, etc.)
-- **Aggregate** (ae1, etc.)
-- **VLAN** (ethernet1/1.100, etc.)
-- **Loopback** (loopback.1, etc.)
-- **Tunnel** (tunnel.1, etc.)
+| Index | Label | Notes |
+|-------|-------|-------|
+| 0 | Name | alphabetical |
+| 1 | Zone | alphabetical |
+| 2 | State | up interfaces sort first; ties broken by name |
+| 3 | IP | lexicographic |
 
-## Filtering
+## Filter scope
 
-Press `/` to enter filter mode. The filter matches against:
+Matches (case-insensitive substring) against: name, zone, IP, state,
+type, virtual router.
 
-- Interface name
-- Zone name
-- IP address
-- State (up/down)
+## Detail panel (`enter`)
 
-Filter examples:
-- `ethernet1` - Physical interfaces on slot 1
-- `trust` - Interfaces in the trust zone
-- `10.0` - Interfaces with IPs starting with 10.0
-- `down` - Interfaces that are down
+Two-column layout at ≥ 100 wide; single column otherwise. Sections:
 
-Press `Esc` to clear the filter.
-
-## Sorting
-
-Press `s` to cycle through sort fields:
-
-1. **Name** (default) - Alphabetical by interface name
-2. **Zone** - Grouped by zone
-3. **State** - Up interfaces first or last
-4. **IP** - By IP address
-
-Press `S` (shift+s) to toggle sort direction.
-
-## Interface Details
-
-Press `Enter` on an interface to expand its details. The expanded view shows:
-
-### Configuration
-- Full interface configuration
-- IP address and netmask
-- Zone and virtual router assignment
-- Link state settings
-
-### Counters
-- Detailed byte and packet counters
-- Error and drop counters by type
-- Multicast/broadcast statistics
-
-### Physical Layer
-- Speed and duplex negotiation
-- Media type
-- Hardware details
-
-Press `Enter` again or `Esc` to collapse.
-
-## Keybindings
-
-| Key | Action |
-|-----|--------|
-| `j` / `Down` | Move cursor down |
-| `k` / `Up` | Move cursor up |
-| `g` / `Home` | Jump to first interface |
-| `G` / `End` | Jump to last interface |
-| `Ctrl+d` / `PgDn` | Page down |
-| `Ctrl+u` / `PgUp` | Page up |
-| `/` | Enter filter mode |
-| `Esc` | Clear filter |
-| `s` | Cycle sort field |
-| `S` | Toggle sort direction |
-| `Enter` | Toggle interface details |
-| `r` | Refresh interfaces |
-
-## Tips
-
-### Identifying Problem Interfaces
-
-1. Filter by `down` to see non-operational interfaces
-2. Sort by State to group down interfaces
-3. Check error counters in the details view
-
-### Monitoring Traffic Distribution
-
-1. Look at Bytes In/Out across interfaces
-2. High traffic interfaces may need capacity attention
-3. Compare against expected traffic patterns
-
-### Troubleshooting Connectivity
-
-1. Verify the interface is Up
-2. Check the IP address configuration
-3. Verify zone assignment matches your policy
-4. Look for errors or drops in the details
-
-### Understanding Error Counters
-
-Common error types:
-- **Input errors** - Problems receiving packets (CRC, framing)
-- **Output errors** - Problems transmitting packets
-- **Drops** - Packets intentionally dropped (queue full, etc.)
-- **Collisions** - Half-duplex collision issues
+- **Basic Information** — State (● UP / ○ DOWN), Type, Zone, Mode,
+  Vsys (if set).
+- **Network** — IP Address, MAC Address, Virtual Router, MTU (if > 0),
+  VLAN Tag (if > 0).
+- **Physical** — Speed, Duplex.
+- **Traffic Statistics** (if any counters > 0) — Bytes In/Out, Packets
+  In/Out, Errors in/out (if non-zero), Drops in/out (if non-zero).
+- **ARP Entries** (if any for this interface) — up to 5 entries showing
+  status bullet, IP, and MAC; count of additional entries shown if more.

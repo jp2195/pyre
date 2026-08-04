@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -15,7 +16,7 @@ type State struct {
 
 // ConnectionState holds state for a single connection
 type ConnectionState struct {
-	LastConnected time.Time `json:"last_connected,omitempty"`
+	LastConnected time.Time `json:"last_connected"`
 	LastUser      string    `json:"last_user,omitempty"`
 	ConnectCount  int       `json:"connect_count"`
 }
@@ -40,6 +41,15 @@ func LoadState() (*State, error) {
 		return state, nil
 	}
 
+	// Warn if the state file is readable by group/other, mirroring the
+	// equivalent check on ~/.pyre.yaml in Load().
+	if info, statErr := os.Stat(statePath); statErr == nil {
+		if info.Mode().Perm()&0o077 != 0 {
+			log.Printf("warning: %s has permissive mode %#o; run `chmod 600 %s`",
+				statePath, info.Mode().Perm(), statePath)
+		}
+	}
+
 	data, err := os.ReadFile(statePath) // #nosec G304 -- Path is constructed from user's home directory
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -60,29 +70,42 @@ func LoadState() (*State, error) {
 	return state, nil
 }
 
-// Save writes the state to disk
-func (s *State) Save() error {
+// Marshal returns the JSON representation Save writes to disk. Must be
+// called from the TUI event loop (see Config.Marshal).
+func (s *State) Marshal() ([]byte, error) {
+	data, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal state: %w", err)
+	}
+	return data, nil
+}
+
+// WriteStateBytes writes pre-marshaled state data to ~/.pyre/state.json.
+// Safe to call from a background goroutine.
+func WriteStateBytes(data []byte) error {
 	statePath, err := StatePath()
 	if err != nil {
 		return err
 	}
 
-	// Ensure directory exists
 	dir := filepath.Dir(statePath)
 	if mkdirErr := os.MkdirAll(dir, 0700); mkdirErr != nil {
 		return fmt.Errorf("failed to create state directory: %w", mkdirErr)
 	}
 
-	data, err := json.MarshalIndent(s, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal state: %w", err)
-	}
-
-	if err := os.WriteFile(statePath, data, 0600); err != nil {
+	if err := atomicWriteFile(statePath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write state file: %w", err)
 	}
-
 	return nil
+}
+
+// Save writes the state to disk.
+func (s *State) Save() error {
+	data, err := s.Marshal()
+	if err != nil {
+		return err
+	}
+	return WriteStateBytes(data)
 }
 
 // UpdateConnection updates the state for a connection after a successful connection

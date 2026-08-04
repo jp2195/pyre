@@ -2,26 +2,24 @@ package views
 
 import (
 	"fmt"
-	"sort"
+	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 )
 
 // ConfigDashboardModel represents the configuration-focused dashboard
 type ConfigDashboardModel struct {
+	DashboardBase
+
 	policies       []models.SecurityRule
+	policiesByHits []models.SecurityRule
 	pendingChanges []models.PendingChange
 
 	policyErr  error
 	changesErr error
-
-	width        int
-	height       int
-	SpinnerFrame string
 }
 
 // NewConfigDashboardModel creates a new config dashboard model
@@ -37,8 +35,8 @@ func (m ConfigDashboardModel) SetSpinnerFrame(frame string) ConfigDashboardModel
 
 // SetSize sets the terminal dimensions
 func (m ConfigDashboardModel) SetSize(width, height int) ConfigDashboardModel {
-	m.width = width
-	m.height = height
+	m.Width = width
+	m.Height = height
 	return m
 }
 
@@ -46,6 +44,11 @@ func (m ConfigDashboardModel) SetSize(width, height int) ConfigDashboardModel {
 func (m ConfigDashboardModel) SetPolicies(policies []models.SecurityRule, err error) ConfigDashboardModel {
 	m.policies = policies
 	m.policyErr = err
+	if policies == nil {
+		m.policiesByHits = nil
+	} else {
+		m.policiesByHits = sortPoliciesByHits(policies)
+	}
 	return m
 }
 
@@ -68,15 +71,13 @@ func (m ConfigDashboardModel) HasData() bool {
 
 // View renders the config dashboard
 func (m ConfigDashboardModel) View() string {
-	if m.width == 0 {
+	if m.Width == 0 {
 		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
-	totalWidth := m.width - 4
-	leftColWidth := totalWidth / 2
-	rightColWidth := totalWidth - leftColWidth - 2
+	totalWidth, leftColWidth, rightColWidth := m.ColumnWidths()
 
-	if leftColWidth < 35 {
+	if m.IsNarrow() {
 		return m.renderSingleColumn(totalWidth)
 	}
 
@@ -85,26 +86,23 @@ func (m ConfigDashboardModel) View() string {
 		m.renderPolicyStats(leftColWidth),
 		m.renderPendingChanges(leftColWidth),
 	}
-	leftCol := lipgloss.JoinVertical(lipgloss.Left, leftPanels...)
 
 	// Right column: rule analysis
 	rightPanels := []string{
 		m.renderZeroHitRules(rightColWidth),
 		m.renderMostHitRules(rightColWidth),
 	}
-	rightCol := lipgloss.JoinVertical(lipgloss.Left, rightPanels...)
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, leftCol, "  ", rightCol)
+	return m.RenderTwoColumn(leftPanels, rightPanels)
 }
 
 func (m ConfigDashboardModel) renderSingleColumn(width int) string {
-	panels := []string{
+	return m.RenderSingleColumn([]string{
 		m.renderPolicyStats(width),
 		m.renderPendingChanges(width),
 		m.renderZeroHitRules(width),
 		m.renderMostHitRules(width),
-	}
-	return lipgloss.JoinVertical(lipgloss.Left, panels...)
+	})
 }
 
 func (m ConfigDashboardModel) renderPolicyStats(width int) string {
@@ -151,32 +149,32 @@ func (m ConfigDashboardModel) renderPolicyStats(width int) string {
 	}
 
 	// Summary
-	b.WriteString(valueStyle().Render(fmt.Sprintf("%d", totalRules)))
+	b.WriteString(valueStyle().Render(strconv.Itoa(totalRules)))
 	b.WriteString(dimStyle().Render(" total rules ("))
-	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", enabledRules)))
+	b.WriteString(highlightStyle().Render(strconv.Itoa(enabledRules)))
 	b.WriteString(dimStyle().Render(" enabled)"))
 	b.WriteString("\n\n")
 
 	// Breakdown
 	labelWidth := 12
 	b.WriteString(labelStyle().Render(fmt.Sprintf("%-*s", labelWidth, "Allow:")))
-	b.WriteString(highlightStyle().Render(fmt.Sprintf("%d", allowRules)))
+	b.WriteString(highlightStyle().Render(strconv.Itoa(allowRules)))
 	b.WriteString("\n")
 
 	b.WriteString(labelStyle().Render(fmt.Sprintf("%-*s", labelWidth, "Deny/Drop:")))
-	b.WriteString(errorStyle().Render(fmt.Sprintf("%d", denyRules)))
+	b.WriteString(errorStyle().Render(strconv.Itoa(denyRules)))
 	b.WriteString("\n")
 
 	b.WriteString(labelStyle().Render(fmt.Sprintf("%-*s", labelWidth, "Zero-hit:")))
 	if zeroHitRules > 0 {
-		b.WriteString(warningStyle().Render(fmt.Sprintf("%d", zeroHitRules)))
+		b.WriteString(warningStyle().Render(strconv.Itoa(zeroHitRules)))
 	} else {
 		b.WriteString(highlightStyle().Render("0"))
 	}
 	b.WriteString("\n")
 
 	b.WriteString(labelStyle().Render(fmt.Sprintf("%-*s", labelWidth, "Total hits:")))
-	b.WriteString(accentStyle().Render(formatNumber(totalHits)))
+	b.WriteString(accentStyle().Render(formatNumberWithCommas(totalHits)))
 
 	return panelStyle().Width(width).Render(b.String())
 }
@@ -203,7 +201,7 @@ func (m ConfigDashboardModel) renderPendingChanges(width int) string {
 	}
 
 	// Count
-	b.WriteString(warningStyle().Render(fmt.Sprintf("%d", len(m.pendingChanges))))
+	b.WriteString(warningStyle().Render(strconv.Itoa(len(m.pendingChanges))))
 	b.WriteString(dimStyle().Render(" uncommitted changes"))
 	b.WriteString("\n\n")
 
@@ -223,23 +221,20 @@ func (m ConfigDashboardModel) renderPendingChanges(width int) string {
 		for user, count := range userChanges {
 			userName := truncateEllipsis(user, 15)
 			b.WriteString(labelStyle().Render(fmt.Sprintf("  %-15s ", userName)))
-			b.WriteString(valueStyle().Render(fmt.Sprintf("%d", count)))
+			b.WriteString(valueStyle().Render(strconv.Itoa(count)))
 			b.WriteString("\n")
 		}
 	}
 
 	// Show recent changes
-	maxShow := 4
-	if len(m.pendingChanges) < maxShow {
-		maxShow = len(m.pendingChanges)
-	}
+	maxShow := min(len(m.pendingChanges), 4)
 
 	if maxShow > 0 {
 		b.WriteString("\n")
 		b.WriteString(subtitleStyle().Render("Recent:"))
 		b.WriteString("\n")
 
-		for i := 0; i < maxShow; i++ {
+		for i := range maxShow {
 			change := m.pendingChanges[i]
 
 			typeStyle := dimStyle()
@@ -270,157 +265,9 @@ func (m ConfigDashboardModel) renderPendingChanges(width int) string {
 }
 
 func (m ConfigDashboardModel) renderZeroHitRules(width int) string {
-	var b strings.Builder
-	b.WriteString(titleStyle().Render("Zero-Hit Rules"))
-	b.WriteString("\n")
-
-	if m.policyErr != nil {
-		b.WriteString(dimStyle().Render("Not available"))
-		return panelStyle().Width(width).Render(b.String())
-	}
-	if m.policies == nil {
-		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
-		return panelStyle().Width(width).Render(b.String())
-	}
-
-	// Find zero-hit rules
-	var zeroHitRules []models.SecurityRule
-	for _, rule := range m.policies {
-		if rule.HitCount == 0 && !rule.Disabled {
-			zeroHitRules = append(zeroHitRules, rule)
-		}
-	}
-
-	if len(zeroHitRules) == 0 {
-		b.WriteString(highlightStyle().Render("All active rules have hits"))
-		return panelStyle().Width(width).Render(b.String())
-	}
-
-	// Summary
-	totalActive := 0
-	for _, rule := range m.policies {
-		if !rule.Disabled {
-			totalActive++
-		}
-	}
-
-	pct := float64(len(zeroHitRules)) / float64(totalActive) * 100
-	b.WriteString(warningStyle().Render(fmt.Sprintf("%d", len(zeroHitRules))))
-	b.WriteString(dimStyle().Render(fmt.Sprintf(" of %d rules (%.0f%%)", totalActive, pct)))
-	b.WriteString("\n\n")
-
-	// List rules
-	maxShow := 8
-	if len(zeroHitRules) < maxShow {
-		maxShow = len(zeroHitRules)
-	}
-
-	nameWidth := width - 15
-	if nameWidth > 30 {
-		nameWidth = 30
-	}
-
-	for i := 0; i < maxShow; i++ {
-		rule := zeroHitRules[i]
-		name := truncateEllipsis(rule.Name, nameWidth)
-
-		var actionStyle lipgloss.Style
-		switch rule.Action {
-		case "allow":
-			actionStyle = highlightStyle()
-		case "deny", "drop":
-			actionStyle = errorStyle()
-		default:
-			actionStyle = dimStyle()
-		}
-
-		b.WriteString(labelStyle().Render(fmt.Sprintf("%3d. ", rule.Position)))
-		b.WriteString(valueStyle().Render(fmt.Sprintf("%-*s ", nameWidth, name)))
-		b.WriteString(actionStyle.Render(rule.Action))
-		if i < maxShow-1 {
-			b.WriteString("\n")
-		}
-	}
-
-	if len(zeroHitRules) > maxShow {
-		b.WriteString("\n")
-		b.WriteString(dimStyle().Render(fmt.Sprintf("... and %d more", len(zeroHitRules)-maxShow)))
-	}
-
-	return panelStyle().Width(width).Render(b.String())
+	return renderZeroHitRulesPanel(m.policies, m.policyErr, m.SpinnerFrame, width, 8, 15)
 }
 
 func (m ConfigDashboardModel) renderMostHitRules(width int) string {
-	var b strings.Builder
-	b.WriteString(titleStyle().Render("Most-Hit Rules"))
-	b.WriteString("\n")
-
-	if m.policyErr != nil {
-		b.WriteString(dimStyle().Render("Not available"))
-		return panelStyle().Width(width).Render(b.String())
-	}
-	if m.policies == nil {
-		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
-		return panelStyle().Width(width).Render(b.String())
-	}
-
-	if len(m.policies) == 0 {
-		b.WriteString(dimStyle().Render("No rules"))
-		return panelStyle().Width(width).Render(b.String())
-	}
-
-	// Sort by hit count
-	sorted := make([]models.SecurityRule, len(m.policies))
-	copy(sorted, m.policies)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].HitCount > sorted[j].HitCount
-	})
-
-	// Show top rules
-	maxShow := 10
-	shown := 0
-	totalWithHits := 0
-	nameWidth := width - 20
-	if nameWidth > 25 {
-		nameWidth = 25
-	}
-
-	for _, rule := range sorted {
-		if rule.HitCount == 0 {
-			continue
-		}
-		totalWithHits++
-		if shown >= maxShow {
-			continue
-		}
-
-		name := truncateEllipsis(rule.Name, nameWidth)
-
-		var actionStyle lipgloss.Style
-		switch rule.Action {
-		case "allow":
-			actionStyle = highlightStyle()
-		case "deny", "drop":
-			actionStyle = errorStyle()
-		default:
-			actionStyle = dimStyle()
-		}
-
-		b.WriteString(valueStyle().Render(fmt.Sprintf("%-*s ", nameWidth, name)))
-		b.WriteString(actionStyle.Render(fmt.Sprintf("%-5s ", rule.Action)))
-		b.WriteString(accentStyle().Render(formatNumber(rule.HitCount)))
-		b.WriteString("\n")
-		shown++
-	}
-
-	if shown == 0 {
-		b.WriteString(dimStyle().Render("No rules have been hit"))
-	}
-
-	result := strings.TrimSuffix(b.String(), "\n")
-	if totalWithHits > maxShow {
-		result += "\n" + dimStyle().Render(fmt.Sprintf("... and %d more rules", totalWithHits-maxShow))
-	}
-
-	return panelStyle().Width(width).Render(result)
+	return renderMostHitRulesPanel(m.policiesByHits, m.policyErr, m.SpinnerFrame, width, 10)
 }

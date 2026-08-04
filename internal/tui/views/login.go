@@ -3,9 +3,9 @@ package views
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/auth"
 )
@@ -35,7 +35,7 @@ func NewLoginModel(creds *auth.Credentials) LoginModel {
 	host := textinput.New()
 	host.Placeholder = "firewall.example.com"
 	host.CharLimit = 255
-	host.Width = 40
+	host.SetWidth(40)
 	if creds.Host != "" {
 		host.SetValue(creds.Host)
 	}
@@ -43,7 +43,7 @@ func NewLoginModel(creds *auth.Credentials) LoginModel {
 	username := textinput.New()
 	username.Placeholder = "admin"
 	username.CharLimit = 64
-	username.Width = 40
+	username.SetWidth(40)
 	if creds.Username != "" {
 		username.SetValue(creds.Username)
 	}
@@ -51,7 +51,7 @@ func NewLoginModel(creds *auth.Credentials) LoginModel {
 	password := textinput.New()
 	password.Placeholder = "password"
 	password.CharLimit = 128
-	password.Width = 40
+	password.SetWidth(40)
 	password.EchoMode = textinput.EchoPassword
 	password.EchoCharacter = '•'
 

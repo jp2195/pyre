@@ -1,24 +1,33 @@
 package tui
 
 import (
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/auth"
 	"github.com/jp2195/pyre/internal/tui/views"
 )
 
-func (m Model) handleLoginKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLoginKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch {
 	case msg.String() == "ctrl+c":
 		return m, tea.Quit
 
+	case msg.String() == "esc":
+		// Reset the login form so any typed credentials (password included)
+		// do not linger in the textinput buffers after leaving the view.
+		// Keeps secret in-memory lifetime as short as possible — see the
+		// "Credential Resolution" section of CLAUDE.md.
+		m.login = views.NewLoginModel(&auth.Credentials{})
+		m.currentView = ViewConnectionHub
+		return m, nil
+
 	case msg.String() == "enter":
 		if m.login.CanSubmit() {
 			m.loading = true
-			return m, m.doLogin()
+			return m, tea.Batch(m.doLogin(), m.spinner.Tick)
 		}
 
 	case msg.String() == " ":
@@ -41,7 +50,7 @@ func (m Model) handleLoginKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) handlePickerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handlePickerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	pickerKeys := DefaultPickerKeyMap()
 
 	switch {
@@ -74,7 +83,7 @@ func (m Model) handlePickerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) handleDevicePickerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleDevicePickerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	devicePickerKeys := DefaultDevicePickerKeyMap()
 
 	switch {
@@ -87,17 +96,19 @@ func (m Model) handleDevicePickerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if conn != nil {
 			device := m.devicePicker.SelectedDevice()
 			if err := conn.SetTarget(device); err != nil {
-				return m, m.setError(err)
+				var cmd tea.Cmd
+				m, cmd = m.setError(err)
+				return m, cmd
 			}
 			m.currentView = ViewDashboard
-			return m, m.fetchCurrentDashboardData()
+			return m, tea.Batch(m.fetchCurrentDashboardData(), m.spinner.Tick)
 		}
 		return m, nil
 
 	case key.Matches(msg, devicePickerKeys.Refresh):
 		conn := m.session.GetActiveConnection()
 		if conn != nil {
-			return m, m.fetchManagedDevices(conn)
+			return m, tea.Batch(m.fetchManagedDevices(conn), m.spinner.Tick)
 		}
 		return m, nil
 	}
@@ -107,7 +118,7 @@ func (m Model) handleDevicePickerKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) handleCommandPaletteKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleCommandPaletteKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.currentView = m.previousView
@@ -175,6 +186,13 @@ func (m Model) buildCommandRegistry() []views.Command {
 			Description: "NAT translation rules",
 			Category:    "Analyze",
 			Action:      func() tea.Msg { return SwitchViewMsg{ViewNATPolicies} },
+		},
+		{
+			ID:          "analyze-objects",
+			Label:       "Objects",
+			Description: "Address & service objects",
+			Category:    "Analyze",
+			Action:      func() tea.Msg { return SwitchViewMsg{ViewObjects} },
 		},
 		{
 			ID:          "analyze-sessions",
@@ -263,14 +281,17 @@ func (m Model) buildCommandRegistry() []views.Command {
 			Description: "Exit application",
 			Category:    "System",
 			Shortcut:    "q",
-			Action:      func() tea.Msg { return tea.Quit() },
+			// tea.Quit is itself a tea.Cmd (func() tea.Msg) — use it
+			// directly so tea.QuitMsg is produced at invocation time, not
+			// at registry-build time.
+			Action: tea.Quit,
 		},
 	}
 
 	return commands
 }
 
-func (m Model) handleConnectionHubKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleConnectionHubKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	hubKeys := DefaultConnectionHubKeyMap()
 
 	// Handle delete confirmation
@@ -342,7 +363,7 @@ func (m Model) handleConnectionHubKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) handleConnectionFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleConnectionFormKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	formKeys := DefaultConnectionFormKeyMap()
 
 	switch {
@@ -394,7 +415,33 @@ func (m Model) handleConnectionFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) handleViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+// currentViewFiltering reports whether the active view's filter text
+// input is focused. Views absent from the switch have no filter.
+func (m Model) currentViewFiltering() bool {
+	switch m.currentView {
+	case ViewPolicies:
+		return m.policies.IsFilterMode()
+	case ViewNATPolicies:
+		return m.natPolicies.IsFilterMode()
+	case ViewSessions:
+		return m.sessions.IsFilterMode()
+	case ViewInterfaces:
+		return m.interfaces.IsFilterMode()
+	case ViewRoutes:
+		return m.routes.IsFilterMode()
+	case ViewIPSecTunnels:
+		return m.ipsecTunnels.IsFilterMode()
+	case ViewGPUsers:
+		return m.gpUsers.IsFilterMode()
+	case ViewLogs:
+		return m.logs.IsFilterMode()
+	case ViewObjects:
+		return m.objects.IsFilterMode()
+	}
+	return false
+}
+
+func (m Model) handleViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch m.currentView {
@@ -416,6 +463,8 @@ func (m Model) handleViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.gpUsers, cmd = m.gpUsers.Update(msg)
 	case ViewLogs:
 		m.logs, cmd = m.logs.Update(msg)
+	case ViewObjects:
+		m.objects, cmd = m.objects.Update(msg)
 	}
 
 	return m, cmd

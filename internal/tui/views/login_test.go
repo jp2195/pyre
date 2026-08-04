@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/auth"
 )
@@ -158,7 +158,7 @@ func TestLoginModel_Update(t *testing.T) {
 	m := NewLoginModel(creds)
 
 	// Type in host field
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")}
+	msg := tea.KeyPressMsg{Code: 'a', Text: "a"}
 	updated, _ := m.Update(msg)
 
 	// The input should have processed the key

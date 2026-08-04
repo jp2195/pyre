@@ -20,10 +20,11 @@
 - [ ] I have read the contributing guidelines
 - [ ] My code follows the project's code style
 - [ ] I have added tests that prove my fix/feature works
-- [ ] All new and existing tests pass (`go test ./...`)
+- [ ] All new and existing tests pass (`go test -race ./...`)
 - [ ] `go vet ./...` passes
 - [ ] `golangci-lint run` passes
 - [ ] I have updated documentation as needed
+- [ ] CI security scans pass (govulncheck, gosec, CodeQL run automatically — check the Actions results)
 
 ## Testing
 

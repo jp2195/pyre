@@ -133,17 +133,24 @@ func (m *MockPANOS) handleOp(w http.ResponseWriter, r *http.Request, cmd string)
 func (m *MockPANOS) handleConfig(w http.ResponseWriter, r *http.Request) {
 	xpath := r.URL.Query().Get("xpath")
 
-	// Only respond to local rulebase queries (not pre-rulebase or post-rulebase)
-	// This simulates a standalone firewall without Panorama-pushed policies
-	if strings.Contains(xpath, "rulebase/security/rules") &&
+	switch {
+	case strings.Contains(xpath, "rulebase/security/rules") &&
 		!strings.Contains(xpath, "pre-rulebase") &&
-		!strings.Contains(xpath, "post-rulebase") {
+		!strings.Contains(xpath, "post-rulebase"):
 		m.respondSecurityRules(w)
-	} else if strings.Contains(xpath, "rulebase/nat/rules") &&
+	case strings.Contains(xpath, "rulebase/nat/rules") &&
 		!strings.Contains(xpath, "pre-rulebase") &&
-		!strings.Contains(xpath, "post-rulebase") {
+		!strings.Contains(xpath, "post-rulebase"):
 		m.respondNATRules(w)
-	} else {
+	case strings.HasSuffix(xpath, "/vsys/entry[@name='vsys1']/address"):
+		m.respondAddressesVsys(w)
+	case strings.HasSuffix(xpath, "/shared/address"):
+		m.respondAddressesShared(w)
+	case strings.HasSuffix(xpath, "/vsys/entry[@name='vsys1']/service"):
+		m.respondServicesVsys(w)
+	case strings.HasSuffix(xpath, "/shared/service"):
+		m.respondServicesShared(w)
+	default:
 		_, _ = w.Write([]byte(`<response status="success"><result></result></response>`)) //nolint:errcheck // test helper
 	}
 }
@@ -613,6 +620,70 @@ func (m *MockPANOS) respondManagedDevices(w http.ResponseWriter) {
 <device-group>Data-Center</device-group>
 </entry>
 </devices>
+</result>
+</response>`))
+}
+
+//nolint:errcheck // test helper
+func (m *MockPANOS) respondAddressesVsys(w http.ResponseWriter) {
+	_, _ = w.Write([]byte(`<response status="success">
+<result>
+  <address>
+    <entry name="web-servers">
+      <ip-netmask>10.0.0.0/24</ip-netmask>
+      <description>Production web tier</description>
+      <tag><member>prod</member><member>web</member></tag>
+    </entry>
+    <entry name="azure-east-range">
+      <ip-range>52.224.0.1-52.255.255.255</ip-range>
+      <tag><member>cloud</member></tag>
+    </entry>
+    <entry name="partner-vpn">
+      <fqdn>vpn.partner.example.com</fqdn>
+    </entry>
+  </address>
+</result>
+</response>`))
+}
+
+//nolint:errcheck // test helper
+func (m *MockPANOS) respondAddressesShared(w http.ResponseWriter) {
+	_, _ = w.Write([]byte(`<response status="success">
+<result>
+  <address>
+    <entry name="legacy-wildcard">
+      <ip-wildcard>10.0.0.0/0.0.255.255</ip-wildcard>
+    </entry>
+  </address>
+</result>
+</response>`))
+}
+
+//nolint:errcheck // test helper
+func (m *MockPANOS) respondServicesVsys(w http.ResponseWriter) {
+	_, _ = w.Write([]byte(`<response status="success">
+<result>
+  <service>
+    <entry name="tcp-443">
+      <protocol><tcp><port>443</port><source-port>1024-65535</source-port></tcp></protocol>
+    </entry>
+    <entry name="tcp-mssql">
+      <protocol><tcp><port>1433,1434</port></tcp></protocol>
+    </entry>
+  </service>
+</result>
+</response>`))
+}
+
+//nolint:errcheck // test helper
+func (m *MockPANOS) respondServicesShared(w http.ResponseWriter) {
+	_, _ = w.Write([]byte(`<response status="success">
+<result>
+  <service>
+    <entry name="udp-dns">
+      <protocol><udp><port>53</port></udp></protocol>
+    </entry>
+  </service>
 </result>
 </response>`))
 }

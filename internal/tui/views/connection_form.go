@@ -3,9 +3,9 @@ package views
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/config"
 )
@@ -87,12 +87,12 @@ func newBaseForm() ConnectionFormModel {
 	hostInput := textinput.New()
 	hostInput.Placeholder = "10.1.1.1 or firewall.example.com"
 	hostInput.CharLimit = 255
-	hostInput.Width = 40
+	hostInput.SetWidth(40)
 
 	usernameInput := textinput.New()
 	usernameInput.Placeholder = "admin"
 	usernameInput.CharLimit = 64
-	usernameInput.Width = 40
+	usernameInput.SetWidth(40)
 
 	return ConnectionFormModel{
 		hostInput:     hostInput,
