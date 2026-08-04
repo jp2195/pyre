@@ -73,7 +73,7 @@ func (m LogsModel) renderSystemTable() string {
 				sevAbbrev,
 				truncate(log.Type, 18),
 				desc)
-			return TableRowSelectedStyle.Render(row)
+			return TableSelectedRowStyle().Render(row)
 		}
 		// Build row with colored severity indicator
 		sevStyle := SeverityStyle(log.Severity)

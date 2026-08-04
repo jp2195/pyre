@@ -60,13 +60,28 @@ func (m VPNDashboardModel) Update(msg tea.Msg) (VPNDashboardModel, tea.Cmd) {
 	return m, nil
 }
 
-// HasData returns true if the dashboard has already loaded its data
+// HasData reports whether every panel has settled — see the note on
+// SecurityDashboardModel.HasData about the spinner tick chain.
 func (m VPNDashboardModel) HasData() bool {
-	return m.tunnels != nil
+	hasTunnels := m.tunnels != nil || m.tunnelErr != nil
+	hasGPUsers := m.gpUsers != nil || m.gpErr != nil
+	return hasTunnels && hasGPUsers
 }
 
-// View renders the VPN dashboard
+// View renders the dashboard, trimmed to the visible height. The panel stack
+// is frequently taller than the terminal, so ClampToHeight windows it and
+// appends a scroll indicator.
 func (m VPNDashboardModel) View() string {
+	return m.ClampToHeight(m.content())
+}
+
+// ContentHeight is the untrimmed height of the panel stack, used to clamp the
+// scroll offset.
+func (m VPNDashboardModel) ContentHeight() int {
+	return lipgloss.Height(m.content())
+}
+
+func (m VPNDashboardModel) content() string {
 	if m.Width == 0 {
 		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}

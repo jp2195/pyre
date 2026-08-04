@@ -197,7 +197,10 @@ func (c *Client) GetSystemResources(ctx context.Context, target string) (*models
 		return nil, err
 	}
 
-	output := string(resp.Result.Inner)
+	// `show system resources` returns CDATA-wrapped `top` output; decode it
+	// as text so the first line ("top - ...") isn't prefixed with the raw
+	// CDATA marker.
+	output := InnerText(resp.Result.Inner)
 	resources := &models.Resources{}
 
 	// Parse load average using regex

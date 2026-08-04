@@ -246,20 +246,31 @@ func (m RuleListModel[T]) View() string {
 
 	if m.Expanded && m.Cursor < len(m.filtered) {
 		b.WriteString("\n")
-		b.WriteString(m.config.RenderDetail(m.filtered[m.Cursor], m.Width))
+		b.WriteString(m.config.RenderDetail(m.filtered[m.Cursor], m.contentWidth()))
 	}
 
 	return panelStyle.Render(b.String())
 }
 
+// contentWidth is the width usable *inside* the view's panel, after its
+// border and horizontal padding. Both the table and the detail panel must
+// size against this — passing the raw terminal width made the detail panel
+// wider than its container, so its border wrapped and every line appeared
+// double-spaced.
+func (m RuleListModel[T]) contentWidth() int {
+	return max(m.Width-12, 20)
+}
+
 func (m RuleListModel[T]) renderTable() string {
 	headerStyle := DetailLabelStyle.Bold(true)
-	selectedStyle := TableRowSelectedStyle.Bold(true)
+	// Flush variants keep every row on the same column grid as the unpadded
+	// header — see TableSelectedRowStyle.
+	selectedStyle := TableSelectedRowStyle().Bold(true)
 	normalStyle := DetailValueStyle
-	disabledStyle := TableRowDisabledStyle
+	disabledStyle := TableDisabledRowStyle()
 	dimStyle := DetailDimStyle
 
-	availableWidth := m.Width - 12
+	availableWidth := m.contentWidth()
 
 	var b strings.Builder
 

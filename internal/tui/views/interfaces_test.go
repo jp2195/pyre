@@ -268,3 +268,97 @@ func TestInterfacesModel_SetSpinnerFrame_ReachesList(t *testing.T) {
 		t.Errorf("list.SpinnerFrame = %q, want ◢", m.list.SpinnerFrame)
 	}
 }
+
+// visibleWidth returns the rune width of a line with ANSI escapes removed.
+func visibleWidth(s string) int {
+	return len([]rune(stripANSI(s)))
+}
+
+// TestInterfaceDetail_FitsWithinGivenWidth pins that the detail panel sizes
+// itself to the width it is handed. RuleListModel renders it *inside* a
+// bordered, padded panel but used to pass the raw terminal width, so the
+// detail's own border overflowed the container and wrapped — which is what
+// made the borders look mangled and every row look double-spaced.
+func TestInterfaceDetail_FitsWithinGivenWidth(t *testing.T) {
+	InitStyles()
+	iface := models.Interface{
+		Name: "loopback.60", Type: "loopback", Zone: "dmz", State: "down",
+		IP: "10.0.105.1/32", VirtualRouter: "lr:default", Vsys: "1",
+	}
+
+	for _, width := range []int{80, 100, 128, 160} {
+		out := renderInterfaceDetail(iface, width, nil)
+		for i, line := range strings.Split(out, "\n") {
+			if got := visibleWidth(line); got > width {
+				t.Errorf("width=%d: line %d is %d cols wide, overflows its container:\n%s",
+					width, i, got, stripANSI(line))
+			}
+		}
+	}
+}
+
+// TestInterfaceDetail_HeadingStaysWithItsFields guards the two-column split.
+// It used to cut the flat line list at its midpoint, stranding the "Network"
+// heading at the bottom of the left column while IP/MAC/Virtual Router began
+// the right column — the heading rendered empty and the fields header-less.
+func TestInterfaceDetail_HeadingStaysWithItsFields(t *testing.T) {
+	InitStyles()
+	iface := models.Interface{
+		Name: "loopback.60", Type: "loopback", Zone: "dmz", State: "down",
+		IP: "10.0.105.1/32", MAC: "3c:fa:30:f7:34:03", VirtualRouter: "lr:default", Vsys: "1",
+	}
+
+	// Wide enough to trigger the two-column layout.
+	lines := strings.Split(stripANSI(renderInterfaceDetail(iface, 130, nil)), "\n")
+
+	netLine := -1
+	for i, l := range lines {
+		if strings.Contains(l, "Network") {
+			netLine = i
+			break
+		}
+	}
+	if netLine < 0 {
+		t.Fatalf("no Network section rendered:\n%s", strings.Join(lines, "\n"))
+	}
+	if netLine == len(lines)-1 || !strings.Contains(lines[netLine+1], "IP Address") {
+		t.Errorf("the Network heading is not followed by its own fields; "+
+			"the column split separated them:\n%s", strings.Join(lines, "\n"))
+	}
+}
+
+// TestSplitSectionsIntoColumns_KeepsSectionsIntact verifies sections are
+// indivisible and the two columns come out close in height.
+func TestSplitSectionsIntoColumns_KeepsSectionsIntact(t *testing.T) {
+	sections := [][]string{
+		{"Basic", "a", "b", "c", "d", "e"}, // 6
+		{"Network", "f", "g", "h"},         // 4
+		{"Physical", "i", "j"},             // 3
+	}
+
+	left, right := splitSectionsIntoColumns(sections)
+
+	rebuilt := make([][]string, 0, len(left)+len(right))
+	rebuilt = append(rebuilt, left...)
+	rebuilt = append(rebuilt, right...)
+	if len(rebuilt) != len(sections) {
+		t.Fatalf("expected %d sections preserved, got %d", len(sections), len(rebuilt))
+	}
+	for i := range sections {
+		if len(rebuilt[i]) != len(sections[i]) {
+			t.Errorf("section %d was split: had %d lines, now %d",
+				i, len(sections[i]), len(rebuilt[i]))
+		}
+	}
+
+	height := func(cols [][]string) int {
+		n := 0
+		for _, c := range cols {
+			n += len(c)
+		}
+		return n
+	}
+	if diff := height(left) - height(right); diff > 3 || diff < -3 {
+		t.Errorf("columns badly unbalanced: left=%d right=%d", height(left), height(right))
+	}
+}

@@ -37,7 +37,11 @@ func TestDispatch_ServicesMsg_RoutesToObjectsModel(t *testing.T) {
 	}
 }
 
-func TestDispatch_TabOnObjectsView_CyclesSubTabsNotNavbar(t *testing.T) {
+// TestDispatch_TabOnObjectsView_NavigatesAway pins that Objects no longer
+// swallows Tab. It used to cycle the Address/Service sub-tabs, which made
+// Objects the one view you could not Tab out of even though the footer
+// advertises "Tab/S-Tab next/prev". a/s still select sub-tabs directly.
+func TestDispatch_TabOnObjectsView_NavigatesAway(t *testing.T) {
 	m := newTestModel(t, ViewDashboard)
 	// Navigate to Objects view via SwitchViewMsg, then send Tab through Model.Update.
 	updated, _ := m.Update(SwitchViewMsg{View: ViewObjects})
@@ -46,10 +50,10 @@ func TestDispatch_TabOnObjectsView_CyclesSubTabsNotNavbar(t *testing.T) {
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	m = updated.(Model)
 
-	if m.objects.ActiveTab() != views.ObjectsTabService {
-		t.Errorf("Tab on Objects view should cycle to Service sub-tab; got tab=%v", m.objects.ActiveTab())
+	if m.objects.ActiveTab() != views.ObjectsTabAddress {
+		t.Errorf("Tab must not cycle Objects sub-tabs; got tab=%v", m.objects.ActiveTab())
 	}
-	if m.currentView != ViewObjects {
-		t.Errorf("Tab on Objects view should NOT change currentView; got %v", m.currentView)
+	if m.currentView == ViewObjects {
+		t.Error("Tab on Objects view should navigate to the next Analyze item")
 	}
 }

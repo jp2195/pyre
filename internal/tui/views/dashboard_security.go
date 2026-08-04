@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 	"github.com/jp2195/pyre/internal/tui/theme"
@@ -65,13 +66,30 @@ func (m SecurityDashboardModel) Update(msg tea.Msg) (SecurityDashboardModel, tea
 	return m, nil
 }
 
-// HasData returns true if the dashboard has already loaded its data
+// HasData reports whether every panel has settled — data received or the
+// fetch failed. It gates the app-wide spinner tick chain (Model.anyLoading),
+// so returning true while a source is still in flight freezes that panel's
+// spinner on "Loading..." forever.
 func (m SecurityDashboardModel) HasData() bool {
-	return m.threatSummary != nil
+	hasThreat := m.threatSummary != nil || m.threatErr != nil
+	hasPolicies := m.policies != nil || m.policyErr != nil
+	return hasThreat && hasPolicies
 }
 
-// View renders the security dashboard
+// View renders the dashboard, trimmed to the visible height. The panel stack
+// is frequently taller than the terminal, so ClampToHeight windows it and
+// appends a scroll indicator.
 func (m SecurityDashboardModel) View() string {
+	return m.ClampToHeight(m.content())
+}
+
+// ContentHeight is the untrimmed height of the panel stack, used to clamp the
+// scroll offset.
+func (m SecurityDashboardModel) ContentHeight() int {
+	return lipgloss.Height(m.content())
+}
+
+func (m SecurityDashboardModel) content() string {
 	if m.Width == 0 {
 		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
@@ -167,7 +185,14 @@ func (m SecurityDashboardModel) renderThreatSeverity(width int) string {
 	b.WriteString(titleStyle().Render("Threats by Severity"))
 	b.WriteString("\n")
 
-	if m.threatErr != nil || m.threatSummary == nil {
+	// Distinguish "still fetching" from "fetch failed" — mirroring the
+	// Threat Summary panel above. Rendering an error as a spinner left the
+	// panel loading forever with no way to tell it had failed.
+	if m.threatErr != nil {
+		b.WriteString(dimStyle().Render("Not available"))
+		return panelStyle().Width(width).Render(b.String())
+	}
+	if m.threatSummary == nil {
 		b.WriteString(RenderLoadingInline(m.SpinnerFrame, "Loading..."))
 		return panelStyle().Width(width).Render(b.String())
 	}

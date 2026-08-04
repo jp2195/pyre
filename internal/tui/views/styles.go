@@ -395,3 +395,25 @@ func StatusStyle(up bool) lipgloss.Style {
 	}
 	return StatusInactiveStyle
 }
+
+// TableSelectedRowStyle returns the selected-row style with horizontal padding
+// removed.
+//
+// Table headers and unselected rows render through unpadded styles, but
+// TableRowSelectedStyle (and TableRowDisabledStyle) carry Padding(0, 1). Mixing
+// them made every row jump one column right as the cursor landed on it and snap
+// back when it left, so the table twitched while scrolling. Rows are already
+// formatted to a fixed width, so the highlight still spans the full row.
+//
+// Use this for any table that also renders an unpadded header or unpadded
+// unselected rows. Pickers and the connection hub, which have no such header to
+// line up against, keep the padded TableRowSelectedStyle.
+func TableSelectedRowStyle() lipgloss.Style {
+	return TableRowSelectedStyle.Padding(0, 0)
+}
+
+// TableDisabledRowStyle is TableRowDisabledStyle with horizontal padding
+// removed, for the same alignment reason as TableSelectedRowStyle.
+func TableDisabledRowStyle() lipgloss.Style {
+	return TableRowDisabledStyle.Padding(0, 0)
+}

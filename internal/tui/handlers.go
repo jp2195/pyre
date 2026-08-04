@@ -20,13 +20,23 @@ func (m Model) handleLoginKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		// do not linger in the textinput buffers after leaving the view.
 		// Keeps secret in-memory lifetime as short as possible — see the
 		// "Credential Resolution" section of CLAUDE.md.
+		// Also clears any in-flight state so a stalled login (e.g. an MFA
+		// push that never arrives) doesn't leave the form frozen.
 		m.login = views.NewLoginModel(&auth.Credentials{})
+		m.loading = false
 		m.currentView = ViewConnectionHub
 		return m, nil
 
 	case msg.String() == "enter":
+		// Ignore Enter while a keygen is already in flight. Each keygen
+		// counts as a login attempt on PAN-OS, so re-submitting during an
+		// MFA push walks the account straight into the lockout threshold.
+		if m.login.Submitting() {
+			return m, nil
+		}
 		if m.login.CanSubmit() {
 			m.loading = true
+			m.login = m.login.SetSubmitting(true)
 			return m, tea.Batch(m.doLogin(), m.spinner.Tick)
 		}
 
@@ -43,6 +53,12 @@ func (m Model) handleLoginKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case msg.String() == "shift+tab":
 		m.login = m.login.PrevField()
+		return m, nil
+	}
+
+	// Freeze the fields while authenticating so the credentials that are
+	// in flight are the ones still shown on screen.
+	if m.login.Submitting() {
 		return m, nil
 	}
 
@@ -446,6 +462,11 @@ func (m Model) handleViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	switch m.currentView {
 	case ViewDashboard:
+		// Scrolling applies to whichever dashboard is on screen, so it is
+		// handled before the (Overview-only) Update below.
+		if delta, ok := m.dashboardScrollDelta(msg); ok {
+			return m.scrollActiveDashboard(delta), nil
+		}
 		m.dashboard, cmd = m.dashboard.Update(msg)
 	case ViewPolicies:
 		m.policies, cmd = m.policies.Update(msg)

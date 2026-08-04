@@ -82,7 +82,7 @@ func (m LogsModel) renderThreatTable() string {
 			truncate(log.ThreatCategory, 15))
 
 		if selected {
-			return TableRowSelectedStyle.Render(row)
+			return TableSelectedRowStyle().Render(row)
 		}
 		// Color code by severity
 		return colorBySeverity(row, log.Severity)

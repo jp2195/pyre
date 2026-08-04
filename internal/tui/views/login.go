@@ -29,6 +29,14 @@ type LoginModel struct {
 	width         int
 	height        int
 	insecure      bool
+	// submitting is true while a keygen request is in flight. It suppresses
+	// repeat submissions: PAN-OS counts every keygen as a login attempt, so
+	// an impatient user pressing Enter during an MFA push would otherwise
+	// burn through the failed-attempt budget and lock the account out.
+	submitting bool
+	// spinner is the frame rendered next to the in-flight message, supplied
+	// by the parent model so it animates with the app-wide spinner tick.
+	spinner string
 }
 
 func NewLoginModel(creds *auth.Credentials) LoginModel {
@@ -100,6 +108,31 @@ func (m LoginModel) SetSize(width, height int) LoginModel {
 
 func (m LoginModel) SetError(err error) LoginModel {
 	m.err = err
+	// A failed attempt ends the in-flight request; re-arm the form so the
+	// user can correct their credentials and retry.
+	m.submitting = false
+	return m
+}
+
+// SetSubmitting marks the form as having a keygen request in flight.
+func (m LoginModel) SetSubmitting(v bool) LoginModel {
+	m.submitting = v
+	if v {
+		// Clear any stale error so the previous failure isn't shown
+		// alongside the "authenticating" message.
+		m.err = nil
+	}
+	return m
+}
+
+// Submitting reports whether a keygen request is currently in flight.
+func (m LoginModel) Submitting() bool {
+	return m.submitting
+}
+
+// SetSpinner supplies the current spinner frame for the in-flight message.
+func (m LoginModel) SetSpinner(frame string) LoginModel {
+	m.spinner = frame
 	return m
 }
 
@@ -170,6 +203,25 @@ func (m LoginModel) Update(msg tea.Msg) (LoginModel, tea.Cmd) {
 	return m, cmd
 }
 
+// loginContentWidth is the login form's content width, matching the widest
+// idle line ("Tab: next  Space: toggle  Enter: connect  Ctrl+C: quit"). The
+// status region is pinned to it so no state can widen the box.
+const loginContentWidth = 54
+
+// loginStatusRows is the height reserved for the status region — enough for
+// the three-line in-flight message, so shorter states pad rather than shrink.
+const loginStatusRows = 3
+
+// loginStatusStyle is the fixed-size region holding the help text, the
+// in-flight message, or an error. Constant width and height keep the centered
+// box from moving when the state changes.
+func loginStatusStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Width(loginContentWidth).
+		Height(loginStatusRows).
+		MarginTop(1)
+}
+
 func (m LoginModel) View() string {
 	titleStyle := ViewTitleStyle.MarginBottom(2)
 	labelStyle := DetailLabelStyle.MarginBottom(1)
@@ -228,13 +280,33 @@ func (m LoginModel) View() string {
 		b.WriteString(inputStyle.Render(checkboxLabel))
 	}
 
-	if m.err != nil {
-		b.WriteString("\n")
-		b.WriteString(errorStyle.Render("Error: " + m.err.Error()))
+	// Status region: idle help, in-flight progress, and errors all render
+	// here at a fixed width and height.
+	//
+	// These used to be written inline at their natural size. The box is
+	// centered with lipgloss.Place, so the in-flight text — the widest line
+	// in the form — grew the box and shoved it left and up the instant Enter
+	// was pressed. The form appeared to jump precisely when the user was
+	// looking for feedback, and the spinner landed somewhere other than where
+	// they were watching. A constant-size region keeps the box still.
+	var status string
+	switch {
+	case m.submitting:
+		spin := m.spinner
+		if spin == "" {
+			spin = "•"
+		}
+		status = StatusWarningStyle.Render(spin+" Authenticating…") + "\n" +
+			helpStyle.MarginTop(0).Render("Approve the MFA prompt if one was sent.") + "\n" +
+			helpStyle.MarginTop(0).Render("Enter is ignored · Esc cancels")
+	case m.err != nil:
+		status = ErrorMsgStyle.Bold(true).Render("Error: " + m.err.Error())
+	default:
+		status = helpStyle.MarginTop(0).Render("Tab: next  Space: toggle  Enter: connect  Ctrl+C: quit")
 	}
 
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("Tab: next  Space: toggle  Enter: connect  Ctrl+C: quit"))
+	b.WriteString(loginStatusStyle().Render(status))
 
 	content := b.String()
 

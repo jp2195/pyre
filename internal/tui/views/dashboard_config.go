@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 )
@@ -64,13 +65,28 @@ func (m ConfigDashboardModel) Update(msg tea.Msg) (ConfigDashboardModel, tea.Cmd
 	return m, nil
 }
 
-// HasData returns true if the dashboard has already loaded its data
+// HasData reports whether every panel has settled — see the note on
+// SecurityDashboardModel.HasData about the spinner tick chain.
 func (m ConfigDashboardModel) HasData() bool {
-	return m.policies != nil
+	hasPolicies := m.policies != nil || m.policyErr != nil
+	hasChanges := m.pendingChanges != nil || m.changesErr != nil
+	return hasPolicies && hasChanges
 }
 
-// View renders the config dashboard
+// View renders the dashboard, trimmed to the visible height. The panel stack
+// is frequently taller than the terminal, so ClampToHeight windows it and
+// appends a scroll indicator.
 func (m ConfigDashboardModel) View() string {
+	return m.ClampToHeight(m.content())
+}
+
+// ContentHeight is the untrimmed height of the panel stack, used to clamp the
+// scroll offset.
+func (m ConfigDashboardModel) ContentHeight() int {
+	return lipgloss.Height(m.content())
+}
+
+func (m ConfigDashboardModel) content() string {
 	if m.Width == 0 {
 		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}

@@ -383,7 +383,7 @@ func (m RoutesModel) renderRoutesTab() string {
 
 func (m RoutesModel) renderRoutesTable() string {
 	headerStyle := DetailLabelStyle.Bold(true)
-	selectedStyle := TableRowSelectedStyle.Bold(true)
+	selectedStyle := TableSelectedRowStyle().Bold(true)
 	normalStyle := DetailValueStyle
 	dimStyle := DetailDimStyle
 
@@ -517,7 +517,7 @@ func (m RoutesModel) renderNeighborsTab() string {
 
 func (m RoutesModel) renderNeighborsTable() string {
 	headerStyle := DetailLabelStyle.Bold(true)
-	selectedStyle := TableRowSelectedStyle.Bold(true)
+	selectedStyle := TableSelectedRowStyle().Bold(true)
 	normalStyle := DetailValueStyle
 	dimStyle := DetailDimStyle
 

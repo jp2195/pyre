@@ -293,10 +293,6 @@ func (m Model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	// Tab cycles forward through items in current group
 	case key.Matches(msg, m.keys.Tab):
-		// Objects view uses Tab internally to cycle Address ↔ Service.
-		if m.currentView == ViewObjects {
-			return m.handleViewKeys(msg)
-		}
 		group := m.navbar.ActiveGroup()
 		if group != nil && len(group.Items) > 0 {
 			nextItem := (m.navbar.ActiveItemIndex() + 1) % len(group.Items)
@@ -306,10 +302,6 @@ func (m Model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	// Shift+Tab cycles backward through items in current group
 	case key.Matches(msg, m.keys.ShiftTab):
-		// Objects view uses Tab internally to cycle Address ↔ Service.
-		if m.currentView == ViewObjects {
-			return m.handleViewKeys(msg)
-		}
 		group := m.navbar.ActiveGroup()
 		if group != nil && len(group.Items) > 0 {
 			prevItem := m.navbar.ActiveItemIndex() - 1
@@ -411,7 +403,10 @@ func (m Model) renderContent() string {
 		return m.connectionForm.View()
 
 	case ViewLogin:
-		return m.login.View()
+		// Feed the shared spinner frame in so the "authenticating" message
+		// animates; the login view is full-screen and has no footer of its
+		// own to carry the global loading indicator.
+		return m.login.SetSpinner(m.spinner.View()).View()
 
 	case ViewPicker:
 		content = m.picker.View()

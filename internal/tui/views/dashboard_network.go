@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 )
@@ -97,8 +98,20 @@ func (m NetworkDashboardModel) HasData() bool {
 	return hasInterfaces && hasARP && hasRoutes && hasNeighbors
 }
 
-// View renders the network dashboard
+// View renders the dashboard, trimmed to the visible height. The panel stack
+// is frequently taller than the terminal, so ClampToHeight windows it and
+// appends a scroll indicator.
 func (m NetworkDashboardModel) View() string {
+	return m.ClampToHeight(m.content())
+}
+
+// ContentHeight is the untrimmed height of the panel stack, used to clamp the
+// scroll offset.
+func (m NetworkDashboardModel) ContentHeight() int {
+	return lipgloss.Height(m.content())
+}
+
+func (m NetworkDashboardModel) content() string {
 	if m.Width == 0 {
 		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}

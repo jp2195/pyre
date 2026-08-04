@@ -2,6 +2,8 @@ package views
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/jp2195/pyre/internal/models"
@@ -201,4 +203,135 @@ func TestDashboardType_Constants(t *testing.T) {
 	if DashboardConfig != 4 {
 		t.Errorf("expected DashboardConfig=4, got %d", DashboardConfig)
 	}
+}
+
+// TestSecurityDashboard_ThreatSeverityShowsErrorNotSpinner guards against a
+// failed threat fetch rendering as a permanent "Loading..." spinner. The
+// sibling Threat Summary panel already degrades to "Not available"; this
+// panel spun forever, so the user could not tell a slow fetch from a dead one.
+func TestSecurityDashboard_ThreatSeverityShowsErrorNotSpinner(t *testing.T) {
+	m := NewSecurityDashboardModel()
+	m = m.SetSpinnerFrame("|")
+	m = m.SetThreatSummary(nil, errors.New("op command failed"))
+
+	out := m.renderThreatSeverity(60)
+	if strings.Contains(out, "Loading") {
+		t.Errorf("threat severity panel spins forever on error; got:\n%s", out)
+	}
+	if !strings.Contains(out, "Not available") {
+		t.Errorf("expected 'Not available' on error; got:\n%s", out)
+	}
+}
+
+// TestHasData_WaitsForEveryPanel guards the frozen-spinner bug: HasData drives
+// the app-wide spinner tick chain (Model.anyLoading). When it reported "done"
+// while some panels were still fetching, the tick chain was dropped and those
+// panels sat on "Loading..." with a spinner frozen mid-frame. A dashboard is
+// only settled once every source has produced data OR an error.
+func TestHasData_WaitsForEveryPanel(t *testing.T) {
+	t.Run("security waits for policies", func(t *testing.T) {
+		m := NewSecurityDashboardModel()
+		m = m.SetThreatSummary(&models.ThreatSummary{}, nil)
+		if m.HasData() {
+			t.Error("security dashboard reported settled while Zero-Hit/Most-Hit " +
+				"rules were still loading; spinner would freeze")
+		}
+		m = m.SetPolicies(nil, errors.New("boom"))
+		if !m.HasData() {
+			t.Error("an errored policy fetch still settles the dashboard")
+		}
+	})
+
+	t.Run("config waits for pending changes", func(t *testing.T) {
+		m := NewConfigDashboardModel()
+		m = m.SetPolicies([]models.SecurityRule{}, nil)
+		if m.HasData() {
+			t.Error("config dashboard settled before pending changes arrived")
+		}
+		m = m.SetPendingChanges(nil, errors.New("boom"))
+		if !m.HasData() {
+			t.Error("an errored changes fetch still settles the dashboard")
+		}
+	})
+
+	t.Run("vpn waits for gp users", func(t *testing.T) {
+		m := NewVPNDashboardModel()
+		m = m.SetIPSecTunnels([]models.IPSecTunnel{}, nil)
+		if m.HasData() {
+			t.Error("vpn dashboard settled before GlobalProtect users arrived")
+		}
+		m = m.SetGlobalProtectUsers(nil, errors.New("boom"))
+		if !m.HasData() {
+			t.Error("an errored gp-user fetch still settles the dashboard")
+		}
+	})
+
+	t.Run("overview waits for resources", func(t *testing.T) {
+		m := NewDashboardModel()
+		m = m.SetSystemInfo(&models.SystemInfo{}, nil)
+		if m.HasData() {
+			t.Error("overview settled while the Resources panel was still loading")
+		}
+	})
+}
+
+// TestClampToHeight_NeverOverflowsTerminal pins that a dashboard's panel stack
+// is trimmed to the visible height. It used to render at full height
+// regardless of terminal size: at 80x24 that pushed Disk Usage, Hardware
+// Status and the entire footer off-screen, and at 120x40 it corrupted the
+// display. DashboardBase.Height was stored and never read.
+func TestClampToHeight_NeverOverflowsTerminal(t *testing.T) {
+	InitStyles()
+	content := strings.Join(makeLines(60), "\n")
+
+	d := DashboardBase{Width: 120, Height: 20}
+	got := strings.Split(d.ClampToHeight(content), "\n")
+	if len(got) > d.Height {
+		t.Errorf("rendered %d lines into a %d-line viewport", len(got), d.Height)
+	}
+	if !strings.Contains(got[len(got)-1], "more") {
+		t.Errorf("expected a scroll indicator on the last line, got %q", got[len(got)-1])
+	}
+
+	// Content that already fits is returned untouched.
+	short := strings.Join(makeLines(5), "\n")
+	if d.ClampToHeight(short) != short {
+		t.Error("content that fits must not be modified")
+	}
+}
+
+// TestScrollBy_ClampsToContent ensures scrolling cannot run past either end,
+// so the view never goes blank and k always returns you to the top.
+func TestScrollBy_ClampsToContent(t *testing.T) {
+	d := DashboardBase{Width: 120, Height: 20}
+	const contentHeight = 60
+
+	if got := d.ScrollBy(-5, contentHeight).Offset; got != 0 {
+		t.Errorf("scrolling up from the top gave Offset=%d, want 0", got)
+	}
+
+	maxOff := d.MaxScrollOffset(contentHeight)
+	if got := d.ScrollBy(9999, contentHeight).Offset; got != maxOff {
+		t.Errorf("scrolling past the end gave Offset=%d, want %d", got, maxOff)
+	}
+
+	// At max offset the last content line must still be visible.
+	d.Offset = maxOff
+	lines := strings.Split(d.ClampToHeight(strings.Join(makeLines(contentHeight), "\n")), "\n")
+	if !strings.Contains(strings.Join(lines, "\n"), "line-60") {
+		t.Error("the final content line is unreachable at max scroll offset")
+	}
+
+	// Content that fits cannot scroll at all.
+	if got := d.MaxScrollOffset(5); got != 0 {
+		t.Errorf("MaxScrollOffset for fitting content = %d, want 0", got)
+	}
+}
+
+func makeLines(n int) []string {
+	out := make([]string, 0, n)
+	for i := range n {
+		out = append(out, fmt.Sprintf("line-%d", i+1))
+	}
+	return out
 }

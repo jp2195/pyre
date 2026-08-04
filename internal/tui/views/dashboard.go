@@ -2,6 +2,7 @@ package views
 
 import (
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 )
@@ -170,12 +171,43 @@ func (m DashboardModel) Update(msg tea.Msg) (DashboardModel, tea.Cmd) {
 	return m, nil
 }
 
-// HasData returns true if the dashboard has already loaded its data
+// HasData reports whether every panel that can show a loading placeholder has
+// settled — data received or the fetch failed. It gates the app-wide spinner
+// tick chain (Model.anyLoading), so returning true too early freezes the
+// remaining panels on "Loading..." with a half-drawn spinner.
+//
+// Only the five panels that render RenderLoadingInline on nil are considered;
+// the rest (licenses, admins, jobs, content versions, ...) either render
+// immediately or are omitted entirely when empty, so they cannot get stuck.
 func (m DashboardModel) HasData() bool {
-	return m.systemInfo != nil
+	for _, settled := range []bool{
+		m.systemInfo != nil || m.sysInfoErr != nil,
+		m.resources != nil || m.resourceErr != nil,
+		m.sessionInfo != nil || m.sessionErr != nil,
+		m.diskUsage != nil || m.diskErr != nil,
+		m.environmentals != nil || m.envErr != nil,
+	} {
+		if !settled {
+			return false
+		}
+	}
+	return true
 }
 
+// View renders the dashboard, trimmed to the visible height. The panel stack
+// is frequently taller than the terminal, so ClampToHeight windows it and
+// appends a scroll indicator.
 func (m DashboardModel) View() string {
+	return m.ClampToHeight(m.content())
+}
+
+// ContentHeight is the untrimmed height of the panel stack, used to clamp the
+// scroll offset.
+func (m DashboardModel) ContentHeight() int {
+	return lipgloss.Height(m.content())
+}
+
+func (m DashboardModel) content() string {
 	if m.Width == 0 {
 		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}

@@ -81,7 +81,7 @@ func (m LogsModel) renderTrafficTable() string {
 			formatBytes(log.Bytes))
 
 		if selected {
-			return TableRowSelectedStyle.Render(row)
+			return TableSelectedRowStyle().Render(row)
 		}
 		// Color code by action
 		return colorByAction(row, log.Action)
