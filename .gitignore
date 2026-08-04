@@ -1,5 +1,6 @@
 # Binaries
 pyre
+/main
 *.exe
 *.dll
 *.so
