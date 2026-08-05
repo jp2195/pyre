@@ -129,3 +129,49 @@ func TestLoginErrorClearsInFlight(t *testing.T) {
 type errFake struct{}
 
 func (errFake) Error() string { return "invalid credentials" }
+
+// TestPasteIntoLoginFields guards bracketed-paste support. tea.PasteMsg was
+// never routed anywhere — the top-level Update only matched KeyPressMsg, so
+// paste fell through to handleDataMsg and was logged as an unhandled message
+// and dropped. Users could not paste a password (or host) into the login form.
+func TestPasteIntoLoginFields(t *testing.T) {
+	m := newTestModel(t, ViewLogin)
+
+	// Focus starts on the host field.
+	res, _ := m.Update(tea.PasteMsg{Content: "fw.example.com"})
+	m = res.(Model)
+	if got := m.login.Host(); got != "fw.example.com" {
+		t.Errorf("paste into host field: got %q, want %q", got, "fw.example.com")
+	}
+
+	updated, _ := m.handleLoginKeys(tea.KeyPressMsg{Code: tea.KeyTab})
+	m = updated.(Model)
+	res, _ = m.Update(tea.PasteMsg{Content: "admin"})
+	m = res.(Model)
+	if got := m.login.Username(); got != "admin" {
+		t.Errorf("paste into username field: got %q, want %q", got, "admin")
+	}
+
+	updated, _ = m.handleLoginKeys(tea.KeyPressMsg{Code: tea.KeyTab})
+	m = updated.(Model)
+	res, _ = m.Update(tea.PasteMsg{Content: "s3cr3t-p@ss"})
+	m = res.(Model)
+	if got := m.login.Password(); got != "s3cr3t-p@ss" {
+		t.Errorf("paste into password field: got %q, want %q", got, "s3cr3t-p@ss")
+	}
+}
+
+// TestPasteIgnoredWhileAuthenticating keeps paste consistent with the other
+// input handling: the fields are frozen while a keygen is in flight.
+func TestPasteIgnoredWhileAuthenticating(t *testing.T) {
+	m := fillLogin(t)
+	updated, _ := m.handleLoginKeys(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+
+	before := m.login.Password()
+	res, _ := m.Update(tea.PasteMsg{Content: "extra"})
+	m = res.(Model)
+	if got := m.login.Password(); got != before {
+		t.Errorf("paste mutated a frozen field: %q -> %q", before, got)
+	}
+}
