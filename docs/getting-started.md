@@ -84,7 +84,13 @@ Footer shows the keys that apply right now — when in doubt, look down.
 Press the same number again, or `Tab`, to cycle through sub-views in
 that group. Try `2`, `2`, `2` to walk through Policies → NAT → Objects.
 
-**3. Inside a list view, four keys do almost everything:**
+**3. Some views have sub-tabs — those are `[` and `]`.** Objects splits
+into Address / Service, Routes into Routes / Neighbors, Logs into
+System / Traffic / Threat. `[` and `]` move between them and never
+leave the view; `Tab` always leaves. Three levels, three sets of keys:
+numbers for groups, `Tab` for views, brackets for sub-tabs.
+
+**4. Inside a list view, four keys do almost everything:**
 
 - `/` filter (substring match, case-insensitive)
 - `s` cycle sort field
@@ -94,18 +100,22 @@ that group. Try `2`, `2`, `2` to walk through Policies → NAT → Objects.
 Try it: press `2` to land on Policies, `/web` to filter for "web", `s`
 to flip sort fields, `Enter` to see the full rule, `Esc` to close.
 
-**4. `Ctrl+P` jumps anywhere.** Don't memorize keybindings. Type the
+Dashboards work the same way for scrolling: if the panel stack is
+taller than your terminal, `j`/`k` scroll it and an indicator at the
+bottom tells you how much is left.
+
+**5. `Ctrl+P` jumps anywhere.** Don't memorize keybindings. Type the
 view name (or any partial — `obj`, `sess`, `logs`) and Enter. Same
 muscle memory as VS Code's command palette.
 
-**5. Two modal pickers.**
+**6. Two modal pickers.**
 
 - `:` opens the connection picker — switch between saved firewalls.
 - `d` opens the device picker — switch between managed devices when
   you're connected to a Panorama. (On a standalone firewall, `d` falls
   through to the view's own handlers.)
 
-**6. `?` toggles help.** `q` or `Ctrl+C` quits.
+**7. `?` toggles help.** `q` or `Ctrl+C` quits.
 
 That's the whole navigation model. Everything else is a refinement.
 

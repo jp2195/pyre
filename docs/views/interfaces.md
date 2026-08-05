@@ -37,7 +37,11 @@ type, virtual router.
 
 ## Detail panel (`enter`)
 
-Two-column layout at ≥ 100 wide; single column otherwise. Sections:
+Two-column layout at ≥ 100 wide; single column otherwise. Sections are
+distributed across the two columns whole — a heading always stays with
+its own fields — and the split is chosen to keep the columns close in
+height, so which section lands in which column varies with the data.
+Sections:
 
 - **Basic Information** — State (● UP / ○ DOWN), Type, Zone, Mode,
   Vsys (if set).
