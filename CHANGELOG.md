@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.4](https://github.com/jp2195/pyre/compare/v1.5.3...v1.5.4) (2026-08-05)
+
+
+### Bug Fixes
+
+* **tui:** support pasting into text inputs ([#54](https://github.com/jp2195/pyre/issues/54)) ([5601c0a](https://github.com/jp2195/pyre/commit/5601c0aea2e8a3ce2c0e251e1bb636f067abff43))
+
 ## [1.5.3](https://github.com/jp2195/pyre/compare/v1.5.2...v1.5.3) (2026-08-04)
 
 
