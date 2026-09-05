@@ -507,10 +507,22 @@ func (m *LogsModel) fetchRequest(t models.LogType, skip int, appendRows bool) te
 // would spend another couple of megabytes and another device job to receive
 // the same page twice.
 func (m LogsModel) needsFetch(t models.LogType) bool {
+	s := m.tabState(t)
+	// A refusal is remembered against the expression that caused it. PAN-OS
+	// field validity is per log type -- an expression naming a traffic-only
+	// field is answered on Traffic and refused on System -- so the view's
+	// single accepted expression cannot speak for every tab, and there is
+	// nothing to revert to on the tab that refused it. Re-sending costs
+	// another device job and cannot come back any different until the
+	// expression changes. Refresh and the range keys call fetchRequest
+	// directly, so the operator can always force the question again.
+	if s.err != nil && s.errQuery == m.query {
+		return false
+	}
 	if m.rowCount(t) > 0 && !m.tabStale(t) {
 		return false
 	}
-	return !m.tabState(t).inflightMatches(m.rng, m.query)
+	return !s.inflightMatches(m.rng, m.query)
 }
 
 // onTabSwitch resets the cursor and asks for the newly shown tab when it has
