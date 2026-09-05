@@ -17,7 +17,13 @@ version.
 
 **pyre does not persist credentials.** No keychain, no token cache, no
 on-disk storage of any kind. API keys and passwords live in memory for
-the duration of a session and are zeroed on disconnect.
+the lifetime of the process and are never written anywhere.
+
+Note what that does *not* claim. Go strings cannot be reliably scrubbed
+from memory, and the API client keeps its own copy of the key, so pyre
+does not promise that a credential is unrecoverable from a core dump
+while it is running. The guarantee is about persistence, not memory
+hygiene.
 
 Credential management is the user's responsibility. Supply keys through
 whichever mechanism fits your environment — shell env vars, direnv, a
@@ -41,8 +47,9 @@ When pyre needs an API key for a host, it checks in this order:
   carry `yaml:"-"` tags, so `config.Save` cannot write them to disk
   even if they are set in memory. A regression test
   (`TestConfig_DoesNotPersistCredentials`) guards this invariant.
-- On `RemoveConnection`, credential fields are zeroed before the
-  connection struct is discarded to shorten in-memory lifetime.
+- `RemoveConnection` clears credential fields before dropping a
+  connection, which shortens their in-memory lifetime when a connection
+  is explicitly removed.
 - `~/.pyre.yaml` with world- or group-readable permissions triggers a
   startup warning. The file is expected to be `0600`.
 
@@ -123,7 +130,7 @@ Direct:
 - `charm.land/bubbletea/v2` — TUI framework
 - `charm.land/bubbles/v2` — TUI components
 - `charm.land/lipgloss/v2` — styling
-- `go.yaml.in/yaml/v4` — YAML parsing (pinned to `v4.0.0-rc.5` pending stable v4)
+- `go.yaml.in/yaml/v4` — YAML parsing (pinned to a release candidate pending a stable v4)
 
 CI runs `govulncheck ./...` on every push and weekly. Dependency pins
 are managed by Renovate.
