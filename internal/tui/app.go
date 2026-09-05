@@ -85,6 +85,21 @@ type Model struct {
 	// selectedConnection stores the connection selected from hub before login
 	selectedConnection       string
 	selectedConnectionConfig config.ConnectionConfig
+
+	// connEpoch identifies the current connection/target generation. Every
+	// fetch is tagged with the epoch it was issued under, and a response
+	// carrying a stale one is dropped. Clearing the views on a switch is not
+	// enough on its own: a request already in flight lands afterwards and
+	// looks exactly like a fresh one.
+	connEpoch int
+}
+
+// epochMsg wraps a fetch result with the connection generation it was issued
+// under, so Update can discard results belonging to a device the user has
+// already switched away from.
+type epochMsg struct {
+	epoch int
+	inner tea.Msg
 }
 
 func NewModel(cfg *config.Config, state *config.State, creds *auth.Credentials, startView ViewState) (Model, error) {
@@ -189,6 +204,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case spinner.TickMsg:
 		return m.handleSpinnerTick(msg)
+	case epochMsg:
+		if msg.epoch != m.connEpoch {
+			// Issued for a connection or target the user has left. Dropping
+			// it is the whole point: applying it would put one device's data
+			// under another device's name.
+			return m, nil
+		}
+		return m.handleDataMsg(msg.inner)
 	default:
 		return m.handleDataMsg(msg)
 	}
@@ -225,6 +248,9 @@ func (m *Model) applySize(w, h int) {
 // width and would otherwise render their "Loading..." placeholder until the
 // next terminal resize.
 func (m *Model) resetViewData() {
+	// Invalidate everything already in flight for the previous connection or
+	// target; those responses are dropped when they arrive.
+	m.connEpoch++
 	for _, s := range viewSlots() {
 		if s.reset != nil {
 			s.reset(m)

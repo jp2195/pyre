@@ -12,11 +12,22 @@ import (
 	"github.com/jp2195/pyre/internal/tui/views"
 )
 
-// fetchCmd creates a tea.Cmd that calls fn with the given context and wraps the result in a message.
-func fetchCmd[T any](ctx context.Context, fn func(context.Context) (T, error), wrap func(T, error) tea.Msg) tea.Cmd {
+// fetchCmd creates a tea.Cmd that calls fn with the given context and wraps
+// the result in a message, tagged with the connection generation it was
+// issued under so a response that outlives a device switch can be dropped.
+func fetchCmd[T any](ctx context.Context, epoch int, fn func(context.Context) (T, error), wrap func(T, error) tea.Msg) tea.Cmd {
 	return func() tea.Msg {
 		result, err := fn(ctx)
-		return wrap(result, err)
+		return epochMsg{epoch: epoch, inner: wrap(result, err)}
+	}
+}
+
+// tagged wraps a hand-written command so its result carries the same
+// connection generation as the fetchCmd-based ones.
+func (m Model) tagged(fn func() tea.Msg) tea.Cmd {
+	epoch := m.connEpoch
+	return func() tea.Msg {
+		return epochMsg{epoch: epoch, inner: fn()}
 	}
 }
 
@@ -146,7 +157,7 @@ func (m Model) fetchConfigDashboardData() tea.Cmd {
 
 func (m Model) fetchSystemInfo(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) (*models.SystemInfo, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (*models.SystemInfo, error) {
 		return conn.Client.GetSystemInfo(ctx, target)
 	}, func(info *models.SystemInfo, err error) tea.Msg {
 		return SystemInfoMsg{Info: info, Err: err}
@@ -155,15 +166,15 @@ func (m Model) fetchSystemInfo(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchManagedDevices(conn *auth.Connection) tea.Cmd {
 	ctx := m.ctx
-	return func() tea.Msg {
+	return m.tagged(func() tea.Msg {
 		err := conn.RefreshManagedDevices(ctx)
 		return ManagedDevicesMsg{Devices: conn.ManagedDevicesSnapshot(), Err: err}
-	}
+	})
 }
 
 func (m Model) detectPanorama(conn *auth.Connection) tea.Cmd {
 	ctx := m.ctx
-	return func() tea.Msg {
+	return m.tagged(func() tea.Msg {
 		// Detection always queries the appliance itself, never a managed device.
 		info, err := conn.Client.GetSystemInfo(ctx, "")
 		if err != nil {
@@ -171,13 +182,13 @@ func (m Model) detectPanorama(conn *auth.Connection) tea.Cmd {
 		}
 		isPanorama := api.IsPanoramaModel(info.Model)
 		return PanoramaDetectedMsg{IsPanorama: isPanorama, Model: info.Model}
-	}
+	})
 }
 
 func (m Model) fetchResources(conn *auth.Connection) tea.Cmd {
 	ctx := m.ctx
 	target := conn.Target()
-	return func() tea.Msg {
+	return m.tagged(func() tea.Msg {
 		res, err := conn.Client.GetSystemResources(ctx, target)
 		if err != nil {
 			return ResourcesMsg{Resources: res, Err: err}
@@ -191,12 +202,12 @@ func (m Model) fetchResources(conn *auth.Connection) tea.Cmd {
 		// Don't fail the whole request if dataplane fetch fails
 
 		return ResourcesMsg{Resources: res, Err: err}
-	}
+	})
 }
 
 func (m Model) fetchSessionInfo(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) (*models.SessionInfo, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (*models.SessionInfo, error) {
 		return conn.Client.GetSessionInfo(ctx, target)
 	}, func(info *models.SessionInfo, err error) tea.Msg {
 		return SessionInfoMsg{Info: info, Err: err}
@@ -205,7 +216,7 @@ func (m Model) fetchSessionInfo(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchHAStatus(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) (*models.HAStatus, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (*models.HAStatus, error) {
 		return conn.Client.GetHAStatus(ctx, target)
 	}, func(status *models.HAStatus, err error) tea.Msg {
 		return HAStatusMsg{Status: status, Err: err}
@@ -218,7 +229,7 @@ func (m Model) fetchInterfaces() tea.Cmd {
 		return nil
 	}
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.Interface, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.Interface, error) {
 		return conn.Client.GetInterfaces(ctx, target)
 	}, func(ifaces []models.Interface, err error) tea.Msg {
 		return InterfacesMsg{Interfaces: ifaces, Err: err}
@@ -227,7 +238,7 @@ func (m Model) fetchInterfaces() tea.Cmd {
 
 func (m Model) fetchThreatSummary(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) (*models.ThreatSummary, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (*models.ThreatSummary, error) {
 		return conn.Client.GetThreatSummary(ctx, target)
 	}, func(s *models.ThreatSummary, err error) tea.Msg {
 		return ThreatSummaryMsg{Summary: s, Err: err}
@@ -236,7 +247,7 @@ func (m Model) fetchThreatSummary(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchGlobalProtect(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) (*models.GlobalProtectInfo, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (*models.GlobalProtectInfo, error) {
 		return conn.Client.GetGlobalProtectInfo(ctx, target)
 	}, func(info *models.GlobalProtectInfo, err error) tea.Msg {
 		return GlobalProtectMsg{Info: info, Err: err}
@@ -245,7 +256,7 @@ func (m Model) fetchGlobalProtect(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchLoggedInAdmins(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.LoggedInAdmin, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.LoggedInAdmin, error) {
 		return conn.Client.GetLoggedInAdmins(ctx, target)
 	}, func(admins []models.LoggedInAdmin, err error) tea.Msg {
 		return LoggedInAdminsMsg{Admins: admins, Err: err}
@@ -254,7 +265,7 @@ func (m Model) fetchLoggedInAdmins(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchLicenses(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.LicenseInfo, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.LicenseInfo, error) {
 		return conn.Client.GetLicenseInfo(ctx, target)
 	}, func(lics []models.LicenseInfo, err error) tea.Msg {
 		return LicensesMsg{Licenses: lics, Err: err}
@@ -263,7 +274,7 @@ func (m Model) fetchLicenses(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchJobs(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.Job, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.Job, error) {
 		return conn.Client.GetJobs(ctx, target)
 	}, func(jobs []models.Job, err error) tea.Msg {
 		return JobsMsg{Jobs: jobs, Err: err}
@@ -272,7 +283,7 @@ func (m Model) fetchJobs(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchDiskUsage(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.DiskUsage, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.DiskUsage, error) {
 		return conn.Client.GetDiskUsage(ctx, target)
 	}, func(disks []models.DiskUsage, err error) tea.Msg {
 		return DiskUsageMsg{Disks: disks, Err: err}
@@ -282,7 +293,7 @@ func (m Model) fetchDiskUsage(conn *auth.Connection) tea.Cmd {
 //nolint:misspell // "environmentals" is the PAN-OS XML API tag name
 func (m Model) fetchEnvironmentals(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.Environmental, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.Environmental, error) {
 		return conn.Client.GetEnvironmentals(ctx, target)
 	}, func(envs []models.Environmental, err error) tea.Msg {
 		return EnvironmentalsMsg{Environmentals: envs, Err: err}
@@ -291,7 +302,7 @@ func (m Model) fetchEnvironmentals(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchCertificates(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.Certificate, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.Certificate, error) {
 		return conn.Client.GetCertificates(ctx, target)
 	}, func(certs []models.Certificate, err error) tea.Msg {
 		return CertificatesMsg{Certificates: certs, Err: err}
@@ -300,7 +311,7 @@ func (m Model) fetchCertificates(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchARPTable(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.ARPEntry, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.ARPEntry, error) {
 		return conn.Client.GetARPTable(ctx, target)
 	}, func(entries []models.ARPEntry, err error) tea.Msg {
 		return ARPTableMsg{Entries: entries, Err: err}
@@ -309,7 +320,7 @@ func (m Model) fetchARPTable(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchRoutingTable(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.RouteEntry, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.RouteEntry, error) {
 		return conn.Client.GetRoutingTable(ctx, target)
 	}, func(routes []models.RouteEntry, err error) tea.Msg {
 		return RoutingTableMsg{Routes: routes, Err: err}
@@ -318,7 +329,7 @@ func (m Model) fetchRoutingTable(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchBGPNeighbors(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.BGPNeighbor, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.BGPNeighbor, error) {
 		return conn.Client.GetBGPNeighbors(ctx, target)
 	}, func(n []models.BGPNeighbor, err error) tea.Msg {
 		return BGPNeighborsMsg{Neighbors: n, Err: err}
@@ -327,7 +338,7 @@ func (m Model) fetchBGPNeighbors(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchOSPFNeighbors(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.OSPFNeighbor, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.OSPFNeighbor, error) {
 		return conn.Client.GetOSPFNeighbors(ctx, target)
 	}, func(n []models.OSPFNeighbor, err error) tea.Msg {
 		return OSPFNeighborsMsg{Neighbors: n, Err: err}
@@ -336,7 +347,7 @@ func (m Model) fetchOSPFNeighbors(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchIPSecTunnels(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.IPSecTunnel, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.IPSecTunnel, error) {
 		return conn.Client.GetIPSecTunnels(ctx, target)
 	}, func(t []models.IPSecTunnel, err error) tea.Msg {
 		return IPSecTunnelsMsg{Tunnels: t, Err: err}
@@ -345,7 +356,7 @@ func (m Model) fetchIPSecTunnels(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchGlobalProtectUsers(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.GlobalProtectUser, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.GlobalProtectUser, error) {
 		return conn.Client.GetGlobalProtectUsers(ctx, target)
 	}, func(u []models.GlobalProtectUser, err error) tea.Msg {
 		return GlobalProtectUsersMsg{Users: u, Err: err}
@@ -354,7 +365,7 @@ func (m Model) fetchGlobalProtectUsers(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchPendingChanges(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.PendingChange, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.PendingChange, error) {
 		return conn.Client.GetPendingChanges(ctx, target)
 	}, func(c []models.PendingChange, err error) tea.Msg {
 		return PendingChangesMsg{Changes: c, Err: err}
@@ -363,7 +374,7 @@ func (m Model) fetchPendingChanges(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchAddresses(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.AddressObject, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.AddressObject, error) {
 		return conn.Client.GetAddresses(ctx, target)
 	}, func(items []models.AddressObject, err error) tea.Msg {
 		return AddressesMsg{Items: items, Err: err}
@@ -372,7 +383,7 @@ func (m Model) fetchAddresses(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchServices(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.ServiceObject, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.ServiceObject, error) {
 		return conn.Client.GetServices(ctx, target)
 	}, func(items []models.ServiceObject, err error) tea.Msg {
 		return ServicesMsg{Items: items, Err: err}
@@ -389,7 +400,7 @@ func (m Model) fetchObjects() tea.Cmd {
 
 func (m Model) fetchNATPoolInfo(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.NATPoolInfo, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.NATPoolInfo, error) {
 		return conn.Client.GetNATPoolInfo(ctx, target)
 	}, func(p []models.NATPoolInfo, err error) tea.Msg {
 		return NATPoolMsg{Pools: p, Err: err}
@@ -403,7 +414,7 @@ func (m Model) fetchPolicies() tea.Cmd {
 	}
 
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.SecurityRule, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.SecurityRule, error) {
 		return conn.Client.GetSecurityPolicies(ctx, target)
 	}, func(policies []models.SecurityRule, err error) tea.Msg {
 		return PoliciesMsg{Policies: policies, Err: err}
@@ -417,7 +428,7 @@ func (m Model) fetchNATPolicies() tea.Cmd {
 	}
 
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.NATRule, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.NATRule, error) {
 		return conn.Client.GetNATRules(ctx, target)
 	}, func(rules []models.NATRule, err error) tea.Msg {
 		return NATPoliciesMsg{Rules: rules, Err: err}
@@ -431,7 +442,7 @@ func (m Model) fetchSessions() tea.Cmd {
 	}
 
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.Session, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.Session, error) {
 		return conn.Client.GetSessions(ctx, "", target)
 	}, func(sessions []models.Session, err error) tea.Msg {
 		return SessionsMsg{Sessions: sessions, Err: err}
@@ -445,7 +456,7 @@ func (m Model) fetchSessionDetail(id int64) tea.Cmd {
 	}
 
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) (*models.SessionDetail, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (*models.SessionDetail, error) {
 		return conn.Client.GetSessionByID(ctx, id, target)
 	}, func(detail *models.SessionDetail, err error) tea.Msg {
 		return SessionDetailMsg{Detail: detail, Err: err}
@@ -467,7 +478,7 @@ func (m Model) fetchLogs() tea.Cmd {
 
 func (m Model) fetchSystemLogs(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.SystemLogEntry, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.SystemLogEntry, error) {
 		return conn.Client.GetSystemLogs(ctx, "", 100, target)
 	}, func(logs []models.SystemLogEntry, err error) tea.Msg {
 		return SystemLogsMsg{Logs: logs, Err: err}
@@ -476,7 +487,7 @@ func (m Model) fetchSystemLogs(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchTrafficLogs(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.TrafficLogEntry, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.TrafficLogEntry, error) {
 		return conn.Client.GetTrafficLogs(ctx, "", 100, target)
 	}, func(logs []models.TrafficLogEntry, err error) tea.Msg {
 		return TrafficLogsMsg{Logs: logs, Err: err}
@@ -485,7 +496,7 @@ func (m Model) fetchTrafficLogs(conn *auth.Connection) tea.Cmd {
 
 func (m Model) fetchThreatLogs(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, func(ctx context.Context) ([]models.ThreatLogEntry, error) {
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.ThreatLogEntry, error) {
 		return conn.Client.GetThreatLogs(ctx, "", 100, target)
 	}, func(logs []models.ThreatLogEntry, err error) tea.Msg {
 		return ThreatLogsMsg{Logs: logs, Err: err}
