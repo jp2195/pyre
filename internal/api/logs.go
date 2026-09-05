@@ -339,7 +339,7 @@ func (c *Client) GetThreatLogs(ctx context.Context, query string, maxLogs int, t
 				SessionID   int64  `xml:"sessionid"`
 				User        string `xml:"srcuser"`
 				// threatid is int64 on pre-11.x PAN-OS but carries the
-				// threat *name* on 11.x ("Proxy:mask.apple-dns.net"), with
+				// threat *name* on 11.x ("Proxy:mask.test-dns.net"), with
 				// the numeric id moved to <tid>. Decode as string and sort
 				// it out below — an int64 here fails the whole batch.
 				ThreatID    string `xml:"threatid"`
@@ -367,7 +367,7 @@ func (c *Client) GetThreatLogs(ctx context.Context, query string, maxLogs int, t
 	for _, e := range statusResult.Logs.Entry {
 		// Reconcile the two PAN-OS threatid shapes:
 		//   pre-11.x: <threatid>30003</threatid><threat>Trojan.GenericKD</threat>
-		//   11.x:     <threatid>Proxy:mask.apple-dns.net</threatid><tid>109010004</tid>
+		//   11.x:     <threatid>Proxy:mask.test-dns.net</threatid><tid>109010004</tid>
 		threatID := e.TID
 		threatName := e.ThreatName
 		if n, err := strconv.ParseInt(e.ThreatID, 10, 64); err == nil {

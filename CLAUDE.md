@@ -104,7 +104,7 @@ logger at a file.
 
 ## Go 1.26 (Current Version)
 
-`go.mod` is pinned to `go 1.26.5`; CI pins `go-version: '1.26.5'` (the
+`go.mod` is pinned to `go 1.26.6`; CI pins `go-version: '1.26.6'` (the
 `go-version` lines across `.github/workflows/` plus `go.mod` move together —
 verify the count with `grep -rc "go-version:" .github/workflows/` rather than
 trusting a number written here).
@@ -116,7 +116,13 @@ The 1.26.x series has shipped these stdlib CVE patches:
 - **1.26.4** — GO-2026-5039 (`net/textproto` error escaping) and GO-2026-5037
   (`crypto/x509` hostname parsing); both reached this codebase's keygen and
   TLS paths and were caught by `govulncheck`.
-- **1.26.5** — current pin, bumped as part of the remediation pass (#47).
+- **1.26.5** — routine stdlib patch, bumped as part of the remediation pass
+  (#47); no `govulncheck` findings against this codebase.
+- **1.26.6** — GO-2026-6218 (`net/url`), GO-2026-6090 (`crypto/tls`),
+  GO-2026-6089 + GO-2026-5026 (`net/http`), GO-2026-6088 (`encoding/xml`),
+  GO-2026-5972 (`encoding/asn1`). All six were reachable: `encoding/xml`
+  from the PAN-OS response decoder, `encoding/asn1` from the CA-bundle
+  loader in `NewTransport`, and the rest from the keygen/API request paths.
 
 When a new patch lands, bump `go.mod` + the CI pins together and re-run
 `govulncheck ./...`.

@@ -309,9 +309,9 @@ func TestPollLogJob_RespectsContextCancellation(t *testing.T) {
 }
 
 // TestGetThreatLogs_PANOS11NamedThreatID reproduces a live PA-440 on PAN-OS
-// 11.2: <threatid> carries the threat *name* ("Proxy:mask.apple-dns.net") and
+// 11.2: <threatid> carries the threat *name* ("Proxy:mask.test-dns.net") and
 // the numeric id moved to <tid>. Decoding threatid as int64 failed the whole
-// batch with `strconv.ParseInt: parsing "Proxy:mask.apple-dns.net"`, so the
+// batch with `strconv.ParseInt: parsing "Proxy:mask.test-dns.net"`, so the
 // Threat tab showed 0 entries and an error.
 func TestGetThreatLogs_PANOS11NamedThreatID(t *testing.T) {
 	var calls atomic.Int32
@@ -326,10 +326,10 @@ func TestGetThreatLogs_PANOS11NamedThreatID(t *testing.T) {
 				`<src>10.0.40.15</src><dst>1.1.1.1</dst>`+
 				`<sport>37847</sport><dport>53</dport>`+
 				`<app>dns-base</app><action>sinkhole</action>`+
-				`<threatid>Proxy:mask.apple-dns.net</threatid>`+
+				`<threatid>Proxy:mask.test-dns.net</threatid>`+
 				`<tid>109010004</tid>`+
 				`<severity>low</severity>`+
-				`<misc>north-america-mask.wrr.mask.apple-dns.net</misc>`+
+				`<misc>region-mask.wrr.mask.test-dns.net</misc>`+
 				`</entry></logs></log><job><status>FIN</status></job></result></response>`)
 		}
 	})
@@ -341,8 +341,8 @@ func TestGetThreatLogs_PANOS11NamedThreatID(t *testing.T) {
 	if len(logs) != 1 {
 		t.Fatalf("expected 1 log entry, got %d", len(logs))
 	}
-	if logs[0].ThreatName != "Proxy:mask.apple-dns.net" {
-		t.Errorf("ThreatName = %q, want %q", logs[0].ThreatName, "Proxy:mask.apple-dns.net")
+	if logs[0].ThreatName != "Proxy:mask.test-dns.net" {
+		t.Errorf("ThreatName = %q, want %q", logs[0].ThreatName, "Proxy:mask.test-dns.net")
 	}
 	if logs[0].ThreatID != 109010004 {
 		t.Errorf("ThreatID = %d, want 109010004", logs[0].ThreatID)
