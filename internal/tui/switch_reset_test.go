@@ -145,3 +145,17 @@ func TestLoginSuccess_SecondHostBecomesActive(t *testing.T) {
 	}
 	assertViewDataCleared(t, nm)
 }
+
+// TestView_DoesNotEnableMouseMode pins a deliberate choice. Mouse reporting
+// was switched on while nothing in the program handles a mouse message, so it
+// bought nothing and cost two things an operator notices: the terminal's own
+// click-drag text selection stops working without holding Shift, which is how
+// you copy an IP out of a table, and every wheel and motion event falls
+// through to the unhandled-message warning. Re-enable it only alongside real
+// mouse handling.
+func TestView_DoesNotEnableMouseMode(t *testing.T) {
+	m := newTestModel(t, ViewDashboard)
+	if got := m.View().MouseMode; got != tea.MouseModeNone {
+		t.Errorf("MouseMode = %v, want MouseModeNone while no mouse messages are handled", got)
+	}
+}

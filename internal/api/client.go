@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -98,6 +99,23 @@ func NewTransport(opts ClientOptions) (*http.Transport, error) {
 	}, nil
 }
 
+// BaseURL returns the PAN-OS API endpoint for host.
+//
+// A bare IPv6 literal has to be bracketed or the result is not a parseable
+// URL at all: Go reads the trailing group as a port and every request fails
+// with "invalid port" before a packet leaves the process. ValidateHost
+// accepts bare IPv6 (net.ParseIP does), so the bracketing belongs here,
+// where the URL is actually built.
+//
+// Hostnames, IPv4 literals, host:port, and already-bracketed IPv6 forms are
+// returned unchanged.
+func BaseURL(host string) string {
+	if ip := net.ParseIP(host); ip != nil && ip.To4() == nil {
+		host = "[" + host + "]"
+	}
+	return fmt.Sprintf("https://%s/api/", host)
+}
+
 // NewClient builds a PAN-OS XML API client for host using apiKey for
 // authentication. The client owns its *http.Transport; callers must invoke
 // Close to release idle connections when finished.
@@ -111,7 +129,7 @@ func NewClient(host, apiKey string, opts ClientOptions) (*Client, error) {
 		return nil, err
 	}
 	return &Client{
-		baseURL: fmt.Sprintf("https://%s/api/", host),
+		baseURL: BaseURL(host),
 		apiKey:  apiKey,
 		httpClient: &http.Client{
 			Transport: tr,

@@ -32,6 +32,12 @@ type LogsModel struct {
 	filteredTraffic []models.TrafficLogEntry
 	filteredThreat  []models.ThreatLogEntry
 
+	// One error per log type. The three tabs are three independent fetches;
+	// a single shared Err meant one failure blanked the other two tabs.
+	systemErr  error
+	trafficErr error
+	threatErr  error
+
 	sortBy      LogSortField
 	lastRefresh time.Time
 }
@@ -72,7 +78,7 @@ func (m LogsModel) HasData() bool {
 
 func (m LogsModel) SetSystemLogs(logs []models.SystemLogEntry, err error) LogsModel {
 	m.systemLogs = logs
-	m.Err = err
+	m.systemErr = err
 	m.Loading = false
 	m.lastRefresh = time.Now()
 	m.applyFilter()
@@ -82,7 +88,7 @@ func (m LogsModel) SetSystemLogs(logs []models.SystemLogEntry, err error) LogsMo
 
 func (m LogsModel) SetTrafficLogs(logs []models.TrafficLogEntry, err error) LogsModel {
 	m.trafficLogs = logs
-	m.Err = err
+	m.trafficErr = err
 	m.Loading = false
 	m.lastRefresh = time.Now()
 	m.applyFilter()
@@ -92,7 +98,7 @@ func (m LogsModel) SetTrafficLogs(logs []models.TrafficLogEntry, err error) Logs
 
 func (m LogsModel) SetThreatLogs(logs []models.ThreatLogEntry, err error) LogsModel {
 	m.threatLogs = logs
-	m.Err = err
+	m.threatErr = err
 	m.Loading = false
 	m.lastRefresh = time.Now()
 	m.applyFilter()
@@ -100,14 +106,21 @@ func (m LogsModel) SetThreatLogs(logs []models.ThreatLogEntry, err error) LogsMo
 	return m
 }
 
-func (m LogsModel) SetError(err error) LogsModel {
-	m.Err = err
-	m.Loading = false
-	return m
-}
-
 func (m LogsModel) ActiveLogType() models.LogType {
 	return m.activeLogType
+}
+
+// activeErr returns the error for the tab currently on screen, so a failed
+// fetch only blanks its own tab.
+func (m LogsModel) activeErr() error {
+	switch m.activeLogType {
+	case models.LogTypeTraffic:
+		return m.trafficErr
+	case models.LogTypeThreat:
+		return m.threatErr
+	default:
+		return m.systemErr
+	}
 }
 
 func (m LogsModel) IsFilterMode() bool {
@@ -289,8 +302,8 @@ func (m LogsModel) View() string {
 	}
 
 	// Error or content
-	if m.Err != nil {
-		sections = append(sections, m.renderError())
+	if activeErr := m.activeErr(); activeErr != nil {
+		sections = append(sections, m.renderError(activeErr))
 	} else if !m.Loading || m.filteredCount() > 0 {
 		sections = append(sections, m.renderTable())
 
@@ -351,8 +364,8 @@ func (m LogsModel) renderFilterBar() string {
 	return FilterBorderStyle.Render(m.Filter.View()) + "\n"
 }
 
-func (m LogsModel) renderError() string {
-	return ErrorMsgStyle.Bold(true).Padding(1, 0).Render(fmt.Sprintf("Error: %v", m.Err))
+func (m LogsModel) renderError(err error) string {
+	return ErrorMsgStyle.Bold(true).Padding(1, 0).Render(fmt.Sprintf("Error: %v", err))
 }
 
 func (m LogsModel) renderTable() string {

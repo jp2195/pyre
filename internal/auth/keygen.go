@@ -50,8 +50,10 @@ func GenerateAPIKey(ctx context.Context, host, username, password string, opts a
 		Transport: tr,
 	}
 
-	// Use POST with form body to keep credentials out of URLs/logs
-	reqURL := fmt.Sprintf("https://%s/api/", host)
+	// Use POST with form body to keep credentials out of URLs/logs.
+	// Shares api.BaseURL so keygen and the API client agree on host
+	// formatting, including bracketing bare IPv6 literals.
+	reqURL := api.BaseURL(host)
 	formData := url.Values{}
 	formData.Set("type", "keygen")
 	formData.Set("user", username)

@@ -75,7 +75,7 @@ func TestLogsModel_SetSystemLogs_WithError(t *testing.T) {
 	err := errors.New("API error")
 	m = m.SetSystemLogs(nil, err)
 
-	if m.Err != err {
+	if m.systemErr != err {
 		t.Error("expected error to be set")
 	}
 }
@@ -104,7 +104,7 @@ func TestLogsModel_SetTrafficLogs_WithError(t *testing.T) {
 	err := errors.New("API error")
 	m = m.SetTrafficLogs(nil, err)
 
-	if m.Err != err {
+	if m.trafficErr != err {
 		t.Error("expected error to be set")
 	}
 }
@@ -133,22 +133,8 @@ func TestLogsModel_SetThreatLogs_WithError(t *testing.T) {
 	err := errors.New("API error")
 	m = m.SetThreatLogs(nil, err)
 
-	if m.Err != err {
+	if m.threatErr != err {
 		t.Error("expected error to be set")
-	}
-}
-
-func TestLogsModel_SetError(t *testing.T) {
-	m := NewLogsModel()
-
-	err := errors.New("test error")
-	m = m.SetError(err)
-
-	if m.Err != err {
-		t.Error("expected error to be set")
-	}
-	if m.Loading {
-		t.Error("expected Loading=false after SetError")
 	}
 }
 
@@ -316,8 +302,8 @@ func TestLogsModel_SetSystemLogs_ClearsPreviousError(t *testing.T) {
 	m := NewLogsModel()
 	m = m.SetSystemLogs(nil, errors.New("fetch failed"))
 	m = m.SetSystemLogs([]models.SystemLogEntry{{Severity: "info", Description: "ok"}}, nil)
-	if m.Err != nil {
-		t.Errorf("Err = %v, want nil after successful refresh", m.Err)
+	if m.systemErr != nil {
+		t.Errorf("systemErr = %v, want nil after successful refresh", m.systemErr)
 	}
 }
 
@@ -325,8 +311,8 @@ func TestLogsModel_SetTrafficLogs_ClearsPreviousError(t *testing.T) {
 	m := NewLogsModel()
 	m = m.SetTrafficLogs(nil, errors.New("fetch failed"))
 	m = m.SetTrafficLogs([]models.TrafficLogEntry{{Action: "allow", SourceIP: "10.0.0.1"}}, nil)
-	if m.Err != nil {
-		t.Errorf("Err = %v, want nil after successful refresh", m.Err)
+	if m.trafficErr != nil {
+		t.Errorf("trafficErr = %v, want nil after successful refresh", m.trafficErr)
 	}
 }
 
@@ -334,8 +320,8 @@ func TestLogsModel_SetThreatLogs_ClearsPreviousError(t *testing.T) {
 	m := NewLogsModel()
 	m = m.SetThreatLogs(nil, errors.New("fetch failed"))
 	m = m.SetThreatLogs([]models.ThreatLogEntry{{Severity: "high", ThreatName: "X"}}, nil)
-	if m.Err != nil {
-		t.Errorf("Err = %v, want nil after successful refresh", m.Err)
+	if m.threatErr != nil {
+		t.Errorf("threatErr = %v, want nil after successful refresh", m.threatErr)
 	}
 }
 

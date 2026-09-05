@@ -405,10 +405,15 @@ func (m Model) handleSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
 // View is the top-level Bubble Tea v2 view. It composes sub-view strings and
 // wraps them in a tea.View so that program-level options (alt-screen, mouse,
 // window title, cursor) can be set here rather than on tea.NewProgram.
+// Mouse reporting is deliberately left off. Nothing here handles a mouse
+// message, so enabling it bought no behavior and cost two things: the
+// terminal's own click-drag selection stops working without Shift, which is
+// how an operator copies an address out of a table, and every wheel and
+// motion event falls through to the unhandled-message warning. Turn it on in
+// the same change that adds real mouse handling.
 func (m Model) View() tea.View {
 	v := tea.NewView(m.renderContent())
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 
