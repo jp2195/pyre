@@ -89,7 +89,7 @@ func (m LogsModel) renderSystemTable() string {
 		return LoadingMsgStyle.Padding(1, 0).Render("Loading system logs...")
 	}
 	if len(m.filteredSystem) == 0 {
-		return EmptyMsgStyle.Padding(1, 0).Render("No system logs found")
+		return m.emptyStateFor("system")
 	}
 
 	layout := m.systemLayout()

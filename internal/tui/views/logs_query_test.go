@@ -143,3 +143,72 @@ func TestLogsModel_QueryBarFitsTheTerminalWidth(t *testing.T) {
 		t.Errorf("width %d: query bar widened the screen from %d cells (pre-existing) to %d", belowFloor, baseline, got)
 	}
 }
+
+// Zero rows under an active query must say what was asked, so a bound that
+// silently matched nothing is visible rather than reading as "no traffic".
+func TestLogsModel_ZeroRowsNamesTheSentExpression(t *testing.T) {
+	sent := "(receive_time geq '2026/09/05 11:57:00') and ((receive_time geq '2025/13/45 99:99:99'))"
+	m := NewLogsModel().SetSize(120, 40)
+	m = m.SetSystemLogs(nil, LogPageMeta{Sent: sent}, nil)
+
+	view := m.View()
+	if !strings.Contains(view, "0 rows matched") {
+		t.Errorf("view does not report a zero match:\n%s", view)
+	}
+	if !strings.Contains(view, "2025/13/45") {
+		t.Errorf("view does not name the expression that was sent:\n%s", view)
+	}
+}
+
+// With no query at all, the plain empty state is still the right message.
+func TestLogsModel_ZeroRowsWithNoQueryKeepsPlainMessage(t *testing.T) {
+	m := NewLogsModel().SetSize(120, 40)
+	m = m.SetSystemLogs(nil, LogPageMeta{}, nil)
+
+	view := m.View()
+	if !strings.Contains(view, "No system logs found") {
+		t.Errorf("plain empty state missing:\n%s", view)
+	}
+	if strings.Contains(view, "0 rows matched") {
+		t.Errorf("query-specific empty state shown with no query:\n%s", view)
+	}
+}
+
+// A long assembled expression must wrap inside the terminal, never widen it,
+// same as every other line this view renders.
+func TestLogsModel_ZeroRowsExpressionWrapsInsteadOfWidening(t *testing.T) {
+	sent := strings.Repeat("(receive_time geq '2026/09/05 11:57:00') and ", 10)
+	const width = 60
+	m := NewLogsModel().SetSize(width, 40)
+	m = m.SetSystemLogs(nil, LogPageMeta{Sent: sent}, nil)
+
+	for _, line := range splitLines(m.View()) {
+		if got := lipgloss.Width(line); got > width {
+			t.Errorf("width %d: line is %d cells, %d over\n  %q", width, got, got-width, line)
+		}
+	}
+}
+
+// Switching to a tab with no rows yet triggers a fetch. Until that fetch
+// completes, the tab must show the loading state rather than asserting
+// there are no logs -- the same lie the zero-match empty state exists to
+// fix, just on the way in instead of on the way out.
+func TestLogsModel_SwitchingToUnfetchedTabShowsLoadingNotEmpty(t *testing.T) {
+	m := NewLogsModel().SetSize(120, 40)
+
+	m, cmd := m.Update(tea.KeyPressMsg{Code: ']', Text: "]"}) // System -> Traffic
+	if m.activeLogType != models.LogTypeTraffic {
+		t.Fatalf("expected Traffic after ], got %v", m.activeLogType)
+	}
+	if cmd == nil {
+		t.Fatal("switching to an unfetched tab did not request a fetch")
+	}
+	if !m.Loading {
+		t.Error("switching to an unfetched tab did not set Loading")
+	}
+
+	view := m.View()
+	if strings.Contains(view, "No traffic logs found") {
+		t.Errorf("view claims no traffic logs while the fetch is in flight:\n%s", view)
+	}
+}

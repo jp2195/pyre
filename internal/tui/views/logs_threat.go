@@ -122,7 +122,7 @@ func (m LogsModel) renderThreatTable() string {
 		return LoadingMsgStyle.Padding(1, 0).Render("Loading threat logs...")
 	}
 	if len(m.filteredThreat) == 0 {
-		return EmptyMsgStyle.Padding(1, 0).Render("No threat logs found")
+		return m.emptyStateFor("threat")
 	}
 
 	layout := m.threatLayout()

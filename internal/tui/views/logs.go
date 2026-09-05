@@ -343,6 +343,10 @@ func (m LogsModel) onTabSwitch() (LogsModel, tea.Cmd) {
 	m.Expanded = false
 
 	if m.rowCount(m.activeLogType) == 0 || m.tabStale(m.activeLogType) {
+		// Without this, the first visit to a tab renders its empty state
+		// for however long the fetch takes -- an empty table asserting
+		// there are no logs when it simply has not asked yet.
+		m = m.SetLoading(true)
 		return m, m.fetchRequest(m.activeLogType, 0, false)
 	}
 	return m, nil
@@ -786,6 +790,19 @@ func (m LogsModel) renderHelp() string {
 	}
 
 	return ViewSubtitleStyle.MarginTop(1).Render(strings.Join(parts, "  "))
+}
+
+// emptyStateFor renders the message shown when a tab has no rows. With an
+// expression in play it names what the device was actually asked, because a
+// bound the device accepted but did not honor returns zero rows with no
+// error, and a blank table reads as "nothing happened".
+func (m LogsModel) emptyStateFor(kind string) string {
+	sent := m.tabState(m.activeLogType).sent
+	if sent == "" {
+		return EmptyMsgStyle.Padding(1, 0).Render(fmt.Sprintf("No %s logs found", kind))
+	}
+	return EmptyMsgStyle.Padding(1, 0).Render(
+		"0 rows matched\n" + strings.Join(wrapText(sent, m.Width), "\n"))
 }
 
 // --- Shared helpers used by log type files ---

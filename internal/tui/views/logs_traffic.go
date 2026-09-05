@@ -131,7 +131,7 @@ func (m LogsModel) renderTrafficTable() string {
 		return LoadingMsgStyle.Padding(1, 0).Render("Loading traffic logs...")
 	}
 	if len(m.filteredTraffic) == 0 {
-		return EmptyMsgStyle.Padding(1, 0).Render("No traffic logs found")
+		return m.emptyStateFor("traffic")
 	}
 
 	layout := m.trafficLayout()
