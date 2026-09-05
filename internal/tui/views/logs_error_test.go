@@ -52,13 +52,13 @@ func TestLogsModel_PerTypeErrorsDoNotOverwrite(t *testing.T) {
 	m = m.SetThreatLogs(nil, threatErr)
 	m = m.SetTrafficLogs([]models.TrafficLogEntry{{Time: time.Now()}}, nil)
 
-	if !errors.Is(m.systemErr, sysErr) {
-		t.Errorf("systemErr = %v, want %v", m.systemErr, sysErr)
+	if !errors.Is(m.tabState(models.LogTypeSystem).err, sysErr) {
+		t.Errorf("systemErr = %v, want %v", m.tabState(models.LogTypeSystem).err, sysErr)
 	}
-	if !errors.Is(m.threatErr, threatErr) {
-		t.Errorf("threatErr = %v, want %v", m.threatErr, threatErr)
+	if !errors.Is(m.tabState(models.LogTypeThreat).err, threatErr) {
+		t.Errorf("threatErr = %v, want %v", m.tabState(models.LogTypeThreat).err, threatErr)
 	}
-	if m.trafficErr != nil {
-		t.Errorf("trafficErr = %v, want nil after a successful fetch", m.trafficErr)
+	if err := m.tabState(models.LogTypeTraffic).err; err != nil {
+		t.Errorf("trafficErr = %v, want nil after a successful fetch", err)
 	}
 }

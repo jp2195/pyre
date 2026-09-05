@@ -75,7 +75,7 @@ func TestLogsModel_SetSystemLogs_WithError(t *testing.T) {
 	err := errors.New("API error")
 	m = m.SetSystemLogs(nil, err)
 
-	if m.systemErr != err {
+	if m.tabState(models.LogTypeSystem).err != err {
 		t.Error("expected error to be set")
 	}
 }
@@ -104,7 +104,7 @@ func TestLogsModel_SetTrafficLogs_WithError(t *testing.T) {
 	err := errors.New("API error")
 	m = m.SetTrafficLogs(nil, err)
 
-	if m.trafficErr != err {
+	if m.tabState(models.LogTypeTraffic).err != err {
 		t.Error("expected error to be set")
 	}
 }
@@ -133,7 +133,7 @@ func TestLogsModel_SetThreatLogs_WithError(t *testing.T) {
 	err := errors.New("API error")
 	m = m.SetThreatLogs(nil, err)
 
-	if m.threatErr != err {
+	if m.tabState(models.LogTypeThreat).err != err {
 		t.Error("expected error to be set")
 	}
 }
@@ -302,8 +302,8 @@ func TestLogsModel_SetSystemLogs_ClearsPreviousError(t *testing.T) {
 	m := NewLogsModel()
 	m = m.SetSystemLogs(nil, errors.New("fetch failed"))
 	m = m.SetSystemLogs([]models.SystemLogEntry{{Severity: "info", Description: "ok"}}, nil)
-	if m.systemErr != nil {
-		t.Errorf("systemErr = %v, want nil after successful refresh", m.systemErr)
+	if err := m.tabState(models.LogTypeSystem).err; err != nil {
+		t.Errorf("systemErr = %v, want nil after successful refresh", err)
 	}
 }
 
@@ -311,8 +311,8 @@ func TestLogsModel_SetTrafficLogs_ClearsPreviousError(t *testing.T) {
 	m := NewLogsModel()
 	m = m.SetTrafficLogs(nil, errors.New("fetch failed"))
 	m = m.SetTrafficLogs([]models.TrafficLogEntry{{Action: "allow", SourceIP: "10.0.0.1"}}, nil)
-	if m.trafficErr != nil {
-		t.Errorf("trafficErr = %v, want nil after successful refresh", m.trafficErr)
+	if err := m.tabState(models.LogTypeTraffic).err; err != nil {
+		t.Errorf("trafficErr = %v, want nil after successful refresh", err)
 	}
 }
 
@@ -320,8 +320,8 @@ func TestLogsModel_SetThreatLogs_ClearsPreviousError(t *testing.T) {
 	m := NewLogsModel()
 	m = m.SetThreatLogs(nil, errors.New("fetch failed"))
 	m = m.SetThreatLogs([]models.ThreatLogEntry{{Severity: "high", ThreatName: "X"}}, nil)
-	if m.threatErr != nil {
-		t.Errorf("threatErr = %v, want nil after successful refresh", m.threatErr)
+	if err := m.tabState(models.LogTypeThreat).err; err != nil {
+		t.Errorf("threatErr = %v, want nil after successful refresh", err)
 	}
 }
 

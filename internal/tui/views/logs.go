@@ -32,15 +32,117 @@ type LogsModel struct {
 	filteredTraffic []models.TrafficLogEntry
 	filteredThreat  []models.ThreatLogEntry
 
-	// One error per log type. The three tabs are three independent fetches;
-	// a single shared Err meant one failure blanked the other two tabs.
-	systemErr  error
-	trafficErr error
-	threatErr  error
+	// One state per log tab. The three tabs are three independent fetches,
+	// so a failure, a page count, and a staleness flag all belong to one
+	// tab rather than to the view.
+	tabs map[models.LogType]logTabState
+
+	// rng is the selected time-range preset, shared by all three tabs.
+	rng LogRange
+	// query is the last expression the device accepted.
+	query string
 
 	sortBy      LogSortField
 	lastRefresh time.Time
 }
+
+// logTabState is everything the view knows about one tab that is not the rows
+// themselves. The rows stay in their own typed slices because they are three
+// genuinely different types.
+type logTabState struct {
+	// err is the last fetch error for this tab, so one failed tab does not
+	// blank the other two.
+	err error
+	// fetched is how many rows have been loaded, and therefore the Skip
+	// for the next page.
+	fetched int
+	// hasMore reports that the last page came back exactly full.
+	hasMore bool
+	// sent is the assembled expression the device received for this tab.
+	sent string
+	// rng and query are what these rows were fetched under. Staleness is
+	// derived by comparing them against the view's current selection
+	// rather than flagged when the selection changes: nothing has to
+	// remember to mark the other tabs, and refresh needs no special case.
+	rng   LogRange
+	query string
+}
+
+func (m LogsModel) tabState(t models.LogType) logTabState {
+	return m.tabs[t]
+}
+
+func (m *LogsModel) setTabState(t models.LogType, s logTabState) {
+	if m.tabs == nil {
+		m.tabs = make(map[models.LogType]logTabState, 3)
+	}
+	m.tabs[t] = s
+}
+
+// tabStale reports whether a tab's rows were fetched under a different range
+// or query than the one now selected, and so must be refetched before they
+// are shown again.
+func (m LogsModel) tabStale(t models.LogType) bool {
+	s := m.tabState(t)
+	return s.rng != m.rng || s.query != m.query
+}
+
+// LogRange is a time-range preset for a log query. The zero value is
+// LogRangeAll, which sends no bound at all -- the behavior the view had
+// before server-side queries existed.
+type LogRange int
+
+const (
+	LogRangeAll LogRange = iota
+	LogRange15m
+	LogRange1h
+	LogRange24h
+	LogRange7d
+	logRangeCount
+)
+
+// Label is the short form shown in the status line.
+func (r LogRange) Label() string {
+	switch r {
+	case LogRange15m:
+		return "15m"
+	case LogRange1h:
+		return "1h"
+	case LogRange24h:
+		return "24h"
+	case LogRange7d:
+		return "7d"
+	default:
+		return "all"
+	}
+}
+
+// Since is the lower bound for this preset, or the zero time for "all". The
+// caller passes now so the bound is testable, and so one keystroke cannot
+// produce two different bounds for two tabs.
+func (r LogRange) Since(now time.Time) time.Time {
+	switch r {
+	case LogRange15m:
+		return now.Add(-15 * time.Minute)
+	case LogRange1h:
+		return now.Add(-time.Hour)
+	case LogRange24h:
+		return now.Add(-24 * time.Hour)
+	case LogRange7d:
+		return now.Add(-7 * 24 * time.Hour)
+	default:
+		return time.Time{}
+	}
+}
+
+// Range is the selected time-range preset.
+func (m LogsModel) Range() LogRange { return m.rng }
+
+// RangeSince is the lower bound implied by the selected range.
+func (m LogsModel) RangeSince() time.Time { return m.rng.Since(time.Now()) }
+
+// Query is the last expression the device accepted.
+func (m LogsModel) Query() string { return m.query }
 
 func NewLogsModel() LogsModel {
 	base := NewTableBase("Filter logs...")
@@ -48,6 +150,7 @@ func NewLogsModel() LogsModel {
 	return LogsModel{
 		TableBase:     base,
 		activeLogType: models.LogTypeSystem,
+		tabs:          make(map[models.LogType]logTabState, 3),
 	}
 }
 
@@ -85,7 +188,9 @@ func (m LogsModel) HasData() bool {
 
 func (m LogsModel) SetSystemLogs(logs []models.SystemLogEntry, err error) LogsModel {
 	m.systemLogs = logs
-	m.systemErr = err
+	s := m.tabState(models.LogTypeSystem)
+	s.err = err
+	m.setTabState(models.LogTypeSystem, s)
 	m.Loading = false
 	m.lastRefresh = time.Now()
 	m.applyFilter()
@@ -95,7 +200,9 @@ func (m LogsModel) SetSystemLogs(logs []models.SystemLogEntry, err error) LogsMo
 
 func (m LogsModel) SetTrafficLogs(logs []models.TrafficLogEntry, err error) LogsModel {
 	m.trafficLogs = logs
-	m.trafficErr = err
+	s := m.tabState(models.LogTypeTraffic)
+	s.err = err
+	m.setTabState(models.LogTypeTraffic, s)
 	m.Loading = false
 	m.lastRefresh = time.Now()
 	m.applyFilter()
@@ -105,7 +212,9 @@ func (m LogsModel) SetTrafficLogs(logs []models.TrafficLogEntry, err error) Logs
 
 func (m LogsModel) SetThreatLogs(logs []models.ThreatLogEntry, err error) LogsModel {
 	m.threatLogs = logs
-	m.threatErr = err
+	s := m.tabState(models.LogTypeThreat)
+	s.err = err
+	m.setTabState(models.LogTypeThreat, s)
 	m.Loading = false
 	m.lastRefresh = time.Now()
 	m.applyFilter()
@@ -120,14 +229,7 @@ func (m LogsModel) ActiveLogType() models.LogType {
 // activeErr returns the error for the tab currently on screen, so a failed
 // fetch only blanks its own tab.
 func (m LogsModel) activeErr() error {
-	switch m.activeLogType {
-	case models.LogTypeTraffic:
-		return m.trafficErr
-	case models.LogTypeThreat:
-		return m.threatErr
-	default:
-		return m.systemErr
-	}
+	return m.tabState(m.activeLogType).err
 }
 
 func (m LogsModel) IsFilterMode() bool {
