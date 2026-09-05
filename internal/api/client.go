@@ -252,6 +252,13 @@ type XMLResponse struct {
 	Code   string `xml:"code,attr"`
 	Result struct {
 		Inner []byte `xml:",innerxml"`
+		// PAN-OS reports parameter validation errors as
+		// <result><msg>text</msg></result>, unlike the <msg><line>
+		// form every other error uses (verified on 11.2.10-h8: an
+		// nlogs above the 5000 ceiling answers HTTP 400 in this
+		// shape). Without this field the sentence is dropped and the
+		// caller sees only a status code.
+		Msg string `xml:"msg"`
 	} `xml:"result"`
 	Msg struct {
 		Line string `xml:"line"`
@@ -260,6 +267,15 @@ type XMLResponse struct {
 
 func (r *XMLResponse) IsSuccess() bool {
 	return r.Status == "success"
+}
+
+// ErrorMessage returns the human-readable error text from whichever of the
+// two shapes PAN-OS used, or "" when the response carries none.
+func (r *XMLResponse) ErrorMessage() string {
+	if r.Msg.Line != "" {
+		return r.Msg.Line
+	}
+	return strings.TrimSpace(r.Result.Msg)
 }
 
 // codeObjectNotPresent is the PAN-OS status code for "the node you asked for
@@ -458,7 +474,7 @@ func CheckResponse(resp *XMLResponse) error {
 	return &APIError{
 		Status:  resp.Status,
 		Code:    resp.Code,
-		Message: SanitizeForDisplay(resp.Msg.Line),
+		Message: SanitizeForDisplay(resp.ErrorMessage()),
 	}
 }
 
