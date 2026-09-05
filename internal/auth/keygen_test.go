@@ -3,6 +3,7 @@ package auth_test
 import (
 	"context"
 	"encoding/pem"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -178,5 +179,24 @@ func TestGenerateAPIKey_RejectsDoctypeResponse(t *testing.T) {
 	_, err := auth.GenerateAPIKey(context.Background(), host, "admin", "admin", api.ClientOptions{Insecure: true})
 	if err == nil {
 		t.Fatal("expected error for DOCTYPE in keygen response, got nil")
+	}
+}
+
+// TestGenerateAPIKey_SendsUserAgent keeps the login request identifiable in
+// the firewall's log alongside every other call pyre makes.
+func TestGenerateAPIKey_SendsUserAgent(t *testing.T) {
+	var got string
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Get("User-Agent")
+		_, _ = io.WriteString(w, `<response status="success"><result><key>K</key></result></response>`)
+	}))
+	defer srv.Close()
+
+	host := strings.TrimPrefix(srv.URL, "https://")
+	if _, err := auth.GenerateAPIKey(context.Background(), host, "admin", "pw", api.ClientOptions{Insecure: true}); err != nil {
+		t.Fatalf("GenerateAPIKey: %v", err)
+	}
+	if !strings.HasPrefix(got, "pyre") {
+		t.Errorf("User-Agent = %q, want it to identify pyre", got)
 	}
 }

@@ -64,6 +64,7 @@ func GenerateAPIKey(ctx context.Context, host, username, password string, opts a
 		return nil, fmt.Errorf("creating keygen request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("User-Agent", api.UserAgent)
 
 	resp, err := client.Do(req)
 	if err != nil {

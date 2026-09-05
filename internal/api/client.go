@@ -19,6 +19,25 @@ import (
 // maxResponseSize is the maximum allowed response body size (50 MB).
 const maxResponseSize = 50 * 1024 * 1024
 
+// MaxConcurrentRequests caps how many API calls one client will have in
+// flight at once.
+//
+// The PAN-OS management plane is slow and is shared with the web UI, and
+// every call is recorded in the firewall's own log. Without a cap, opening
+// the Overview dashboard fans out about sixteen requests simultaneously and
+// a policy load issues roughly fifteen config calls, which is both a
+// self-inflicted latency problem and a needlessly noisy audit trail. Four
+// keeps the views responsive without behaving like a scraper.
+//
+// The cap is per client, and each connection has its own client, so it
+// bounds load per firewall rather than across all of them.
+const MaxConcurrentRequests = 4
+
+// UserAgent identifies pyre in the firewall's API log. An unidentified
+// client is a worse answer to "what made these calls?" than it needs to be.
+// Exported so the keygen flow in internal/auth sends the same value.
+const UserAgent = "pyre"
+
 // debugLogging enables per-request API trace logging when PYRE_DEBUG=1 (or
 // "true") is set in the environment at process start. It is evaluated once
 // because toggling it at runtime across goroutines would require a mutex or
@@ -43,9 +62,10 @@ func debugf(format string, args ...any) {
 // consulting shared mutable state. This eliminates cross-goroutine bleed
 // when multiple fetches run concurrently with different targets.
 type Client struct {
-	baseURL    string       // 16 bytes (string header)
-	apiKey     string       // 16 bytes (string header)
-	httpClient *http.Client // 8 bytes (pointer)
+	baseURL    string        // 16 bytes (string header)
+	apiKey     string        // 16 bytes (string header)
+	httpClient *http.Client  // 8 bytes (pointer)
+	sem        chan struct{} // 8 bytes (pointer); see MaxConcurrentRequests
 }
 
 // ClientOptions carries optional knobs for NewClient. Zero value is safe:
@@ -90,7 +110,11 @@ func NewTransport(opts ClientOptions) (*http.Transport, error) {
 		tlsCfg.RootCAs = pool
 	}
 	return &http.Transport{
-		TLSClientConfig:       tlsCfg,
+		TLSClientConfig: tlsCfg,
+		// Honor HTTPS_PROXY / HTTP_PROXY / NO_PROXY. Every other Go HTTP
+		// client on the machine does, and a firewall reached through a
+		// corporate egress proxy is otherwise simply unreachable.
+		Proxy:                 http.ProxyFromEnvironment,
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          10,
 		IdleConnTimeout:       30 * time.Second,
@@ -135,6 +159,7 @@ func NewClient(host, apiKey string, opts ClientOptions) (*Client, error) {
 			Transport: tr,
 			Timeout:   30 * time.Second,
 		},
+		sem: make(chan struct{}, MaxConcurrentRequests),
 	}, nil
 }
 
@@ -177,6 +202,19 @@ func (r *XMLResponse) Error() string {
 // firewalls and Panorama-local queries. Target is per-request to avoid the
 // races that come with client-scoped mutable state.
 func (c *Client) request(ctx context.Context, params url.Values, target string) (*XMLResponse, error) {
+	// Wait for a slot before doing anything else. Queuing here rather than
+	// at the call sites means every path is bounded, including the fan-outs
+	// that build a dashboard. Nothing holds a slot while issuing another
+	// request, so this cannot deadlock.
+	if c.sem != nil {
+		select {
+		case c.sem <- struct{}{}:
+			defer func() { <-c.sem }()
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+
 	start := time.Now()
 
 	// Inject target parameter for Panorama routing
@@ -205,6 +243,7 @@ func (c *Client) request(ctx context.Context, params url.Values, target string) 
 	// Use X-PAN-KEY header instead of query parameter (PAN-OS 8.0+)
 	// This prevents API key from appearing in server/proxy logs
 	req.Header.Set("X-PAN-KEY", c.apiKey) // NOT logged
+	req.Header.Set("User-Agent", UserAgent)
 
 	resp, err := c.httpClient.Do(req)
 	duration := time.Since(start)

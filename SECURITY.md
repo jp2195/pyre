@@ -131,6 +131,15 @@ are managed by Renovate.
 ## Network notes
 
 - pyre talks to firewalls over HTTPS only, typically port 443.
+- Each client caps itself at 4 concurrent API calls
+  (`api.MaxConcurrentRequests`). The management plane is shared with the
+  web UI and logs every call, so an unbounded fan-out is both slow and
+  noisy in the audit trail. The cap is per connection, so it bounds load
+  per firewall.
+- Every request sends `User-Agent: pyre`, so calls are attributable in
+  the firewall's own API log.
+- `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY` are honored, so traffic can
+  be routed through a corporate egress proxy or an inspection proxy.
 - The same permissions a user needs in PAN-OS also apply here — pyre
   doesn't elevate.
 - Firewall API calls are logged by PAN-OS; review those logs for audit.
