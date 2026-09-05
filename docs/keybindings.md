@@ -56,7 +56,7 @@ keys resume once `Enter` or `Esc` closes it.
 | `/`         | Filter the rows already loaded (client-side)        |
 | `f`         | Device query — a raw PAN-OS expression              |
 | `t` / `T`   | Cycle the time range: 15m · 1h · 24h · 7d · all     |
-| `m`         | Load the next page                                  |
+| `m`         | Load the next page (ignored while one is in flight) |
 | `s` / `S`   | Sort field / direction                              |
 
 `/` and `f` compose: `f` narrows what the firewall sends, `/` narrows what

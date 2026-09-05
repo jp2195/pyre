@@ -12,8 +12,9 @@ System (N)   Traffic (N)   Threat (N)          Sort: <field> <dir>  |  Updated X
 
 Each tab label shows the live filtered count for that log type. The
 right side of the tab bar shows the current sort field/direction and
-how long ago the data was last fetched. The tab bar updates in place
-as the filter changes.
+how long ago the tab on screen was last fetched — each tab keeps its
+own timestamp, because each is a separate fetch. The tab bar updates in
+place as the filter changes.
 
 ## System logs
 
@@ -164,11 +165,17 @@ page; the other two tabs refetch the next time they are shown.
 ## Device query (`f`)
 
 `f` opens a bar that sends a raw PAN-OS log expression to the device,
-combined with the active time range's bound. `Enter` commits the text
-and refetches page one; `Esc` discards the edit and leaves the
-previously accepted query in place. This is a different filter from
-`/`: `/` only ever narrows rows already loaded into pyre, while `f`
-changes what the firewall itself matches and sends back.
+combined with the active time range's bound. `Enter` sends the text and
+refetches page one; `Esc` discards the edit. This is a different filter
+from `/`: `/` only ever narrows rows already loaded into pyre, while
+`f` changes what the firewall itself matches and sends back.
+
+An expression only becomes the stored query once the device answers it
+without an error. A refused one is never stored, so `r` re-sends the
+last query the device accepted rather than retrying a bad one, and the
+other tabs do not go stale against it. The bar reopens with the text
+you last sent — including a refused one, so a typo can be corrected
+rather than retyped.
 
 Examples:
 
@@ -180,8 +187,9 @@ hand (verified on a PA-440 running PAN-OS 11.2.10-h8):
 
 - **Bad queries are rejected synchronously with a useful message.**
   `(bogus_field eq x)` comes back as something like `Invalid operator eq
-  for field bogus_field`, and the rows already on screen are left alone
-  rather than cleared.
+  for field bogus_field`. The message is shown above the rows already on
+  screen, together with the expression that caused it, rather than
+  replacing the results you were reading.
 - **A malformed time bound is accepted and silently matches nothing.**
   pyre already adds its own `receive_time` bound from the time-range
   preset, so a query typed into the bar does not normally need one. An
@@ -197,11 +205,28 @@ hand (verified on a PA-440 running PAN-OS 11.2.10-h8):
 where it was. A page is capped at 5000 rows — PAN-OS rejects a larger
 request — though pyre's default page size is smaller than that cap.
 
+A page takes a second or more to arrive, so `m` does nothing while one
+is already on its way: the skip it would send comes from the rows
+already loaded, and that only moves when a page lands. Every page of
+one pagination also reuses the lower bound the first page was fetched
+with, so a busy device adding rows at the head cannot push the same
+rows into the next page.
+
 PAN-OS returns no total match count for a log query anywhere in its
 response, so pyre cannot say "500 of 12,000" even if it wanted to. The
 status line instead reports "500 shown, more available" when the last
 page came back exactly full (the only signal that more rows might
 exist), and plain "500 shown" once a page comes back short.
+
+## Time bounds and the device clock
+
+PAN-OS interprets a time bound in its own wall clock and reports no time
+zone anywhere, so pyre derives the offset from the clock the device
+reports. A bounded query learns it first when it is not yet known. If
+the device cannot be asked, the bound is still sent — showing everything
+when you asked for the last hour would be its own wrong answer — and a
+line above the table says the window may be off by the firewall's UTC
+offset.
 
 ## Filter behavior
 

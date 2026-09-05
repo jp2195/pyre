@@ -40,11 +40,22 @@ go fix ./...                  # Apply modernizers (safe, behavior-preserving)
   `XMLResponse.NodeAbsent()` rather than checking success alone.
 - **Log queries**: `api.LogQuery`/`api.LogPage` carry one page. The time bound
   is a `time.Time` formatted in `c.deviceLocation()` — never format a bound in
-  the local zone. `nlogs` clamps to 5000 (the device answers 5001 with HTTP
-  400) and `HasMore` is `len(entries) == Max`, because a PAN-OS log response
-  reports no total match count anywhere. The view describes a fetch with
-  `views.FetchLogsCmd` and the parent performs it, the same split as
-  `views.FetchDetailCmd`.
+  the local zone, and `ensureBoundZone` learns that zone on demand before a
+  bound is written, because `deviceLocation` otherwise guesses the operator's.
+  When it cannot be learned the bound is still sent and `LogPage.Warning` says
+  so; dropping the clause would answer "the last hour" with everything.
+  `nlogs` clamps to 5000 (the device answers 5001 with HTTP 400) and `HasMore`
+  is `len(entries) == Max`, because a PAN-OS log response reports no total
+  match count anywhere. The view describes a fetch with `views.FetchLogsCmd`
+  and the parent performs it, the same split as `views.FetchDetailCmd`.
+- **A log fetch is identified by its request.** `views.FetchLogsCmd` carries a
+  per-tab `ReqID` plus the range and query it was issued under, and comes back
+  on `views.LogPageMeta.Req`. A page whose request no longer matches what the
+  tab wants is dropped, never merged: pages take seconds and the view moves on.
+  Loading state, the paging bound, and `lastRefresh` are per tab for the same
+  reason — the three tabs are three independent fetches. Only the view mints a
+  request (`LogsModel.RefreshActiveTab` and its key handlers), so no path can
+  issue a fetch the view does not know it is waiting for.
 - `saveConfig()` / `saveState()` return `tea.Cmd` (avoid goroutine race conditions)
 - `setError()` is a value receiver that returns an updated Model with `m.err` set plus an auto-dismiss tick Cmd
 - Navigation has a single source of truth: the ordered `navDefs` table in `tui/navigation.go` derives the navbar groups (`navbarGroups()`), `navTargets`, and `viewToNavbar`. Adding a nav item = one `navDefs` entry; `views.NewNavbarModel(groups)` takes the groups as a parameter.
