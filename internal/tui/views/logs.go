@@ -312,6 +312,22 @@ func (m LogsModel) onTabSwitch() (LogsModel, tea.Cmd) {
 	return m, nil
 }
 
+// onQueryChanged resets the active tab to its first page and refetches it.
+// The other two tabs need no marking: each records the range and query its
+// rows came from, so they now read as stale and are refetched when next
+// shown. That is also why refresh needs no special case — it refetches the
+// visible tab, and the other two go stale on their own.
+func (m LogsModel) onQueryChanged() (LogsModel, tea.Cmd) {
+	s := m.tabState(m.activeLogType)
+	s.fetched = 0
+	s.hasMore = false
+	m.setTabState(m.activeLogType, s)
+	m.Cursor = 0
+	m.Offset = 0
+	m.Expanded = false
+	return m, m.fetchRequest(m.activeLogType, 0, false)
+}
+
 // rowCount is how many unfiltered rows a tab holds.
 func (m LogsModel) rowCount(t models.LogType) int {
 	switch t {
@@ -392,6 +408,29 @@ func (m LogsModel) sortLabel() string {
 	}
 }
 
+// statusLine names the range, the active query and how much is loaded. It
+// never claims a total: the device reports no match count, so the honest
+// phrasing is "more available" rather than "500 of N".
+func (m LogsModel) statusLine() string {
+	s := m.tabState(m.activeLogType)
+	parts := []string{m.rng.Label()}
+
+	if m.query != "" && m.Width >= 80 {
+		parts = append(parts, m.query)
+	}
+
+	switch {
+	case s.hasMore && m.Width < 60:
+		parts = append(parts, fmt.Sprintf("%d+", s.fetched))
+	case s.hasMore:
+		parts = append(parts, fmt.Sprintf("%d shown, more available", s.fetched))
+	case s.fetched > 0:
+		parts = append(parts, fmt.Sprintf("%d shown", s.fetched))
+	}
+
+	return ViewSubtitleStyle.Render(truncateEllipsis(strings.Join(parts, " · "), m.Width))
+}
+
 func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
 	if m.FilterMode {
 		return m.updateFilterMode(msg)
@@ -415,6 +454,12 @@ func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
 			m.SortAsc = !m.SortAsc
 			m.applySort()
 			return m, nil
+		case "t":
+			m.rng = (m.rng + 1) % logRangeCount
+			return m.onQueryChanged()
+		case "T":
+			m.rng = (m.rng + logRangeCount - 1) % logRangeCount
+			return m.onQueryChanged()
 		case "]":
 			// Cycle forward through log types: System -> Traffic -> Threat -> System
 			switch m.activeLogType {
@@ -493,6 +538,7 @@ func (m LogsModel) View() string {
 
 	// Tab bar for log types
 	sections = append(sections, m.renderTabBar())
+	sections = append(sections, m.statusLine())
 
 	// Filter bar
 	if m.FilterMode {
@@ -622,6 +668,7 @@ func (m LogsModel) renderHelp() string {
 		{"j/k", "scroll"},
 		{"enter", expandText},
 		{"/", "filter"},
+		{"t", "range"},
 		{"s", "sort field"},
 		{"S", "sort dir"},
 		{"r", "refresh"},

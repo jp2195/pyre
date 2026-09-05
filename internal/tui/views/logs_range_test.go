@@ -1,8 +1,14 @@
 package views
 
 import (
+	"strings"
 	"testing"
 	"time"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+
+	"github.com/jp2195/pyre/internal/models"
 )
 
 func TestLogRange_SinceAndLabel(t *testing.T) {
@@ -42,5 +48,99 @@ func TestLogsModel_DefaultRangeIsAll(t *testing.T) {
 	}
 	if m.Query() != "" {
 		t.Errorf("default Query() = %q, want empty", m.Query())
+	}
+}
+
+func TestLogsModel_TCyclesRangeAndRefetches(t *testing.T) {
+	m := NewLogsModel()
+	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
+
+	want := []LogRange{LogRange15m, LogRange1h, LogRange24h, LogRange7d, LogRangeAll}
+	for i, wantRange := range want {
+		var cmd tea.Cmd
+		m, cmd = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+		if m.Range() != wantRange {
+			t.Fatalf("after %d presses range = %v, want %v", i+1, m.Range(), wantRange)
+		}
+		if cmd == nil {
+			t.Fatalf("press %d returned no refetch command", i+1)
+		}
+		if _, ok := cmd().(FetchLogsCmd); !ok {
+			t.Fatalf("press %d did not emit FetchLogsCmd", i+1)
+		}
+	}
+}
+
+func TestLogsModel_ShiftTCyclesBackward(t *testing.T) {
+	m := NewLogsModel()
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'T', Text: "T"})
+	if m.Range() != LogRange7d {
+		t.Errorf("range = %v, want LogRange7d (wrapped backward from all)", m.Range())
+	}
+}
+
+// Changing the range leaves the tabs the operator cannot see holding rows
+// from the old range, so they read as stale and are refetched when next
+// shown rather than silently mixing two ranges in one table.
+func TestLogsModel_RangeChangeMakesOtherTabsStale(t *testing.T) {
+	m := NewLogsModel()
+	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
+	m = m.SetTrafficLogs([]models.TrafficLogEntry{{Action: "allow"}}, LogPageMeta{}, nil)
+
+	if m.tabStale(models.LogTypeTraffic) {
+		t.Fatal("traffic was stale before anything changed")
+	}
+
+	m, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+
+	if !m.tabStale(models.LogTypeTraffic) {
+		t.Error("traffic tab is not stale after a range change")
+	}
+}
+
+// A page arriving under the current range clears that tab's staleness,
+// because the rows now carry the range they were fetched under.
+func TestLogsModel_CompletedPageClearsStaleness(t *testing.T) {
+	m := NewLogsModel()
+	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
+
+	m, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	if !m.tabStale(models.LogTypeSystem) {
+		t.Fatal("the active tab should read as stale until its new page lands")
+	}
+
+	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
+	if m.tabStale(models.LogTypeSystem) {
+		t.Error("staleness survived a page fetched under the current range")
+	}
+}
+
+func TestLogsModel_StatusLineShowsRange(t *testing.T) {
+	m := NewLogsModel().SetSize(100, 40)
+	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
+	m, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+
+	if got := m.statusLine(); !strings.Contains(got, "15m") {
+		t.Errorf("status line %q does not name the range", got)
+	}
+}
+
+// The supported floor is 60 columns. The status line must fit at every width
+// the view claims to support, and must still name the range at the floor.
+func TestLogsModel_StatusLineFitsEveryWidth(t *testing.T) {
+	for _, width := range []int{60, 80, 120} {
+		m := NewLogsModel().SetSize(width, 40)
+		m = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{HasMore: true}, nil)
+		m, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+
+		line := m.statusLine()
+		for _, rendered := range strings.Split(line, "\n") {
+			if got := lipgloss.Width(rendered); got > width {
+				t.Errorf("width %d: status line is %d cells wide: %q", width, got, rendered)
+			}
+		}
+		if !strings.Contains(line, "15m") {
+			t.Errorf("width %d: status line %q dropped the range", width, line)
+		}
 	}
 }
