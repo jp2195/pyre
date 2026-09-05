@@ -198,8 +198,12 @@ func (m CommandPaletteModel) View() string {
 
 	var b strings.Builder
 
-	// Input field
-	m.textInput.SetWidth(modalWidth - 4)
+	// Input field. The width is the text area only: the bubbles input renders
+	// its prompt on top of that, so sizing it to the modal's inner width made
+	// the field wider than the box and wrapped its underline onto a second
+	// line as a stray fragment.
+	// The trailing -1 reserves the cell the cursor occupies past the text.
+	m.textInput.SetWidth(modalWidth - 4 - lipgloss.Width(m.textInput.Prompt) - 1)
 	b.WriteString(ModalInputStyle.Render(m.textInput.View()))
 	b.WriteString("\n")
 
@@ -237,6 +241,10 @@ func (m CommandPaletteModel) modalWidth() int {
 	}
 	return modalWidth
 }
+
+// paletteLabelWidth is the column the command descriptions start at. The
+// longest label in the registry is "GlobalProtect Users" at 19 cells.
+const paletteLabelWidth = 20
 
 // renderCommandList renders the categorized, scrollable command list.
 func (m CommandPaletteModel) renderCommandList(b *strings.Builder, modalWidth int) {
@@ -298,15 +306,22 @@ func (m CommandPaletteModel) renderCommandList(b *strings.Builder, modalWidth in
 				shortcut = shortcutStyle.Render("[" + cmd.Shortcut + "] ")
 			}
 
+			// Pad the label to a fixed column so the descriptions form a
+			// straight edge instead of stepping in and out with label length.
+			label := cmd.Label
+			if pad := paletteLabelWidth - lipgloss.Width(label); pad > 0 {
+				label += strings.Repeat(" ", pad)
+			}
+
 			desc := ""
 			if cmd.Description != "" {
-				maxDescLen := modalWidth - len(cmd.Label) - len(shortcut) - 10
+				maxDescLen := modalWidth - paletteLabelWidth - lipgloss.Width(shortcut) - 10
 				if maxDescLen > 0 {
 					desc = descStyle.Render("  " + truncateEllipsis(cmd.Description, maxDescLen))
 				}
 			}
 
-			b.WriteString(indicator + shortcut + style.Render(cmd.Label) + desc + "\n")
+			b.WriteString(indicator + shortcut + style.Render(label) + desc + "\n")
 			visibleCount++
 			currentIdx++
 		}
