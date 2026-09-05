@@ -197,16 +197,22 @@ func (m ConnectionHubModel) View() string {
 	panelStyle := ViewPanelStyle
 	helpStyle := HelpDescStyle.MarginTop(1)
 
+	boxWidth := modalBoxWidth(m.width, 70)
+	contentWidth := modalContentWidth(boxWidth)
+
 	var b strings.Builder
 
 	// Title
 	b.WriteString(titleStyle.Render("PYRE - Connections"))
-	b.WriteString("\n\n")
+	// One newline, not two: the title style already renders a blank
+	// line through its bottom margin.
+	b.WriteString("\n")
 
 	if len(m.connections) == 0 {
 		b.WriteString(EmptyMsgStyle.Render("No connections configured."))
 		b.WriteString("\n\n")
-		b.WriteString(HelpDescStyle.Render("Press [n] to add a new connection or [q] for quick connect"))
+		b.WriteString(HelpDescStyle.Render(fitHints(contentWidth, "  ",
+			"[n] add a connection", "[q] quick connect")))
 	} else {
 		// Render in original sorted order (recency-based) so the cursor
 		// index maps directly to a row. An inline type tag distinguishes
@@ -226,21 +232,14 @@ func (m ConnectionHubModel) View() string {
 			confirmMsg := fmt.Sprintf("Delete %q? [y/n]", m.confirmTarget)
 			b.WriteString(WarningMsgStyle.Render(confirmMsg))
 		} else {
-			b.WriteString(helpStyle.Render("[Enter] Connect  [n] New  [e] Edit  [d] Delete  [q] Quick Connect"))
+			b.WriteString(helpStyle.Render(fitHints(contentWidth, "  ",
+				"[Enter] Connect", "[n] New", "[e] Edit", "[d] Delete", "[q] Quick Connect")))
 		}
 	}
 
 	content := b.String()
 
 	// Calculate box width based on content
-	boxWidth := 70
-	if m.width < boxWidth+10 {
-		boxWidth = m.width - 10
-	}
-	if boxWidth < 40 {
-		boxWidth = 40
-	}
-
 	box := panelStyle.Width(boxWidth).Render(content)
 
 	return lipgloss.Place(

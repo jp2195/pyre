@@ -316,7 +316,14 @@ func (m ConnectionFormModel) View() string {
 		panRadio = "(*) Panorama"
 	}
 
-	typeRow := fwRadio + "    " + panRadio
+	// Four spaces between the two options reads better, but this row is the
+	// widest line in the box on a narrow terminal, so close the gap before
+	// letting it push the box past the screen edge.
+	gap := "    "
+	if lipgloss.Width(fwRadio+gap+panRadio)+inputChromeWidth > m.width {
+		gap = " "
+	}
+	typeRow := fwRadio + gap + panRadio
 	if m.focusedField == FormFieldType {
 		b.WriteString(focusedInputStyle.Render(typeRow))
 	} else {
@@ -325,9 +332,15 @@ func (m ConnectionFormModel) View() string {
 	b.WriteString("\n")
 
 	// Insecure checkbox
-	insecureCheck := "[ ] Skip TLS verification (insecure)"
+	// The label is the widest fixed string in the box, so it decides the box
+	// width on a narrow terminal. Drop the parenthetical before the meaning.
+	insecureLabel := " Skip TLS verification (insecure)"
+	if lipgloss.Width(insecureLabel)+3+inputChromeWidth > m.width {
+		insecureLabel = " Skip TLS verification"
+	}
+	insecureCheck := "[ ]" + insecureLabel
 	if m.insecure {
-		insecureCheck = "[x] Skip TLS verification (insecure)"
+		insecureCheck = "[x]" + insecureLabel
 	}
 	if m.focusedField == FormFieldInsecure {
 		b.WriteString(focusedInputStyle.Render(insecureCheck))

@@ -87,9 +87,14 @@ func (m PickerModel) View() string {
 	activeStyle := StatusActiveStyle
 	helpStyle := HelpDescStyle.MarginTop(1)
 
+	boxWidth := modalBoxWidth(m.width, 60)
+	contentWidth := modalContentWidth(boxWidth)
+
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("Firewall Connections"))
-	b.WriteString("\n\n")
+	// One newline, not two: the title style already renders a blank
+	// line through its bottom margin.
+	b.WriteString("\n")
 
 	panoramaStyle := PanoramaStyle
 	targetStyle := TagStyle
@@ -138,14 +143,10 @@ func (m PickerModel) View() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("j/k: navigate  g/G: first/last  enter: select  a: add new  esc: back"))
+	b.WriteString(helpStyle.Render(fitHints(contentWidth, "  ",
+		"j/k: navigate", "g/G: first/last", "enter: select", "a: add new", "esc: back")))
 
 	content := b.String()
-
-	boxWidth := 60
-	if m.width < boxWidth+10 {
-		boxWidth = m.width - 10
-	}
 
 	box := panelStyle.Width(boxWidth).Render(content)
 

@@ -99,9 +99,14 @@ func (m DevicePickerModel) View() string {
 	disconnectedStyle := StatusInactiveStyle
 	helpStyle := HelpDescStyle.MarginTop(1)
 
+	boxWidth := modalBoxWidth(m.width, 80)
+	contentWidth := modalContentWidth(boxWidth)
+
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("Select Target Device"))
-	b.WriteString("\n\n")
+	// One newline, not two: the title style already renders a blank
+	// line through its bottom margin.
+	b.WriteString("\n")
 
 	// Panorama option (index 0)
 	{
@@ -115,8 +120,13 @@ func (m DevicePickerModel) View() string {
 			indicator = activeStyle.Render("► ")
 		}
 
-		line := indicator + style.Render(fmt.Sprintf("[%s]", m.panoramaName)) +
-			dimStyle.Render(" - Direct Panorama operations")
+		// The explanation goes when the row would not otherwise fit; the
+		// name of the Panorama itself has to stay.
+		name := style.Render(fmt.Sprintf("[%s]", m.panoramaName))
+		line := indicator + name + dimStyle.Render(" - Direct Panorama operations")
+		if lipgloss.Width(line) > contentWidth {
+			line = indicator + name
+		}
 		b.WriteString(line + "\n")
 	}
 
@@ -133,16 +143,14 @@ func (m DevicePickerModel) View() string {
 		}
 
 		// Format: hostname (model) [ha-state] - IP - connected/disconnected
-		haState := ""
+		hardware := fmt.Sprintf(" (%s)", device.Model)
 		if device.HAState != "" {
-			haState = fmt.Sprintf(" [%s]", device.HAState)
+			hardware += fmt.Sprintf(" [%s]", device.HAState)
 		}
 
-		connStatus := connectedStyle.Render("connected")
-		connIcon := connectedStyle.Render("●")
+		connWord, connGlyph, connStyle := "connected", "●", connectedStyle
 		if !device.Connected {
-			connStatus = disconnectedStyle.Render("disconnected")
-			connIcon = disconnectedStyle.Render("○")
+			connWord, connGlyph, connStyle = "disconnected", "○", disconnectedStyle
 		}
 
 		hostname := device.Hostname
@@ -150,10 +158,37 @@ func (m DevicePickerModel) View() string {
 			hostname = device.Serial
 		}
 
-		line := indicator + style.Render(hostname) +
-			dimStyle.Render(fmt.Sprintf(" (%s)%s", device.Model, haState)) +
-			" - " + dimStyle.Render(device.IPAddress) +
-			" - " + connIcon + " " + connStatus
+		// The row was a fixed string, so on a narrow terminal it wrapped and
+		// its second half landed on a line of its own without the marker
+		// column. Give up the model and HA state first: they describe the
+		// hardware, while the address and the connection state are what an
+		// operator is choosing between. Only then cut the name.
+		//
+		// Measure the rendered line rather than the raw text: the row style
+		// pads the name, and the status glyph is an ambiguous-width
+		// character, so counting runes understates the row by several cells.
+		render := func(name, hw string, withWord bool) string {
+			status := connStyle.Render(connGlyph)
+			if withWord {
+				status += " " + connStyle.Render(connWord)
+			}
+			return indicator + style.Render(name) + dimStyle.Render(hw) +
+				" - " + dimStyle.Render(device.IPAddress) + " - " + status
+		}
+
+		// Give up the hardware description first, then spell the connection
+		// state with its glyph alone. The name and the address identify the
+		// device, so they are the last things to go.
+		line := render(hostname, hardware, true)
+		if lipgloss.Width(line) > contentWidth {
+			line = render(hostname, "", true)
+		}
+		if lipgloss.Width(line) > contentWidth {
+			line = render(hostname, "", false)
+		}
+		if over := lipgloss.Width(line) - contentWidth; over > 0 {
+			line = render(truncate(hostname, max(len([]rune(hostname))-over, 1)), "", false)
+		}
 
 		b.WriteString(line + "\n")
 	}
@@ -163,14 +198,10 @@ func (m DevicePickerModel) View() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("j/k: navigate  enter: select  esc: back  r: refresh"))
+	b.WriteString(helpStyle.Render(fitHints(contentWidth, "  ",
+		"j/k: navigate", "enter: select", "esc: back", "r: refresh")))
 
 	content := b.String()
-
-	boxWidth := 80
-	if m.width < boxWidth+10 {
-		boxWidth = m.width - 10
-	}
 
 	box := panelStyle.Width(boxWidth).Render(content)
 

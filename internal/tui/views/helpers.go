@@ -172,11 +172,15 @@ func fitHints(width int, sep string, hints ...string) string {
 // about 54 columns.
 func modalInputWidth(termWidth int) int {
 	const preferred = 40
+	// A text input renders three cells wider than the width set on it, for
+	// the prompt and the cursor cell. InputStyle frames that with a border
+	// and a cell of padding either side, and the modal box adds its own
+	// border and four cells of padding. Seventeen cells go before any text.
+	const overhead = 17
 	if termWidth <= 0 {
 		return preferred
 	}
-	// The input's prompt occupies two more cells than the input itself.
-	return max(min(preferred, termWidth-modalChromeWidth-2), 12)
+	return max(min(preferred, termWidth-overhead), 12)
 }
 
 // tableChromeWidth is what a framed list view spends on chrome before any
@@ -187,3 +191,29 @@ func modalInputWidth(termWidth int) int {
 // which is less than the panel actually spends, so its header rule ran past
 // the content area and wrapped.
 const tableChromeWidth = 12
+
+// modalBoxWidth sizes a centered modal box: the preferred width when the
+// terminal has room for it, otherwise whatever the terminal leaves after its
+// margins, and never wider than the terminal itself.
+//
+// The screens each did this by hand. Two shrank the box with the terminal but
+// set no lower bound, so the width went negative on a tiny one; the third
+// clamped to a floor wider than a small terminal and overflowed it.
+func modalBoxWidth(termWidth, preferred int) int {
+	if termWidth <= 0 {
+		return preferred
+	}
+	return max(min(preferred, termWidth-modalChromeWidth), 1)
+}
+
+// modalContentWidth is the width of the text area inside a modal box of the
+// given outer width. ViewPanelStyle draws a one-cell border and pads two
+// cells either side, and Width sets the outer width, border included.
+func modalContentWidth(boxWidth int) int {
+	return max(boxWidth-6, 1)
+}
+
+// inputChromeWidth is what a framed line inside a modal form spends before
+// its text: InputStyle's border and padding, plus the modal box's own border
+// and horizontal padding.
+const inputChromeWidth = 14

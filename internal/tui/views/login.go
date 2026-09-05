@@ -289,7 +289,12 @@ func (m LoginModel) View() string {
 	if m.insecure {
 		checkboxChar = "[x]"
 	}
+	// The label is the widest fixed string in the box, so it decides the box
+	// width on a narrow terminal. Drop the parenthetical before the meaning.
 	checkboxLabel := checkboxChar + " Skip TLS verification (insecure)"
+	if lipgloss.Width(checkboxLabel)+inputChromeWidth > m.width {
+		checkboxLabel = checkboxChar + " Skip TLS verification"
+	}
 	if m.focusedField == FieldInsecure {
 		b.WriteString(focusedInputStyle.Render(checkboxLabel))
 	} else {
