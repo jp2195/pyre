@@ -198,8 +198,15 @@ func (c *Client) GetJobs(ctx context.Context, target string) ([]models.Job, erro
 		}
 	}
 
+	// `show jobs all` returns some jobs twice, byte for byte, so the panel
+	// would list the same job more than once. Keep the first of each id.
+	seen := make(map[int]bool, len(entries))
 	jobs := make([]models.Job, 0, len(entries))
 	for _, e := range entries {
+		if seen[e.ID] {
+			continue
+		}
+		seen[e.ID] = true
 		job := models.Job{
 			ID:      e.ID,
 			Type:    e.Type,
@@ -258,8 +265,13 @@ func (c *Client) GetDiskUsage(ctx context.Context, target string) ([]models.Disk
 
 		fields := strings.Fields(line)
 		if len(fields) >= 6 {
-			pctStr := strings.TrimSuffix(fields[4], "%")
-			pct, _ := strconv.ParseFloat(pctStr, 64) //nolint:errcheck // intentional - default to 0 on parse error
+			// The use column has to be a real percentage. Requiring it means
+			// a header or banner line cannot be mistaken for a filesystem
+			// even if the leading-word check above misses it.
+			pct, err := strconv.ParseFloat(strings.TrimSuffix(fields[4], "%"), 64)
+			if err != nil {
+				continue
+			}
 
 			disk := models.DiskUsage{
 				Filesystem: SanitizeForDisplay(fields[0]),
