@@ -54,6 +54,55 @@ func sortThreatLogs(logs []models.ThreatLogEntry, sortBy LogSortField, asc bool)
 	})
 }
 
+// Threat table columns. The wide set adds the destination, which matters for
+// triage and had no column at all, and spells severity out in full.
+const (
+	thTime     = 19
+	thSeverity = 13 // "informational"
+	thSevShort = 4  // "INFO"
+	thSource   = 15
+	thDest     = 15
+	thAction   = 12 // "reset-client"
+	thCategory = 15
+)
+
+func (m LogsModel) threatLayout() logColumnLayout {
+	// +1 per gap between columns.
+	fixedWide := thTime + thSeverity + thSource + thDest + thAction + thCategory + 6
+	fixedNarrow := thTime + thSevShort + thSource + thAction + 4
+	return logLayout(m.Width, fixedWide, fixedNarrow, 150)
+}
+
+func (m LogsModel) formatThreatHeader(l logColumnLayout) string {
+	if l.wide {
+		return fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
+			thTime, "Time", thSeverity, "Severity", l.flex, "Threat",
+			thSource, "Source", thDest, "Destination", thAction, "Action", thCategory, "Category")
+	}
+	return fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s",
+		thTime, "Time", thSevShort, "Sev", l.flex, "Threat", thSource, "Source", thAction, "Action")
+}
+
+func (m LogsModel) formatThreatRow(log models.ThreatLogEntry, l logColumnLayout) string {
+	timeStr := log.Time.Format("2006-01-02 15:04:05")
+	if l.wide {
+		return fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
+			thTime, timeStr,
+			thSeverity, truncate(log.Severity, thSeverity),
+			l.flex, truncate(log.ThreatName, l.flex),
+			thSource, truncate(log.SourceIP, thSource),
+			thDest, truncate(log.DestIP, thDest),
+			thAction, truncate(log.Action, thAction),
+			thCategory, truncate(log.ThreatCategory, thCategory))
+	}
+	return fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s",
+		thTime, timeStr,
+		thSevShort, abbreviateSeverity(log.Severity),
+		l.flex, truncate(log.ThreatName, l.flex),
+		thSource, truncate(log.SourceIP, thSource),
+		thAction, truncate(log.Action, thAction))
+}
+
 func (m LogsModel) renderThreatTable() string {
 	if m.Loading && len(m.threatLogs) == 0 {
 		return LoadingMsgStyle.Padding(1, 0).Render("Loading threat logs...")
@@ -62,28 +111,15 @@ func (m LogsModel) renderThreatTable() string {
 		return EmptyMsgStyle.Padding(1, 0).Render("No threat logs found")
 	}
 
+	layout := m.threatLayout()
+
 	var b strings.Builder
-
-	// Header
-	header := fmt.Sprintf("%-19s %-9s %-20s %-15s %-7s %-15s",
-		"Time", "Severity", "Threat", "Source", "Action", "Category")
-	b.WriteString(TableHeaderStyle.Render(header) + "\n")
-
+	b.WriteString(TableHeaderStyle.Render(m.formatThreatHeader(layout)) + "\n")
 	b.WriteString(renderLogRows(m.Offset, m.Cursor, m.visibleRows(), m.filteredThreat, func(log models.ThreatLogEntry, selected bool) string {
-		timeStr := log.Time.Format("2006-01-02 15:04:05")
-
-		row := fmt.Sprintf("%-19s %-9s %-20s %-15s %-7s %-15s",
-			timeStr,
-			truncate(log.Severity, 9),
-			truncate(log.ThreatName, 20),
-			truncate(log.SourceIP, 15),
-			truncate(log.Action, 7),
-			truncate(log.ThreatCategory, 15))
-
+		row := m.formatThreatRow(log, layout)
 		if selected {
 			return TableSelectedRowStyle().Render(row)
 		}
-		// Color code by severity
 		return colorBySeverity(row, log.Severity)
 	}))
 

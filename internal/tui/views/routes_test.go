@@ -148,7 +148,7 @@ func TestRoutes_ProtocolFilterKeys(t *testing.T) {
 
 	m = pressRoutes(m, "b") // BGP only
 	out := m.View()
-	if !strings.Contains(out, "(filter: bgp)") {
+	if !strings.Contains(out, "protocol: bgp") {
 		t.Errorf("expected protocol filter indicator:\n%s", out)
 	}
 	if !strings.Contains(out, "10.1.0.0/16") || strings.Contains(out, "10.2.0.0/16") {
@@ -278,8 +278,10 @@ func TestRoutes_ErrorAndLoadingStates(t *testing.T) {
 
 func TestRoutes_ViewZeroWidth(t *testing.T) {
 	m := NewRoutesModel()
-	if out := m.View(); out != "Loading..." {
-		t.Errorf("expected zero-width fallback 'Loading...', got %q", out)
+	// The placeholder is the shared spinner-aware one the other views use,
+	// so match on its text rather than the whole styled string.
+	if out := m.View(); !strings.Contains(out, "Loading...") {
+		t.Errorf("expected zero-width fallback to mention 'Loading...', got %q", out)
 	}
 }
 

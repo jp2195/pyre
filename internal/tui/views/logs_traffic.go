@@ -53,6 +53,63 @@ func sortTrafficLogs(logs []models.TrafficLogEntry, sortBy LogSortField, asc boo
 	})
 }
 
+// Traffic table columns. The rule name is the flexible one: it is the field
+// most often long enough to be cut, and the one an operator is usually
+// reading the table to find.
+const (
+	tfTime   = 19
+	tfAction = 12 // "reset-client"
+	tfSource = 15
+	tfDest   = 15
+	tfApp    = 16
+	tfBytes  = 10
+
+	// Narrow variants.
+	tfActionNarrow = 10
+	tfAppNarrow    = 12
+)
+
+func (m LogsModel) trafficLayout() logColumnLayout {
+	fixedWide := tfTime + tfAction + tfSource + tfDest + tfApp + tfBytes + 6
+	// The byte count is the first thing to go on a narrow terminal. What
+	// identifies a flow is who talked to whom, over what application, under
+	// which rule; the volume is context rather than identity.
+	fixedNarrow := tfTime + tfActionNarrow + tfSource + tfDest + tfAppNarrow + 5
+	return logLayout(m.Width, fixedWide, fixedNarrow, 150)
+}
+
+func (m LogsModel) formatTrafficHeader(l logColumnLayout) string {
+	if l.wide {
+		return fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
+			tfTime, "Time", tfAction, "Action", tfSource, "Source", tfDest, "Dest",
+			tfApp, "App", l.flex, "Rule", tfBytes, "Bytes")
+	}
+	return fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s %-*s",
+		tfTime, "Time", tfActionNarrow, "Action", tfSource, "Source", tfDest, "Dest",
+		tfAppNarrow, "App", l.flex, "Rule")
+}
+
+func (m LogsModel) formatTrafficRow(log models.TrafficLogEntry, l logColumnLayout) string {
+	timeStr := log.Time.Format("2006-01-02 15:04:05")
+	if l.wide {
+		return fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
+			tfTime, timeStr,
+			tfAction, truncate(log.Action, tfAction),
+			tfSource, truncate(log.SourceIP, tfSource),
+			tfDest, truncate(log.DestIP, tfDest),
+			tfApp, truncate(log.Application, tfApp),
+			l.flex, truncate(log.Rule, l.flex),
+			tfBytes, formatBytes(log.Bytes))
+	}
+	return fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s %-*s",
+		tfTime, timeStr,
+		tfActionNarrow, truncate(log.Action, tfActionNarrow),
+		tfSource, truncate(log.SourceIP, tfSource),
+		tfDest, truncate(log.DestIP, tfDest),
+		tfAppNarrow, truncate(log.Application, tfAppNarrow),
+		l.flex, truncate(log.Rule, l.flex))
+}
+
 func (m LogsModel) renderTrafficTable() string {
 	if m.Loading && len(m.trafficLogs) == 0 {
 		return LoadingMsgStyle.Padding(1, 0).Render("Loading traffic logs...")
@@ -61,29 +118,15 @@ func (m LogsModel) renderTrafficTable() string {
 		return EmptyMsgStyle.Padding(1, 0).Render("No traffic logs found")
 	}
 
+	layout := m.trafficLayout()
+
 	var b strings.Builder
-
-	// Header
-	header := fmt.Sprintf("%-19s %-7s %-15s %-15s %-12s %-15s %-10s",
-		"Time", "Action", "Source", "Dest", "App", "Rule", "Bytes")
-	b.WriteString(TableHeaderStyle.Render(header) + "\n")
-
+	b.WriteString(TableHeaderStyle.Render(m.formatTrafficHeader(layout)) + "\n")
 	b.WriteString(renderLogRows(m.Offset, m.Cursor, m.visibleRows(), m.filteredTraffic, func(log models.TrafficLogEntry, selected bool) string {
-		timeStr := log.Time.Format("2006-01-02 15:04:05")
-
-		row := fmt.Sprintf("%-19s %-7s %-15s %-15s %-12s %-15s %-10s",
-			timeStr,
-			truncate(log.Action, 7),
-			truncate(log.SourceIP, 15),
-			truncate(log.DestIP, 15),
-			truncate(log.Application, 12),
-			truncate(log.Rule, 15),
-			formatBytes(log.Bytes))
-
+		row := m.formatTrafficRow(log, layout)
 		if selected {
 			return TableSelectedRowStyle().Render(row)
 		}
-		// Color code by action
 		return colorByAction(row, log.Action)
 	}))
 

@@ -149,6 +149,20 @@ func styleInterfaceRow(iface models.Interface, width int) string {
 	return bulletStyle.Render(interfaceBullet(iface)) + " " + DetailValueStyle.Render(formatInterfaceRow(iface, width))
 }
 
+// routerName strips the routing-mode prefix PAN-OS puts on an interface's
+// forwarding domain: "lr:default" under advanced routing, "vr:default" under
+// legacy. The mode is global to a device, so the prefix is the same on every
+// row and says nothing the "VR" column heading does not already say, while
+// costing three characters of a narrow column.
+func routerName(vr string) string {
+	for _, prefix := range []string{"lr:", "vr:"} {
+		if name, ok := strings.CutPrefix(vr, prefix); ok {
+			return name
+		}
+	}
+	return vr
+}
+
 // arpEntriesForInterface returns ARP entries for a specific interface.
 func arpEntriesForInterface(arpTable []models.ARPEntry, ifaceName string) []models.ARPEntry {
 	var result []models.ARPEntry
@@ -182,7 +196,7 @@ func formatInterfaceRow(iface models.Interface, width int) string {
 	ifType := cleanValue(iface.Type)
 	zone := cleanValue(iface.Zone)
 	mac := cleanValue(iface.MAC)
-	vr := cleanValue(iface.VirtualRouter)
+	vr := routerName(cleanValue(iface.VirtualRouter))
 
 	if width >= 120 {
 		return fmt.Sprintf("%-16s %-10s %-12s %-18s %-17s %-12s",
@@ -249,7 +263,7 @@ func renderInterfaceDetail(iface models.Interface, width int, arpTable []models.
 	lines = append(lines, sectionStyle.Render("Network"))
 	lines = append(lines, row("IP Address", iface.IP))
 	lines = append(lines, row("MAC Address", iface.MAC))
-	lines = append(lines, row("Virtual Router", iface.VirtualRouter))
+	lines = append(lines, row("Virtual Router", routerName(iface.VirtualRouter)))
 	if iface.MTU > 0 {
 		lines = append(lines, labelStyle.Render("MTU")+valueStyle.Render(strconv.Itoa(iface.MTU)))
 	}

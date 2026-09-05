@@ -295,28 +295,22 @@ func (m RoutesModel) updateFilterMode(msg tea.Msg) (RoutesModel, tea.Cmd) {
 
 func (m RoutesModel) View() string {
 	if m.Width == 0 {
-		return "Loading..."
+		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
+
+	titleStyle := ViewTitleStyle.MarginBottom(1)
+	panelStyle := ViewPanelStyle.Width(m.Width - 4)
 
 	var b strings.Builder
-	c := theme.Colors()
 
-	// Render tabs
-	tabStyle := lipgloss.NewStyle().Padding(0, 2)
-	activeTabStyle := tabStyle.Background(c.Primary).Foreground(c.White)
-	inactiveTabStyle := tabStyle.Foreground(c.TextMuted)
-
-	routesTab := inactiveTabStyle.Render("Routes")
-	neighborsTab := inactiveTabStyle.Render("Neighbors")
-	if m.activeTab == RoutesTabRoutes {
-		routesTab = activeTabStyle.Render("Routes")
-	} else {
-		neighborsTab = activeTabStyle.Render("Neighbors")
-	}
-
-	tabBar := lipgloss.JoinHorizontal(lipgloss.Top, routesTab, " ", neighborsTab)
-	b.WriteString(tabBar)
-	b.WriteString("\n\n")
+	// Framed and titled like every other list view, with the tab indicator
+	// beside the title the way Objects does it.
+	b.WriteString(titleStyle.Render("Routes"))
+	b.WriteString("  ")
+	b.WriteString(m.renderTabIndicator())
+	b.WriteString("\n")
+	b.WriteString(BannerInfoStyle.Render(m.bannerText()))
+	b.WriteString("\n")
 
 	if m.activeTab == RoutesTabRoutes {
 		b.WriteString(m.renderRoutesTab())
@@ -324,21 +318,38 @@ func (m RoutesModel) View() string {
 		b.WriteString(m.renderNeighborsTab())
 	}
 
-	// Help text
-	b.WriteString("\n")
-	if m.activeTab == RoutesTabRoutes {
-		filterInfo := ""
-		if m.protocolFilter != "" {
-			filterInfo = fmt.Sprintf(" [%s]", m.protocolFilter)
-		}
-		b.WriteString(lipgloss.NewStyle().Foreground(c.TextMuted).Render(
-			fmt.Sprintf("[/] switch  /filter  a/c/s/b/o protocol%s  r refresh", filterInfo)))
-	} else {
-		b.WriteString(lipgloss.NewStyle().Foreground(c.TextMuted).Render(
-			"[/] switch  r refresh"))
-	}
+	return panelStyle.Render(b.String())
+}
 
-	return b.String()
+// renderTabIndicator shows which of the two tabs is active.
+func (m RoutesModel) renderTabIndicator() string {
+	routes, neighbors := "Routes", "Neighbors"
+	if m.activeTab == RoutesTabRoutes {
+		routes = StatusActiveStyle.Render("[Routes]")
+		neighbors = StatusMutedStyle.Render(neighbors)
+	} else {
+		routes = StatusMutedStyle.Render(routes)
+		neighbors = StatusActiveStyle.Render("[Neighbors]")
+	}
+	return routes + "  " + neighbors + BannerInfoStyle.Render("  ([/] to switch)")
+}
+
+// bannerText is the count-and-keys line the other list views carry.
+func (m RoutesModel) bannerText() string {
+	if m.activeTab == RoutesTabNeighbors {
+		return fmt.Sprintf(" [%d neighbors | r: refresh]", len(m.bgpNeighbors)+len(m.ospfNeighbors))
+	}
+	filterInfo := ""
+	if m.protocolFilter != "" {
+		filterInfo = fmt.Sprintf(" | protocol: %s", m.protocolFilter)
+	}
+	total := len(m.routes)
+	shown := len(m.filtered)
+	count := fmt.Sprintf("%d routes", total)
+	if shown != total {
+		count = fmt.Sprintf("%d of %d routes", shown, total)
+	}
+	return fmt.Sprintf(" [%s%s | a/c/s/b/o: protocol | /: filter | r: refresh]", count, filterInfo)
 }
 
 func (m RoutesModel) renderRoutesTab() string {
@@ -355,19 +366,6 @@ func (m RoutesModel) renderRoutesTab() string {
 	if m.routes == nil {
 		return RenderLoadingInline(m.SpinnerFrame, "Loading routes...")
 	}
-
-	// Summary line
-	total := len(m.routes)
-	showing := len(m.filtered)
-	summaryText := fmt.Sprintf("%d routes", total)
-	if showing != total {
-		summaryText = fmt.Sprintf("%d of %d routes", showing, total)
-	}
-	if m.protocolFilter != "" {
-		summaryText += fmt.Sprintf(" (filter: %s)", m.protocolFilter)
-	}
-	b.WriteString(lipgloss.NewStyle().Foreground(c.TextLabel).Render(summaryText))
-	b.WriteString("\n")
 
 	// Filter input if active
 	if m.FilterMode {

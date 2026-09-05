@@ -354,10 +354,21 @@ func (m LogsModel) renderTabBar() string {
 		updateInfo = StatusMutedStyle.Render(fmt.Sprintf("  |  Updated %s ago", ago))
 	}
 
+	// The sort/updated block is supplementary. If the tabs and it together do
+	// not fit, drop it rather than pushing the line past the terminal edge:
+	// padding was clamped to a minimum of one space, so a narrow terminal
+	// produced a line wider than the screen.
 	rightSide := sortInfo + updateInfo
-	padding := max(m.Width-lipgloss.Width(tabBar)-lipgloss.Width(rightSide)-2, 1)
+	gap := m.Width - lipgloss.Width(tabBar) - lipgloss.Width(rightSide) - 2
+	if gap < 1 {
+		rightSide = ""
+		gap = m.Width - lipgloss.Width(tabBar)
+	}
+	if gap < 0 {
+		gap = 0
+	}
 
-	return tabBar + strings.Repeat(" ", padding) + rightSide + "\n"
+	return tabBar + strings.Repeat(" ", gap) + rightSide + "\n"
 }
 
 func (m LogsModel) renderFilterBar() string {
@@ -415,9 +426,24 @@ func (m LogsModel) renderHelp() string {
 		{"r", "refresh"},
 	}
 
-	parts := make([]string, 0, len(keys))
+	// Keep only the hints that fit. The full list is wider than a narrow
+	// terminal, and because the view is joined vertically, one over-long line
+	// widened every other line with it and pushed the whole table off screen.
+	var (
+		parts []string
+		used  int
+	)
 	for _, k := range keys {
-		parts = append(parts, HelpKeyStyle.Render(k.key)+HelpDescStyle.Render(":"+k.desc))
+		part := HelpKeyStyle.Render(k.key) + HelpDescStyle.Render(":"+k.desc)
+		w := lipgloss.Width(part)
+		if len(parts) > 0 {
+			w += 2 // the separator
+		}
+		if m.Width > 0 && used+w > m.Width {
+			break
+		}
+		used += w
+		parts = append(parts, part)
 	}
 
 	return ViewSubtitleStyle.MarginTop(1).Render(strings.Join(parts, "  "))
@@ -435,6 +461,38 @@ func renderLogRows[T any](offset, cursor, visibleRows int, items []T, renderRow 
 		b.WriteString(renderRow(items[i], i == cursor) + "\n")
 	}
 	return b.String()
+}
+
+// logColumnLayout describes how a log table divides the terminal: a set of
+// fixed column widths plus one column that absorbs whatever is left.
+//
+// The log tables used to use a single hardcoded set of widths, so on a wide
+// terminal they stopped around column 110 and truncated values there was room
+// for, while on a narrow one they overflowed the screen. Several fixed widths
+// were also too small for the vocabulary the device emits: an Action column
+// of 7 cells cannot hold "sinkhole", and a Severity column of 9 cannot hold
+// "informational".
+type logColumnLayout struct {
+	wide bool // the terminal is roomy enough for the full column set
+	flex int  // width of the one column that takes the remaining space
+}
+
+// The flexible column is bounded at both ends: wide enough to be readable on
+// a small terminal, and narrow enough that a very wide one does not stretch a
+// single column across half the screen and strand the columns after it.
+const (
+	minFlexColumn = 12
+	maxFlexColumn = 48
+)
+
+// logLayout picks the column set for the given terminal width and sizes the
+// flexible column from what the fixed ones leave behind.
+func logLayout(width, fixedWide, fixedNarrow int, wideThreshold int) logColumnLayout {
+	clamp := func(n int) int { return min(max(n, minFlexColumn), maxFlexColumn) }
+	if width >= wideThreshold {
+		return logColumnLayout{wide: true, flex: clamp(width - fixedWide)}
+	}
+	return logColumnLayout{wide: false, flex: clamp(width - fixedNarrow)}
 }
 
 // abbreviateSeverity returns a short severity label.

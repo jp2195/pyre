@@ -146,14 +146,30 @@ func (m Model) renderFooter() string {
 		}
 	}
 
-	help := navHint +
-		devicesHint +
-		views.HelpKeyStyle.Render("  Tab/S-Tab") + views.HelpDescStyle.Render(" next/prev") +
-		views.HelpKeyStyle.Render("  r") + views.HelpDescStyle.Render(" refresh") +
-		views.HelpKeyStyle.Render("  :") + views.HelpDescStyle.Render(" conn") +
-		views.HelpKeyStyle.Render("  Ctrl+P") + views.HelpDescStyle.Render(" commands") +
-		views.HelpKeyStyle.Render("  ?") + views.HelpDescStyle.Render(" help") +
-		views.HelpKeyStyle.Render("  q") + views.HelpDescStyle.Render(" quit")
+	// Hints in decreasing order of usefulness, kept only while they fit. The
+	// footer used to be a fixed ~95-cell string, and because the screen is
+	// joined vertically that one over-long line padded every other line to
+	// its width, pushing the whole interface past the right edge of any
+	// narrower terminal.
+	hints := []struct{ key, desc string }{
+		{"  Tab/S-Tab", " next/prev"},
+		{"  r", " refresh"},
+		{"  :", " conn"},
+		{"  Ctrl+P", " commands"},
+		{"  ?", " help"},
+		{"  q", " quit"},
+	}
+	help := navHint + devicesHint
+	used := lipgloss.Width(help)
+	for _, h := range hints {
+		w := lipgloss.Width(h.key) + lipgloss.Width(h.desc)
+		// FooterStyle adds a cell of padding either side.
+		if m.width > 0 && used+w+2 > m.width {
+			break
+		}
+		used += w
+		help += views.HelpKeyStyle.Render(h.key) + views.HelpDescStyle.Render(h.desc)
+	}
 
 	sections = append(sections, FooterStyle.Render(help))
 
