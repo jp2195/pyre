@@ -59,7 +59,7 @@ func (c *Client) GetPendingChanges(ctx context.Context, target string) ([]models
 		}
 
 		// Parse time
-		if t, err := parsePANTime(e.Time); err == nil {
+		if t, err := c.parsePANTime(e.Time); err == nil {
 			change.Time = t
 		}
 

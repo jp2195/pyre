@@ -123,7 +123,7 @@ func (c *Client) GetSessions(ctx context.Context, filter, target string) ([]mode
 		var startTime time.Time
 		// Ignore parse error - time format may vary, zero time acceptable
 		if e.StartTime != "" {
-			startTime, _ = time.Parse("Mon Jan 2 15:04:05 2006", e.StartTime) //nolint:errcheck // intentional - zero time acceptable
+			startTime, _ = parsePANTimeIn(e.StartTime, c.deviceLocation()) //nolint:errcheck // intentional - zero time acceptable
 		}
 		// Convert protocol number to name
 		proto := protoToName(e.Proto)
@@ -264,7 +264,7 @@ func (c *Client) GetSessionByID(ctx context.Context, id int64, target string) (*
 
 	// Parse start time
 	if result.StartTime != "" {
-		if t, err := time.Parse("Mon Jan 2 15:04:05 2006", result.StartTime); err == nil {
+		if t, err := parsePANTimeIn(result.StartTime, c.deviceLocation()); err == nil {
 			detail.StartTime = t
 		}
 	}

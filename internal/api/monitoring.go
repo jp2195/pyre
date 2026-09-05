@@ -119,12 +119,47 @@ type jobEntry struct {
 	Stoppable string `xml:"stoppable"`
 }
 
+// jobTimeOfDayLayout matches the bare dequeue time PAN-OS reports for jobs.
+const jobTimeOfDayLayout = "15:04:05"
+
+// parseJobStart resolves a job's start time from the enqueue and dequeue
+// fields.
+//
+// PAN-OS reports tenq as a full datetime but tdeq as a bare time of day
+// ("21:43:45"), which matches no layout on its own, so every job's start time
+// used to come back as the zero time. The date is taken from tenq; a start
+// that lands before the enqueue belongs to the following day, which is what
+// happens to a job queued at 23:59.
+func (c *Client) parseJobStart(enqueued, dequeued string) time.Time {
+	enq := c.parseJobTimestamp(enqueued)
+	deq := c.parseJobTimestamp(dequeued)
+	if !deq.IsZero() {
+		return deq
+	}
+	if enq.IsZero() || dequeued == "" {
+		return enq
+	}
+	// Scoped to this parser on purpose: a bare time of day must not be in
+	// the shared layout list, or any malformed timestamp anywhere would
+	// "parse" into year zero instead of reporting an error.
+	tod, err := time.ParseInLocation(jobTimeOfDayLayout, dequeued, c.deviceLocation())
+	if err != nil {
+		return enq
+	}
+	start := time.Date(enq.Year(), enq.Month(), enq.Day(),
+		tod.Hour(), tod.Minute(), tod.Second(), 0, c.deviceLocation())
+	if start.Before(enq) {
+		start = start.AddDate(0, 0, 1)
+	}
+	return start
+}
+
 // parseJobTimestamp tries multiple time layouts to parse a PAN-OS job timestamp.
-func parseJobTimestamp(s string) time.Time {
+func (c *Client) parseJobTimestamp(s string) time.Time {
 	if s == "" {
 		return time.Time{}
 	}
-	if t, err := parsePANTime(s); err == nil {
+	if t, err := c.parsePANTime(s); err == nil {
 		return t
 	}
 	return time.Time{}
@@ -174,12 +209,17 @@ func (c *Client) GetJobs(ctx context.Context, target string) ([]models.Job, erro
 			User:    e.User,
 		}
 
-		if e.Progress != "" {
-			job.Progress, _ = strconv.Atoi(strings.TrimSuffix(e.Progress, "%")) //nolint:errcheck // intentional - default to 0 on parse error
+		// PAN-OS reuses the progress field: it holds a percentage while a
+		// job runs, and the completion timestamp once it has finished. A
+		// finished job is 100% whatever the field says.
+		if pct, err := strconv.Atoi(strings.TrimSuffix(e.Progress, "%")); err == nil {
+			job.Progress = pct
+		} else if strings.EqualFold(e.Status, "FIN") {
+			job.Progress = 100
 		}
 
-		job.StartTime = parseJobTimestamp(e.TDeq)
-		job.EndTime = parseJobTimestamp(e.Tfin)
+		job.StartTime = c.parseJobStart(e.TEnq, e.TDeq)
+		job.EndTime = c.parseJobTimestamp(e.Tfin)
 
 		jobs = append(jobs, job)
 	}
@@ -418,10 +458,10 @@ func (c *Client) GetCertificates(ctx context.Context, target string) ([]models.C
 		}
 
 		// Parse dates
-		if t, err := parsePANTime(e.NotValidBefore); err == nil {
+		if t, err := c.parsePANTime(e.NotValidBefore); err == nil {
 			cert.NotBefore = t
 		}
-		if t, err := parsePANTime(e.NotValidAfter); err == nil {
+		if t, err := c.parsePANTime(e.NotValidAfter); err == nil {
 			cert.NotAfter = t
 		}
 

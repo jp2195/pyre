@@ -148,11 +148,11 @@ func (c *Client) submitAndPollLog(ctx context.Context, logType, query string, ma
 }
 
 // parseLogTime parses various PAN-OS time formats
-func parseLogTime(timeStr string) time.Time {
+func (c *Client) parseLogTime(timeStr string) time.Time {
 	if timeStr == "" {
 		return time.Time{}
 	}
-	if t, err := parsePANTime(timeStr); err == nil {
+	if t, err := c.parsePANTime(timeStr); err == nil {
 		return t
 	}
 	log.Printf("[API Warning] failed to parse log time %q: no matching layout", timeStr)
@@ -200,7 +200,7 @@ func (c *Client) GetSystemLogs(ctx context.Context, query string, maxLogs int, t
 		} else {
 			entry.Type = e.Type
 		}
-		entry.Time = parseLogTime(e.Time)
+		entry.Time = c.parseLogTime(e.Time)
 		logs = append(logs, entry)
 	}
 
@@ -293,8 +293,8 @@ func (c *Client) GetTrafficLogs(ctx context.Context, query string, maxLogs int, 
 			Category:      e.Category,
 			VirtualSystem: e.Vsys,
 			DeviceName:    e.DeviceName,
-			Time:          parseLogTime(e.Time),
-			ReceiveTime:   parseLogTime(e.ReceiveTime),
+			Time:          c.parseLogTime(e.Time),
+			ReceiveTime:   c.parseLogTime(e.ReceiveTime),
 		}
 		logs = append(logs, entry)
 	}
@@ -410,8 +410,8 @@ func (c *Client) GetThreatLogs(ctx context.Context, query string, maxLogs int, t
 			DeviceName:     e.DeviceName,
 			ReportID:       e.ReportID,
 			PCAP:           e.PCAP,
-			Time:           parseLogTime(e.Time),
-			ReceiveTime:    parseLogTime(e.ReceiveTime),
+			Time:           c.parseLogTime(e.Time),
+			ReceiveTime:    c.parseLogTime(e.ReceiveTime),
 		}
 		logs = append(logs, entry)
 	}

@@ -21,15 +21,24 @@ var panosTimeLayouts = []string{
 	"January 02, 2006",
 }
 
-// parsePANTime tries each layout in panosTimeLayouts and returns the first
-// successful parse. Returns an error listing the input if no layout matches.
-// Callers that do not care about the error (and are content with the zero
-// time) can discard it with `t, _ := parsePANTime(s)`.
-func parsePANTime(s string) (time.Time, error) {
+// parsePANTimeIn tries each layout in panosTimeLayouts and returns the first
+// successful parse, interpreting the value in loc.
+//
+// PAN-OS timestamps are bare device-local wall clock with no offset, so the
+// location has to come from outside the string. Interpreting them as UTC,
+// which is what time.Parse does with a zoneless layout, puts every timestamp
+// out by the device's offset: on a PA-440 keeping EDT, a log line written one
+// second earlier displayed as "4h ago". See Client.deviceLocation.
+func parsePANTimeIn(s string, loc *time.Location) (time.Time, error) {
 	for _, layout := range panosTimeLayouts {
-		if t, err := time.Parse(layout, s); err == nil {
+		if t, err := time.ParseInLocation(layout, s, loc); err == nil {
 			return t, nil
 		}
 	}
 	return time.Time{}, fmt.Errorf("unrecognized PAN-OS timestamp %q", s)
+}
+
+// parsePANTime interprets s in the device's zone.
+func (c *Client) parsePANTime(s string) (time.Time, error) {
+	return parsePANTimeIn(s, c.deviceLocation())
 }

@@ -128,7 +128,7 @@ func (c *Client) GetGlobalProtectUsers(ctx context.Context, target string) ([]mo
 		}
 
 		// Parse login time
-		if t, err := parsePANTime(e.LoginTime); err == nil {
+		if t, err := c.parsePANTime(e.LoginTime); err == nil {
 			user.LoginTime = t
 			user.Duration = formatDuration(time.Since(t))
 		}

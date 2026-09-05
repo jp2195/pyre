@@ -2,6 +2,7 @@ package api
 
 import (
 	"testing"
+	"time"
 )
 
 func TestParsePANTime(t *testing.T) {
@@ -14,6 +15,8 @@ func TestParsePANTime(t *testing.T) {
 		{"dash layout", "2026-04-18 12:30:45", false},
 		{"ansic-ish single-digit day", "Sat Apr 18 12:30:45 2026", false},
 		{"ansic-ish two-digit day", "Sat Apr 02 12:30:45 2026", false},
+		// Real PA-440 output space-pads a single-digit day.
+		{"space-padded day from a real device", "Fri Sep  4 21:46:19 2026", false},
 		{"US slash layout", "04/18/2026 12:30:45", false},
 		{"cert layout with TZ", "Apr 18 12:30:45 2026 UTC", false},
 		{"license expiration layout", "April 18, 2026", false},
@@ -24,18 +27,18 @@ func TestParsePANTime(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := parsePANTime(tc.in)
+			got, err := parsePANTimeIn(tc.in, time.UTC)
 			if tc.wantErr {
 				if err == nil {
-					t.Errorf("parsePANTime(%q) = %v, want error", tc.in, got)
+					t.Errorf("parsePANTimeIn(%q) = %v, want error", tc.in, got)
 				}
 				return
 			}
 			if err != nil {
-				t.Errorf("parsePANTime(%q) unexpected error: %v", tc.in, err)
+				t.Errorf("parsePANTimeIn(%q) unexpected error: %v", tc.in, err)
 			}
 			if got.IsZero() {
-				t.Errorf("parsePANTime(%q) returned zero time", tc.in)
+				t.Errorf("parsePANTimeIn(%q) returned zero time", tc.in)
 			}
 		})
 	}

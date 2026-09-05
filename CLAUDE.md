@@ -35,6 +35,13 @@ go fix ./...                  # Apply modernizers (safe, behavior-preserving)
 - `saveConfig()` / `saveState()` return `tea.Cmd` (avoid goroutine race conditions)
 - `setError()` is a value receiver that returns an updated Model with `m.err` set plus an auto-dismiss tick Cmd
 - Navigation has a single source of truth: the ordered `navDefs` table in `tui/navigation.go` derives the navbar groups (`navbarGroups()`), `navTargets`, and `viewToNavbar`. Adding a nav item = one `navDefs` entry; `views.NewNavbarModel(groups)` takes the groups as a parameter.
+- **Device time**: PAN-OS reports bare wall clock with no offset, and
+  `show system info` carries no time-zone field (verified on PA-440 /
+  11.2.10-h8). `Client` learns the device's UTC offset by comparing the
+  reported clock against ours in `learnDeviceClock`, and all timestamps
+  parse through `Client.parsePANTime` in that zone. Never call
+  `time.Parse` on a PAN-OS timestamp: a zoneless layout means UTC, which
+  puts every relative time out by the device's offset.
 - Format helpers shared in `views/format_helpers.go`
 - **Bubble Tea v2 View composition**: only the top-level `tui.Model.View()` returns `tea.View`; every sub-view model returns `string`. The top-level composes sub-view strings and sets program options (alt-screen, mouse mode, window title, cursor) on the returned `tea.View` rather than on `tea.NewProgram`.
 - Use `tea.KeyPressMsg` in key handler type switches (not `tea.KeyMsg`, which in v2 is the union interface of press and release). Construct test messages as `tea.KeyPressMsg{Code: tea.KeyDown}` or `tea.KeyPressMsg{Code: 'j', Text: "j"}` — `Runes`/`Type` from v1 no longer exist.

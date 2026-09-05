@@ -113,9 +113,12 @@ func (c *Client) GetSystemInfo(ctx context.Context, target string) (*models.Syst
 		OperationalMode:     si.OperationalMode,
 	}
 
-	// Parse current time
+	// The reported wall clock is the only source of the device's UTC offset:
+	// PAN-OS sends no time-zone field here. Learn it before parsing anything,
+	// so this and every later timestamp land in the device's zone.
 	if si.Time != "" {
-		if t, err := parsePANTime(si.Time); err == nil {
+		c.learnDeviceClock(si.Time)
+		if t, err := c.parsePANTime(si.Time); err == nil {
 			info.CurrentTime = t
 		} else {
 			log.Printf("[API Warning] failed to parse system time %q: no matching layout", si.Time)
@@ -176,7 +179,7 @@ func (c *Client) GetLoggedInAdmins(ctx context.Context, target string) ([]models
 		}
 		// Parse session start time
 		if e.Time != "" {
-			if t, err := parsePANTime(e.Time); err == nil {
+			if t, err := c.parsePANTime(e.Time); err == nil {
 				admin.SessionStart = t
 			}
 		}
@@ -382,7 +385,7 @@ func (c *Client) GetLicenseInfo(ctx context.Context, target string) ([]models.Li
 		}
 		// Calculate days left if we have an expiration date
 		if e.Expires != "" && e.Expires != "Never" {
-			if expTime, err := time.Parse("January 02, 2006", e.Expires); err == nil {
+			if expTime, err := parsePANTimeIn(e.Expires, c.deviceLocation()); err == nil {
 				lic.DaysLeft = int(time.Until(expTime).Hours() / 24)
 			}
 		}

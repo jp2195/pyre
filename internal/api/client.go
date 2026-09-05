@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"sync/atomic"
 	"time"
 )
 
@@ -66,6 +67,45 @@ type Client struct {
 	apiKey     string        // 16 bytes (string header)
 	httpClient *http.Client  // 8 bytes (pointer)
 	sem        chan struct{} // 8 bytes (pointer); see MaxConcurrentRequests
+
+	// deviceLoc is the zone the device keeps its clock in, learned from its
+	// own reported time. Nil until GetSystemInfo has run. Atomic because
+	// fetches run concurrently.
+	deviceLoc atomic.Pointer[time.Location]
+}
+
+// deviceLocation returns the zone to interpret this device's timestamps in.
+//
+// PAN-OS emits bare wall clock with no offset, and `show system info` carries
+// no time-zone field to interpret it with (verified on PA-440 / 11.2.10-h8),
+// so the offset is derived from the device's own clock in learnDeviceClock.
+// Until that has run, the device is assumed to share the operator's zone,
+// which is both the common case and a far better guess than UTC.
+//
+// Deriving the offset from the clock rather than a zone name has a useful
+// side effect: a device whose clock is skewed gets timestamps interpreted
+// against its own clock, so "5m ago" stays true relative to the log the
+// device wrote.
+func (c *Client) deviceLocation() *time.Location {
+	if loc := c.deviceLoc.Load(); loc != nil {
+		return loc
+	}
+	return time.Local
+}
+
+// learnDeviceClock records the device's UTC offset from the wall clock it
+// reports, so every later timestamp is interpreted in the device's zone.
+// A value that does not parse leaves the previous assumption in place.
+//
+// On Panorama the offset tracks whichever managed device was last queried,
+// which is what the views are showing.
+func (c *Client) learnDeviceClock(reported string) {
+	wall, err := parsePANTimeIn(reported, time.UTC)
+	if err != nil {
+		return
+	}
+	offset := wall.Sub(time.Now().UTC())
+	c.deviceLoc.Store(time.FixedZone("", int(offset.Round(time.Second).Seconds())))
 }
 
 // ClientOptions carries optional knobs for NewClient. Zero value is safe:
