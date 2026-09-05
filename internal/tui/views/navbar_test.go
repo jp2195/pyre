@@ -205,21 +205,6 @@ func TestNavbarModel_SetActiveByID(t *testing.T) {
 	}
 }
 
-func TestNavbarModel_GetItemID(t *testing.T) {
-	nav := NewNavbarModel(testNavGroups())
-
-	id := nav.GetItemID()
-	if id != "overview" {
-		t.Errorf("expected 'overview', got %q", id)
-	}
-
-	nav = nav.SetActiveByID("analyze", "policies")
-	id = nav.GetItemID()
-	if id != "policies" {
-		t.Errorf("expected 'policies', got %q", id)
-	}
-}
-
 func TestNavbarModel_RenderTabs(t *testing.T) {
 	nav := NewNavbarModel(testNavGroups())
 

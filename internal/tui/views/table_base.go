@@ -46,13 +46,6 @@ func (t TableBase) SetLoading(loading bool) TableBase {
 	return t
 }
 
-// SetError updates the error state.
-func (t TableBase) SetError(err error) TableBase {
-	t.Err = err
-	t.Loading = false
-	return t
-}
-
 // SetSpinnerFrame updates the spinner frame for display.
 func (t TableBase) SetSpinnerFrame(frame string) TableBase {
 	t.SpinnerFrame = frame
@@ -200,12 +193,6 @@ func (t *TableBase) HandleCollapseIfExpanded() bool {
 		return true
 	}
 	return false
-}
-
-// ResetPosition resets cursor and offset to the beginning.
-func (t *TableBase) ResetPosition() {
-	t.Cursor = 0
-	t.Offset = 0
 }
 
 // FilterValue returns the current filter value.

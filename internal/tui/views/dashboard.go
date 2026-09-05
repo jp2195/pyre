@@ -18,21 +18,6 @@ const (
 	DashboardConfig
 )
 
-// DashboardName returns the display name for a dashboard type
-func DashboardName(dt DashboardType) string {
-	names := map[DashboardType]string{
-		DashboardMain:     "Main",
-		DashboardNetwork:  "Network",
-		DashboardSecurity: "Security",
-		DashboardVPN:      "VPN",
-		DashboardConfig:   "Config",
-	}
-	if name, ok := names[dt]; ok {
-		return name
-	}
-	return "Main"
-}
-
 type DashboardModel struct {
 	DashboardBase
 

@@ -1,8 +1,6 @@
 package auth
 
 import (
-	"fmt"
-	"os"
 	"testing"
 
 	"github.com/jp2195/pyre/internal/config"
@@ -247,39 +245,34 @@ func TestResolveCredentials_ConfigDefault(t *testing.T) {
 
 func TestCredentials_Methods(t *testing.T) {
 	tests := []struct {
-		name                     string
-		creds                    Credentials
-		wantHasHost              bool
-		wantHasAPIKey            bool
-		wantNeedsInteractiveAuth bool
+		name          string
+		creds         Credentials
+		wantHasHost   bool
+		wantHasAPIKey bool
 	}{
 		{
-			name:                     "empty credentials",
-			creds:                    Credentials{},
-			wantHasHost:              false,
-			wantHasAPIKey:            false,
-			wantNeedsInteractiveAuth: true,
+			name:          "empty credentials",
+			creds:         Credentials{},
+			wantHasHost:   false,
+			wantHasAPIKey: false,
 		},
 		{
-			name:                     "host only",
-			creds:                    Credentials{Host: "10.0.0.1"},
-			wantHasHost:              true,
-			wantHasAPIKey:            false,
-			wantNeedsInteractiveAuth: true,
+			name:          "host only",
+			creds:         Credentials{Host: "10.0.0.1"},
+			wantHasHost:   true,
+			wantHasAPIKey: false,
 		},
 		{
-			name:                     "api key only",
-			creds:                    Credentials{APIKey: "key"},
-			wantHasHost:              false,
-			wantHasAPIKey:            true,
-			wantNeedsInteractiveAuth: true,
+			name:          "api key only",
+			creds:         Credentials{APIKey: "key"},
+			wantHasHost:   false,
+			wantHasAPIKey: true,
 		},
 		{
-			name:                     "complete credentials",
-			creds:                    Credentials{Host: "10.0.0.1", APIKey: "key"},
-			wantHasHost:              true,
-			wantHasAPIKey:            true,
-			wantNeedsInteractiveAuth: false,
+			name:          "complete credentials",
+			creds:         Credentials{Host: "10.0.0.1", APIKey: "key"},
+			wantHasHost:   true,
+			wantHasAPIKey: true,
 		},
 	}
 
@@ -290,9 +283,6 @@ func TestCredentials_Methods(t *testing.T) {
 			}
 			if got := tt.creds.HasAPIKey(); got != tt.wantHasAPIKey {
 				t.Errorf("HasAPIKey() = %v, want %v", got, tt.wantHasAPIKey)
-			}
-			if got := tt.creds.NeedsInteractiveAuth(); got != tt.wantNeedsInteractiveAuth {
-				t.Errorf("NeedsInteractiveAuth() = %v, want %v", got, tt.wantNeedsInteractiveAuth)
 			}
 		})
 	}
@@ -345,158 +335,6 @@ func TestConnection_ConnectedDeviceCount(t *testing.T) {
 	count := conn.ConnectedDeviceCount()
 	if count != 2 {
 		t.Errorf("expected 2 connected devices, got %d", count)
-	}
-}
-
-// KeygenError tests
-
-func TestKeygenError_Error(t *testing.T) {
-	tests := []struct {
-		name     string
-		err      *KeygenError
-		expected string
-	}{
-		{
-			name:     "message only",
-			err:      &KeygenError{Message: "authentication failed"},
-			expected: "authentication failed",
-		},
-		{
-			name:     "message with cause",
-			err:      &KeygenError{Message: "connection failed", Cause: os.ErrPermission},
-			expected: "connection failed: permission denied",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.err.Error()
-			if got != tt.expected {
-				t.Errorf("Error() = %q, want %q", got, tt.expected)
-			}
-		})
-	}
-}
-
-func TestKeygenError_Unwrap(t *testing.T) {
-	cause := os.ErrNotExist
-	err := &KeygenError{Message: "test", Cause: cause}
-
-	unwrapped := err.Unwrap()
-	if unwrapped != cause {
-		t.Errorf("Unwrap() = %v, want %v", unwrapped, cause)
-	}
-
-	// Test with nil cause
-	err2 := &KeygenError{Message: "test"}
-	if err2.Unwrap() != nil {
-		t.Error("expected Unwrap() to return nil when Cause is nil")
-	}
-}
-
-func TestIsAuthenticationError(t *testing.T) {
-	tests := []struct {
-		name     string
-		err      error
-		expected bool
-	}{
-		{
-			name:     "nil error",
-			err:      nil,
-			expected: false,
-		},
-		{
-			name:     "KeygenError with invalid credential",
-			err:      &KeygenError{Message: "Invalid credential for user"},
-			expected: true,
-		},
-		{
-			name:     "KeygenError with authentication failed",
-			err:      &KeygenError{Message: "authentication failed"},
-			expected: true,
-		},
-		{
-			name:     "KeygenError with invalid username",
-			err:      &KeygenError{Message: "Invalid username provided"},
-			expected: true,
-		},
-		{
-			name:     "KeygenError with invalid password",
-			err:      &KeygenError{Message: "Invalid password"},
-			expected: true,
-		},
-		{
-			name:     "KeygenError with connection error",
-			err:      &KeygenError{Message: "connection refused"},
-			expected: false,
-		},
-		{
-			name:     "regular error with auth message",
-			err:      fmt.Errorf("authentication failed"),
-			expected: true,
-		},
-		{
-			name:     "regular error with invalid credentials",
-			err:      fmt.Errorf("invalid credentials"),
-			expected: true,
-		},
-		{
-			name:     "regular error with invalid username or password",
-			err:      fmt.Errorf("invalid username or password"),
-			expected: true,
-		},
-		{
-			name:     "regular error without auth message",
-			err:      fmt.Errorf("network error"),
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := IsAuthenticationError(tt.err)
-			if got != tt.expected {
-				t.Errorf("IsAuthenticationError() = %v, want %v", got, tt.expected)
-			}
-		})
-	}
-}
-
-func TestIsConnectionError(t *testing.T) {
-	tests := []struct {
-		name     string
-		err      error
-		expected bool
-	}{
-		{
-			name:     "nil error",
-			err:      nil,
-			expected: false,
-		},
-		{
-			name:     "KeygenError",
-			err:      &KeygenError{Message: "connection refused"},
-			expected: true,
-		},
-		{
-			name:     "regular error",
-			err:      fmt.Errorf("some error"),
-			expected: false,
-		},
-		{
-			name:     "wrapped KeygenError",
-			err:      fmt.Errorf("wrapped: %w", &KeygenError{Message: "connection failed"}),
-			expected: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := IsConnectionError(tt.err)
-			if got != tt.expected {
-				t.Errorf("IsConnectionError() = %v, want %v", got, tt.expected)
-			}
-		})
 	}
 }
 

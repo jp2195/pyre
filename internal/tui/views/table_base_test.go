@@ -1,7 +1,6 @@
 package views
 
 import (
-	"errors"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -53,21 +52,6 @@ func TestTableBase_SetLoading(t *testing.T) {
 	tb = tb.SetLoading(false)
 	if tb.Loading {
 		t.Error("expected Loading=false")
-	}
-}
-
-func TestTableBase_SetError(t *testing.T) {
-	tb := NewTableBase("")
-	tb.Loading = true
-
-	err := errors.New("test error")
-	tb = tb.SetError(err)
-
-	if tb.Err != err {
-		t.Errorf("expected error to be set")
-	}
-	if tb.Loading {
-		t.Error("expected Loading=false after SetError")
 	}
 }
 
@@ -286,21 +270,6 @@ func TestTableBase_HandleCollapseIfExpanded(t *testing.T) {
 	collapsed = tb.HandleCollapseIfExpanded()
 	if collapsed {
 		t.Error("expected HandleCollapseIfExpanded to return false when not expanded")
-	}
-}
-
-func TestTableBase_ResetPosition(t *testing.T) {
-	tb := NewTableBase("")
-	tb.Cursor = 10
-	tb.Offset = 5
-
-	tb.ResetPosition()
-
-	if tb.Cursor != 0 {
-		t.Errorf("expected Cursor=0, got %d", tb.Cursor)
-	}
-	if tb.Offset != 0 {
-		t.Errorf("expected Offset=0, got %d", tb.Offset)
 	}
 }
 

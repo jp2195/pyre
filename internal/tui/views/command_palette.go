@@ -32,7 +32,6 @@ type CommandPaletteModel struct {
 	height    int
 	textInput textinput.Model
 	focused   bool
-	prefilter string // Category to pre-filter (e.g., "Connections" for ":")
 }
 
 // NewCommandPaletteModel creates a new command palette model
@@ -69,19 +68,6 @@ func (m CommandPaletteModel) Focus() CommandPaletteModel {
 	m.focused = true
 	m.query = ""
 	m.cursor = 0
-	m.prefilter = ""
-	m.textInput.SetValue("")
-	m.textInput.Focus()
-	m.filterCommands()
-	return m
-}
-
-// FocusWithFilter focuses the palette with a pre-filter category
-func (m CommandPaletteModel) FocusWithFilter(category string) CommandPaletteModel {
-	m.focused = true
-	m.query = ""
-	m.cursor = 0
-	m.prefilter = category
 	m.textInput.SetValue("")
 	m.textInput.Focus()
 	m.filterCommands()
@@ -108,7 +94,7 @@ func (m CommandPaletteModel) SelectedCommand() *Command {
 	return nil
 }
 
-// filterCommands filters commands based on the current query and prefilter
+// filterCommands filters commands based on the current query
 func (m *CommandPaletteModel) filterCommands() {
 	m.filtered = nil
 	query := strings.ToLower(m.query)
@@ -116,11 +102,6 @@ func (m *CommandPaletteModel) filterCommands() {
 	for _, cmd := range m.commands {
 		// Skip unavailable commands
 		if cmd.Available != nil && !cmd.Available() {
-			continue
-		}
-
-		// Apply prefilter if set
-		if m.prefilter != "" && cmd.Category != m.prefilter {
 			continue
 		}
 

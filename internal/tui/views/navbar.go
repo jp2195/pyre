@@ -109,14 +109,6 @@ func (m NavbarModel) SetActiveByID(groupID, itemID string) NavbarModel {
 	return m
 }
 
-// GetItemID returns the current item ID for view switching
-func (m NavbarModel) GetItemID() string {
-	if item := m.ActiveItem(); item != nil {
-		return item.ID
-	}
-	return ""
-}
-
 // RenderTabs renders the navigation tabs for the header
 // Returns: "1:Monitor  2:Analyze  3:Tools" with active group highlighted
 func (m NavbarModel) RenderTabs() string {

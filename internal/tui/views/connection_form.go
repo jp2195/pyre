@@ -44,7 +44,6 @@ type ConnectionFormModel struct {
 	insecure      bool
 	saveToConfig  bool
 	focusedField  ConnectionFormField
-	err           error
 	width         int
 	height        int
 }
@@ -124,18 +123,6 @@ func (m *ConnectionFormModel) updateFocus() {
 func (m ConnectionFormModel) SetSize(width, height int) ConnectionFormModel {
 	m.width = width
 	m.height = height
-	return m
-}
-
-// SetError sets an error message to display
-func (m ConnectionFormModel) SetError(err error) ConnectionFormModel {
-	m.err = err
-	return m
-}
-
-// ClearError clears any error message
-func (m ConnectionFormModel) ClearError() ConnectionFormModel {
-	m.err = nil
 	return m
 }
 
@@ -357,12 +344,6 @@ func (m ConnectionFormModel) View() string {
 		} else {
 			b.WriteString(inputStyle.Render(saveCheck))
 		}
-	}
-
-	// Error message
-	if m.err != nil {
-		b.WriteString("\n")
-		b.WriteString(errorStyle.Render("Error: " + m.err.Error()))
 	}
 
 	// Help text

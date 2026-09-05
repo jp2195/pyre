@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -98,53 +97,4 @@ func GenerateAPIKey(ctx context.Context, host, username, password string, opts a
 	}
 
 	return &KeygenResult{APIKey: xmlResp.Result.Key}, nil
-}
-
-type KeygenError struct {
-	Message string
-	Cause   error
-}
-
-func (e *KeygenError) Error() string {
-	if e.Cause != nil {
-		return fmt.Sprintf("%s: %v", e.Message, e.Cause)
-	}
-	return e.Message
-}
-
-func (e *KeygenError) Unwrap() error {
-	return e.Cause
-}
-
-// IsAuthenticationError checks if the error indicates an authentication failure.
-// Uses errors.As to properly unwrap and check for KeygenError types.
-func IsAuthenticationError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	// Check if this is a KeygenError with authentication-related message
-	if keygenErr, ok := errors.AsType[*KeygenError](err); ok {
-		msg := strings.ToLower(keygenErr.Message)
-		return strings.Contains(msg, "invalid credential") ||
-			strings.Contains(msg, "authentication failed") ||
-			strings.Contains(msg, "invalid username") ||
-			strings.Contains(msg, "invalid password")
-	}
-
-	// Fallback: check the error message directly for common auth failure strings
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "authentication failed") ||
-		strings.Contains(msg, "invalid credentials") ||
-		strings.Contains(msg, "invalid username or password")
-}
-
-// IsConnectionError checks if the error is a connection-related KeygenError.
-// Uses errors.As to properly unwrap error chains.
-func IsConnectionError(err error) bool {
-	if err == nil {
-		return false
-	}
-	_, ok := errors.AsType[*KeygenError](err) //nolint:errcheck // intentional - only need ok
-	return ok
 }

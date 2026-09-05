@@ -275,10 +275,6 @@ func (c *Credentials) HasAPIKey() bool {
 	return c.APIKey != ""
 }
 
-func (c *Credentials) NeedsInteractiveAuth() bool {
-	return c.Host == "" || c.APIKey == ""
-}
-
 // normalizeHostForEnv converts a connection host into an env-var-safe
 // suffix. Strips any :port (including bracketed IPv6 forms) and
 // replaces ".", "-", and ":" with "_" before uppercasing.

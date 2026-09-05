@@ -50,18 +50,6 @@ func (m DevicePickerModel) SetSize(width, height int) DevicePickerModel {
 	return m
 }
 
-// SelectedSerial returns the serial of the selected device, or empty string for Panorama.
-func (m DevicePickerModel) SelectedSerial() string {
-	if m.cursor == 0 {
-		return ""
-	}
-	idx := m.cursor - 1
-	if idx >= 0 && idx < len(m.devices) {
-		return m.devices[idx].Serial
-	}
-	return ""
-}
-
 // SelectedDevice returns the selected device, or nil for Panorama.
 func (m DevicePickerModel) SelectedDevice() *models.ManagedDevice {
 	if m.cursor == 0 {

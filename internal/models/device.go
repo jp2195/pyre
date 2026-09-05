@@ -131,7 +131,6 @@ type LicenseInfo struct {
 	Expires     string
 	Expired     bool
 	DaysLeft    int
-	Authcode    string
 }
 
 // LoggedInAdmin represents an admin currently logged in

@@ -90,8 +90,6 @@ type LoginErrorMsg struct {
 	Err error
 }
 
-type RefreshTickMsg struct{}
-
 type ErrorMsg struct {
 	Err error
 }

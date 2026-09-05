@@ -166,27 +166,6 @@ func TestDashboardModel_SetThreatSummary(t *testing.T) {
 	}
 }
 
-func TestDashboardName(t *testing.T) {
-	tests := []struct {
-		dt   DashboardType
-		want string
-	}{
-		{DashboardMain, "Main"},
-		{DashboardNetwork, "Network"},
-		{DashboardSecurity, "Security"},
-		{DashboardVPN, "VPN"},
-		{DashboardConfig, "Config"},
-		{DashboardType(99), "Main"}, // Unknown type defaults to Main
-	}
-
-	for _, tt := range tests {
-		got := DashboardName(tt.dt)
-		if got != tt.want {
-			t.Errorf("DashboardName(%d) = %q, want %q", tt.dt, got, tt.want)
-		}
-	}
-}
-
 func TestDashboardType_Constants(t *testing.T) {
 	if DashboardMain != 0 {
 		t.Errorf("expected DashboardMain=0, got %d", DashboardMain)
