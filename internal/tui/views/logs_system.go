@@ -47,6 +47,43 @@ func sortSystemLogs(logs []models.SystemLogEntry, sortBy LogSortField, asc bool)
 	})
 }
 
+// System table columns. The description is the flexible one: it is the whole
+// reason to read the table, and the only field with no natural length.
+const (
+	sysTime        = 19
+	sysTimeCompact = 8 // "15:04:05"
+	sysSeverity    = 4
+	sysType        = 18
+)
+
+func (m LogsModel) systemLayout() logColumnLayout {
+	// +1 per gap between columns, including the one before the description.
+	fixedWide := sysTime + sysSeverity + sysType + 3
+	fixedNarrow := sysTime + sysSeverity + 2
+	fixedCompact := sysTimeCompact + sysSeverity + 2
+	// The full set is worth showing as soon as it fits: unlike the traffic
+	// and threat tables it adds one column rather than a different shape.
+	return logLayout(m.Width, [3]int{fixedWide, fixedNarrow, fixedCompact}, fixedWide+minFlexColumn)
+}
+
+// systemCells returns the fixed cells of a system log row, already padded, in
+// the order the selected layout renders them. Header and data rows share it
+// so their columns cannot drift apart.
+func systemCells(l logColumnLayout, timeText, severity, logType string) []string {
+	timeWidth := sysTime
+	if l.compact() {
+		timeWidth = sysTimeCompact
+	}
+	cells := []string{
+		fmt.Sprintf("%-*s", timeWidth, truncate(timeText, timeWidth)),
+		fmt.Sprintf("%-*s", sysSeverity, truncate(severity, sysSeverity)),
+	}
+	if l.wide() {
+		cells = append(cells, fmt.Sprintf("%-*s", sysType, truncate(logType, sysType)))
+	}
+	return cells
+}
+
 func (m LogsModel) renderSystemTable() string {
 	if m.Loading && len(m.systemLogs) == 0 {
 		return LoadingMsgStyle.Padding(1, 0).Render("Loading system logs...")
@@ -55,32 +92,46 @@ func (m LogsModel) renderSystemTable() string {
 		return EmptyMsgStyle.Padding(1, 0).Render("No system logs found")
 	}
 
+	layout := m.systemLayout()
+
 	var b strings.Builder
 
-	// Header - compact severity, more space for description
-	header := fmt.Sprintf("%-19s %-4s %-18s %s",
-		"Time", "Sev", "Type", "Description")
+	header := strings.Join(systemCells(layout, "Time", "Sev", "Type"), " ")
+	if layout.flex > 0 {
+		header += " " + fmt.Sprintf("%-*s", layout.flex, "Description")
+	}
 	b.WriteString(TableHeaderStyle.Render(header) + "\n")
 
 	b.WriteString(renderLogRows(m.Offset, m.Cursor, m.visibleRows(), m.filteredSystem, func(log models.SystemLogEntry, selected bool) string {
 		timeStr := log.Time.Format("2006-01-02 15:04:05")
-		sevAbbrev := abbreviateSeverity(log.Severity)
-		desc := truncate(log.Description, m.Width-46)
+		if layout.compact() {
+			timeStr = log.Time.Format(logTimeOnlyLayout)
+		}
+		cells := systemCells(layout, timeStr, abbreviateSeverity(log.Severity), log.Type)
+		desc := ""
+		if layout.flex > 0 {
+			desc = fmt.Sprintf("%-*s", layout.flex, truncate(log.Description, layout.flex))
+		}
 
 		if selected {
-			row := fmt.Sprintf("%-19s %-4s %-18s %s",
-				timeStr,
-				sevAbbrev,
-				truncate(log.Type, 18),
-				desc)
+			row := strings.Join(cells, " ")
+			if desc != "" {
+				row += " " + desc
+			}
 			return TableSelectedRowStyle().Render(row)
 		}
-		// Build row with colored severity indicator
-		sevStyle := SeverityStyle(log.Severity)
-		return DetailLabelStyle.Render(fmt.Sprintf("%-19s", timeStr)) + " " +
-			sevStyle.Render(fmt.Sprintf("%-4s", sevAbbrev)) + " " +
-			StatusMutedStyle.Render(fmt.Sprintf("%-18s", truncate(log.Type, 18))) + " " +
-			DetailValueStyle.Render(desc)
+
+		// The severity cell is color-coded, so the row is styled cell by cell.
+		styles := []lipgloss.Style{DetailLabelStyle, SeverityStyle(log.Severity), StatusMutedStyle}
+		parts := make([]string, len(cells))
+		for i, cell := range cells {
+			parts[i] = styles[i].Render(cell)
+		}
+		row := strings.Join(parts, " ")
+		if desc != "" {
+			row += " " + DetailValueStyle.Render(desc)
+		}
+		return row
 	}))
 
 	return b.String()

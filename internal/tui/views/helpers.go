@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	"charm.land/lipgloss/v2"
+
 	"github.com/jp2195/pyre/internal/auth"
 )
 
@@ -124,3 +126,64 @@ func wrapText(text string, width int) []string {
 	lines = append(lines, currentLine)
 	return lines
 }
+
+// tableSeparator renders the horizontal rule under a table header. It spans
+// the table, not the header text: the last column is often wider than its
+// label, so measuring the header left the rule ending at an arbitrary point
+// part-way across the data.
+//
+// The available width is derived by subtracting a fixed chrome allowance from
+// the terminal width, so it goes negative once the terminal is narrower than
+// that allowance. strings.Repeat panics on a negative count, and a panic
+// inside a Bubble Tea View leaves the terminal in the alternate screen with
+// echo off, so clamp before repeating. Dragging a pane narrow is a routine
+// thing to do; it must not take the program down.
+func tableSeparator(availableWidth int) string {
+	return strings.Repeat("─", max(availableWidth, 0))
+}
+
+// modalChromeWidth is what a centered modal box spends on its border and
+// horizontal padding, so the content has terminal width minus this to work in.
+const modalChromeWidth = 10
+
+// fitHints joins hints in order, keeping only those that still fit in width.
+// The first hint is always kept, so the line is never empty.
+//
+// A modal box has no explicit width: it sizes itself to its widest line. A
+// fixed help string therefore sets the width of the whole box, and on a
+// narrow terminal it pushes the box wider than the screen. Dropping the
+// least important hints keeps the box inside the terminal instead.
+func fitHints(width int, sep string, hints ...string) string {
+	if len(hints) == 0 {
+		return ""
+	}
+	out := hints[0]
+	for _, h := range hints[1:] {
+		if width > 0 && lipgloss.Width(out)+lipgloss.Width(sep)+lipgloss.Width(h) > width {
+			break
+		}
+		out += sep + h
+	}
+	return out
+}
+
+// modalInputWidth sizes a text input inside a centered modal. The inputs were
+// a fixed 40 cells, which is wider than the content area of a terminal under
+// about 54 columns.
+func modalInputWidth(termWidth int) int {
+	const preferred = 40
+	if termWidth <= 0 {
+		return preferred
+	}
+	// The input's prompt occupies two more cells than the input itself.
+	return max(min(preferred, termWidth-modalChromeWidth-2), 12)
+}
+
+// tableChromeWidth is what a framed list view spends on chrome before any
+// table column: two cells of panel border, four of horizontal padding, and
+// two of slack so a full-width row does not sit flush against the frame.
+//
+// The views used to each subtract their own number. Routes subtracted six,
+// which is less than the panel actually spends, so its header rule ran past
+// the content area and wrapped.
+const tableChromeWidth = 12

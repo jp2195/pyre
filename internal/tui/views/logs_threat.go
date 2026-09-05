@@ -64,17 +64,26 @@ const (
 	thDest     = 15
 	thAction   = 12 // "reset-client"
 	thCategory = 15
+
+	// Compact variant: the date is dropped from the timestamp. What is left
+	// is the threat, where it came from, and what the firewall did.
+	thTimeCompact = 8 // "15:04:05"
 )
 
 func (m LogsModel) threatLayout() logColumnLayout {
 	// +1 per gap between columns.
 	fixedWide := thTime + thSeverity + thSource + thDest + thAction + thCategory + 6
 	fixedNarrow := thTime + thSevShort + thSource + thAction + 4
-	return logLayout(m.Width, fixedWide, fixedNarrow, 150)
+	fixedCompact := thTimeCompact + thSevShort + thSource + thAction + 4
+	return logLayout(m.Width, [3]int{fixedWide, fixedNarrow, fixedCompact}, 150)
 }
 
 func (m LogsModel) formatThreatHeader(l logColumnLayout) string {
-	if l.wide {
+	if l.compact() {
+		return formatCompactRow(l, thTimeCompact, "Time",
+			[]int{thSevShort, thSource, thAction}, []string{"Sev", "Source", "Action"}, "Threat")
+	}
+	if l.wide() {
 		return fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
 			thTime, "Time", thSeverity, "Severity", l.flex, "Threat",
 			thSource, "Source", thDest, "Destination", thAction, "Action", thCategory, "Category")
@@ -85,7 +94,12 @@ func (m LogsModel) formatThreatHeader(l logColumnLayout) string {
 
 func (m LogsModel) formatThreatRow(log models.ThreatLogEntry, l logColumnLayout) string {
 	timeStr := log.Time.Format("2006-01-02 15:04:05")
-	if l.wide {
+	if l.compact() {
+		return formatCompactRow(l, thTimeCompact, log.Time.Format(logTimeOnlyLayout),
+			[]int{thSevShort, thSource, thAction},
+			[]string{abbreviateSeverity(log.Severity), log.SourceIP, log.Action}, log.ThreatName)
+	}
+	if l.wide() {
 		return fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
 			thTime, timeStr,
 			thSeverity, truncate(log.Severity, thSeverity),

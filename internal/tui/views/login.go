@@ -103,6 +103,10 @@ func (m *LoginModel) updateFocus() {
 func (m LoginModel) SetSize(width, height int) LoginModel {
 	m.width = width
 	m.height = height
+	inputWidth := modalInputWidth(width)
+	m.hostInput.SetWidth(inputWidth)
+	m.usernameInput.SetWidth(inputWidth)
+	m.passwordInput.SetWidth(inputWidth)
 	return m
 }
 
@@ -212,12 +216,24 @@ const loginContentWidth = 54
 // the three-line in-flight message, so shorter states pad rather than shrink.
 const loginStatusRows = 3
 
+// loginStatusWidth is the status region's width for a given terminal width:
+// the form's natural content width, narrowed when the terminal cannot fit it.
+// Holding it constant for a given terminal size is what keeps the centered box
+// from moving as the state changes; clamping is what keeps the box on screen,
+// since the region is the widest line and therefore sets the box's width.
+func loginStatusWidth(termWidth int) int {
+	if termWidth <= 0 {
+		return loginContentWidth
+	}
+	return max(min(loginContentWidth, termWidth-modalChromeWidth), 20)
+}
+
 // loginStatusStyle is the fixed-size region holding the help text, the
 // in-flight message, or an error. Constant width and height keep the centered
 // box from moving when the state changes.
-func loginStatusStyle() lipgloss.Style {
+func loginStatusStyle(termWidth int) lipgloss.Style {
 	return lipgloss.NewStyle().
-		Width(loginContentWidth).
+		Width(loginStatusWidth(termWidth)).
 		Height(loginStatusRows).
 		MarginTop(1)
 }
@@ -302,11 +318,15 @@ func (m LoginModel) View() string {
 	case m.err != nil:
 		status = ErrorMsgStyle.Bold(true).Render("Error: " + m.err.Error())
 	default:
-		status = helpStyle.MarginTop(0).Render("Tab: next  Space: toggle  Enter: connect  Ctrl+C: quit")
+		// Bounded by the terminal as well as the region: on a narrow window the
+		// full hint list is wider than the box and would overflow it.
+		status = helpStyle.MarginTop(0).Render(fitHints(
+			loginStatusWidth(m.width), "  ",
+			"Tab: next", "Space: toggle", "Enter: connect", "Ctrl+C: quit"))
 	}
 
 	b.WriteString("\n")
-	b.WriteString(loginStatusStyle().Render(status))
+	b.WriteString(loginStatusStyle(m.width).Render(status))
 
 	content := b.String()
 

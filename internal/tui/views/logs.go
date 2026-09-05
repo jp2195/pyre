@@ -51,6 +51,13 @@ func NewLogsModel() LogsModel {
 	}
 }
 
+// SetActiveLogType selects which log tab is displayed. The tab is normally
+// chosen with the bracket keys; this lets callers address a tab directly.
+func (m LogsModel) SetActiveLogType(t models.LogType) LogsModel {
+	m.activeLogType = t
+	return m
+}
+
 func (m LogsModel) SetSize(width, height int) LogsModel {
 	m.TableBase = m.TableBase.SetSize(width, height)
 	m.EnsureCursorValid(m.filteredCount())
@@ -473,9 +480,24 @@ func renderLogRows[T any](offset, cursor, visibleRows int, items []T, renderRow 
 // of 7 cells cannot hold "sinkhole", and a Severity column of 9 cannot hold
 // "informational".
 type logColumnLayout struct {
-	wide bool // the terminal is roomy enough for the full column set
-	flex int  // width of the one column that takes the remaining space
+	tier logTier
+	flex int // width of the flexible column; 0 means it is omitted entirely
 }
+
+// logTier names the column sets a log table can render, widest first.
+type logTier int
+
+const (
+	logTierWide logTier = iota
+	logTierNarrow
+	logTierCompact
+)
+
+// wide reports whether the full column set was selected.
+func (l logColumnLayout) wide() bool { return l.tier == logTierWide }
+
+// compact reports whether the smallest column set was selected.
+func (l logColumnLayout) compact() bool { return l.tier == logTierCompact }
 
 // The flexible column is bounded at both ends: wide enough to be readable on
 // a small terminal, and narrow enough that a very wide one does not stretch a
@@ -485,14 +507,31 @@ const (
 	maxFlexColumn = 48
 )
 
-// logLayout picks the column set for the given terminal width and sizes the
-// flexible column from what the fixed ones leave behind.
-func logLayout(width, fixedWide, fixedNarrow int, wideThreshold int) logColumnLayout {
-	clamp := func(n int) int { return min(max(n, minFlexColumn), maxFlexColumn) }
-	if width >= wideThreshold {
-		return logColumnLayout{wide: true, flex: clamp(width - fixedWide)}
+// logLayout picks the widest column set that actually fits, and sizes the
+// flexible column from what the fixed columns leave behind.
+//
+// fixed gives the total width of each tier's fixed columns, including the
+// single space between them and before the flexible column. A tier is only
+// eligible when it leaves room for a readable flexible column, so a table is
+// never rendered wider than the terminal it was measured against. Selecting
+// a tier by threshold alone, without that check, is what let the narrow
+// traffic set overflow every terminal below 88 columns.
+//
+// wideThreshold holds the widest tier back until the terminal is roomy
+// enough to be worth the extra columns, which is a taste judgment rather
+// than a fitting one.
+func logLayout(width int, fixed [3]int, wideThreshold int) logColumnLayout {
+	for _, tier := range []logTier{logTierWide, logTierNarrow, logTierCompact} {
+		if tier == logTierWide && width < wideThreshold {
+			continue
+		}
+		if flex := width - fixed[tier]; flex >= minFlexColumn {
+			return logColumnLayout{tier: tier, flex: min(flex, maxFlexColumn)}
+		}
 	}
-	return logColumnLayout{wide: false, flex: clamp(width - fixedNarrow)}
+	// Narrower than even the compact set: drop its flexible column rather
+	// than render it below the readable minimum and spill off the screen.
+	return logColumnLayout{tier: logTierCompact, flex: 0}
 }
 
 // abbreviateSeverity returns a short severity label.
@@ -536,4 +575,25 @@ func colorBySeverity(row, severity string) string {
 
 func colorByAction(row, action string) string {
 	return ActionStyle(action).Render(row)
+}
+
+// logTimeOnlyLayout drops the date from a log timestamp. Every row on screen
+// is from the same recent window, so the date is the least informative thing
+// the line carries and the first thing worth spending on a narrower terminal.
+const logTimeOnlyLayout = "15:04:05"
+
+// formatCompactRow lays out the smallest column set: a time column, some
+// fixed columns, then the flexible column, which is omitted when the layout
+// could not give it a readable width. Header and data rows share it so their
+// columns cannot drift apart.
+func formatCompactRow(l logColumnLayout, timeWidth int, timeText string, widths []int, cells []string, flexText string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%-*s", timeWidth, truncate(timeText, timeWidth))
+	for i, w := range widths {
+		fmt.Fprintf(&b, " %-*s", w, truncate(cells[i], w))
+	}
+	if l.flex > 0 {
+		fmt.Fprintf(&b, " %-*s", l.flex, truncate(flexText, l.flex))
+	}
+	return b.String()
 }

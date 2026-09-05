@@ -298,7 +298,10 @@ func (m RoutesModel) View() string {
 		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
-	titleStyle := ViewTitleStyle.MarginBottom(1)
+	// No bottom margin: what follows is appended to the title and belongs on
+	// the same line. With a margin the title renders as a two-line block, so
+	// the tab indicator landed underneath it, indented by the title width.
+	titleStyle := ViewTitleStyle
 	panelStyle := ViewPanelStyle.Width(m.Width - 4)
 
 	var b strings.Builder
@@ -337,7 +340,7 @@ func (m RoutesModel) renderTabIndicator() string {
 // bannerText is the count-and-keys line the other list views carry.
 func (m RoutesModel) bannerText() string {
 	if m.activeTab == RoutesTabNeighbors {
-		return fmt.Sprintf(" [%d neighbors | r: refresh]", len(m.bgpNeighbors)+len(m.ospfNeighbors))
+		return fmt.Sprintf("[%d neighbors | r: refresh]", len(m.bgpNeighbors)+len(m.ospfNeighbors))
 	}
 	filterInfo := ""
 	if m.protocolFilter != "" {
@@ -349,7 +352,11 @@ func (m RoutesModel) bannerText() string {
 	if shown != total {
 		count = fmt.Sprintf("%d of %d routes", shown, total)
 	}
-	return fmt.Sprintf(" [%s%s | a/c/s/b/o: protocol | /: filter | r: refresh]", count, filterInfo)
+	// ViewPanelStyle spends four cells on horizontal padding and two on its
+	// border; the banner adds " [" and "]".
+	budget := m.Width - 10 - 2
+	return "[" + fitHints(budget, " | ",
+		count+filterInfo, "a/c/s/b/o: protocol", "/: filter", "r: refresh") + "]"
 }
 
 func (m RoutesModel) renderRoutesTab() string {
@@ -385,7 +392,7 @@ func (m RoutesModel) renderRoutesTable() string {
 	normalStyle := DetailValueStyle
 	dimStyle := DetailDimStyle
 
-	availableWidth := m.Width - 6
+	availableWidth := m.Width - tableChromeWidth
 
 	var b strings.Builder
 
@@ -393,7 +400,7 @@ func (m RoutesModel) renderRoutesTable() string {
 	header := m.formatRouteHeaderRow(availableWidth)
 	b.WriteString(headerStyle.Render(header))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(strings.Repeat("─", min(availableWidth, len(header)+10))))
+	b.WriteString(dimStyle.Render(tableSeparator(availableWidth)))
 	b.WriteString("\n")
 
 	visibleRows := m.visibleRows()
@@ -519,7 +526,7 @@ func (m RoutesModel) renderNeighborsTable() string {
 	normalStyle := DetailValueStyle
 	dimStyle := DetailDimStyle
 
-	availableWidth := m.Width - 6
+	availableWidth := m.Width - tableChromeWidth
 
 	var b strings.Builder
 
@@ -527,7 +534,7 @@ func (m RoutesModel) renderNeighborsTable() string {
 	header := m.formatNeighborHeaderRow(availableWidth)
 	b.WriteString(headerStyle.Render(header))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(strings.Repeat("─", min(availableWidth, len(header)+10))))
+	b.WriteString(dimStyle.Render(tableSeparator(availableWidth)))
 	b.WriteString("\n")
 
 	// Build combined neighbor list

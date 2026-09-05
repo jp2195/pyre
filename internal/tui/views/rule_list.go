@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // RuleListConfig defines the type-specific behavior for a RuleListModel.
@@ -204,7 +205,10 @@ func (m RuleListModel[T]) View() string {
 		return RenderLoadingInline(m.SpinnerFrame, "Loading...")
 	}
 
-	titleStyle := ViewTitleStyle.MarginBottom(1)
+	// No bottom margin: the banner is appended to the title and belongs on the
+	// same line. With a margin the title rendered as a two-line block, so the
+	// banner landed underneath it, indented by the width of the title.
+	titleStyle := ViewTitleStyle
 	panelStyle := ViewPanelStyle.Width(m.Width - 4)
 
 	var b strings.Builder
@@ -213,7 +217,18 @@ func (m RuleListModel[T]) View() string {
 	if noun == "" {
 		noun = "rules"
 	}
-	sortInfo := BannerInfoStyle.Render(fmt.Sprintf(" [%d %s | Sort: %s | s: change | S: dir | /: filter | enter: details]", len(m.filtered), noun, m.sortLabel()))
+	// The banner names the item count, the sort field, and the keys the view
+	// answers to. Written as one fixed string it ran to about 90 cells beside
+	// the title, so on an 80-column terminal lipgloss wrapped it and the tail
+	// of the key list took a row from the table. Keep only what fits.
+	//
+	// ViewPanelStyle spends four cells on horizontal padding and two on its
+	// border, on top of the width set above; the banner adds " [" and "]".
+	budget := m.Width - 10 - lipgloss.Width(titleStyle.Render(title)) - 3
+	sortInfo := BannerInfoStyle.Render(" [" + fitHints(budget, " | ",
+		fmt.Sprintf("%d %s", len(m.filtered), noun),
+		"Sort: "+m.sortLabel(),
+		"s: change", "S: dir", "/: filter", "enter: details") + "]")
 	b.WriteString(titleStyle.Render(title) + sortInfo)
 	b.WriteString("\n")
 
@@ -278,7 +293,7 @@ func (m RuleListModel[T]) renderTable() string {
 	header := m.config.FormatHeaderRow(availableWidth)
 	b.WriteString(headerStyle.Render(header))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(strings.Repeat("─", min(availableWidth, len(header)+10))))
+	b.WriteString(dimStyle.Render(tableSeparator(availableWidth)))
 	b.WriteString("\n")
 
 	visibleRows := m.visibleRows()

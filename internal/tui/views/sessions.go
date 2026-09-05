@@ -173,42 +173,107 @@ func compareSession(a, b models.Session, sortIdx int) bool {
 	}
 }
 
-func formatSessionHeader(width int) string {
-	return fmt.Sprintf("%-7s %-15s %-15s %-5s %-4s %-10s %-7s %-15s %-5s %-8s",
-		"ID", "Source", "Destination", "Port", "Pro", "App", "State", "Zones", "Age", "Bytes")
+// sessionColumns records which optional columns the session table shows.
+//
+// The table is fixed-width: every column has a set size, so a narrower
+// terminal is served by dropping columns rather than by shrinking them. The
+// columns are dropped least-useful first, which for triaging live sessions
+// means protocol and application before zones, and zones before age and
+// bytes. Source, destination, port and state are always present.
+type sessionColumns struct {
+	idWidth     int
+	proto       bool
+	app         bool
+	zones       bool
+	ageAndBytes bool
 }
 
-// sessionRowParts splits a row into prefix, state cell, and suffix so the
-// state cell can be color-coded independently for non-selected rows.
-func sessionRowParts(s models.Session) (prefix, state, suffix string) {
-	zoneFlow := fmt.Sprintf("%s→%s", truncate(s.SourceZone, 7), truncate(s.DestZone, 7))
+// Rendered width of each tier. Each doubles as the threshold that selects it,
+// so a tier is only chosen once it genuinely fits the available width.
+const (
+	sessionWidthFull    = 100
+	sessionWidthNoZone  = 84
+	sessionWidthCompact = 68
+)
+
+func sessionLayout(width int) sessionColumns {
+	switch {
+	case width >= sessionWidthFull:
+		return sessionColumns{idWidth: 7, proto: true, app: true, zones: true, ageAndBytes: true}
+	case width >= sessionWidthNoZone:
+		return sessionColumns{idWidth: 7, proto: true, app: true, ageAndBytes: true}
+	case width >= sessionWidthCompact:
+		return sessionColumns{idWidth: 7, ageAndBytes: true}
+	default:
+		return sessionColumns{idWidth: 6}
+	}
+}
+
+// sessionHeaderParts and sessionRowParts both split the line into prefix,
+// state cell, and suffix so the state cell can be color-coded independently
+// on non-selected rows. They must stay column-for-column identical.
+
+func sessionHeaderParts(width int) (prefix, state, suffix string) {
+	c := sessionLayout(width)
+	prefix = fmt.Sprintf("%-*s %-15s %-15s %-5s ", c.idWidth, "ID", "Source", "Destination", "Port")
+	if c.proto {
+		prefix += fmt.Sprintf("%-4s ", "Pro")
+	}
+	if c.app {
+		prefix += fmt.Sprintf("%-10s ", "App")
+	}
+	state = fmt.Sprintf("%-7s", "State")
+	if c.zones {
+		suffix += fmt.Sprintf(" %-15s", "Zones")
+	}
+	if c.ageAndBytes {
+		suffix += fmt.Sprintf(" %-5s %-8s", "Age", "Bytes")
+	}
+	return prefix, state, suffix
+}
+
+func formatSessionHeader(width int) string {
+	prefix, state, suffix := sessionHeaderParts(width)
+	return prefix + state + suffix
+}
+
+func sessionRowParts(s models.Session, width int) (prefix, state, suffix string) {
+	c := sessionLayout(width)
 	proto := s.Protocol
 	if proto == "" {
 		proto = "—"
 	}
-	prefix = fmt.Sprintf("%-7d %-15s %-15s %-5d %-4s %-10s ",
+	prefix = fmt.Sprintf("%-*d %-15s %-15s %-5d ",
+		c.idWidth,
 		s.ID,
 		truncate(s.SourceIP, 15),
 		truncate(s.DestIP, 15),
-		s.DestPort,
-		truncate(proto, 4),
-		truncate(s.Application, 10))
+		s.DestPort)
+	if c.proto {
+		prefix += fmt.Sprintf("%-4s ", truncate(proto, 4))
+	}
+	if c.app {
+		prefix += fmt.Sprintf("%-10s ", truncate(s.Application, 10))
+	}
 	state = fmt.Sprintf("%-7s", truncate(s.State, 7))
-	suffix = fmt.Sprintf(" %-15s %-5s %-8s",
-		truncate(zoneFlow, 15),
-		formatDuration(s.StartTime),
-		formatBytes(s.TotalBytes))
+	if c.zones {
+		zoneFlow := fmt.Sprintf("%s→%s", truncate(s.SourceZone, 7), truncate(s.DestZone, 7))
+		suffix += fmt.Sprintf(" %-15s", truncate(zoneFlow, 15))
+	}
+	if c.ageAndBytes {
+		suffix += fmt.Sprintf(" %-5s %-8s", formatDuration(s.StartTime), formatBytes(s.TotalBytes))
+	}
 	return prefix, state, suffix
 }
 
 func formatSessionRow(s models.Session, width int) string {
-	prefix, state, suffix := sessionRowParts(s)
+	prefix, state, suffix := sessionRowParts(s, width)
 	return prefix + state + suffix
 }
 
 // styleSessionRow renders a non-selected row with the state cell color-coded.
 func styleSessionRow(s models.Session, width int) string {
-	prefix, state, suffix := sessionRowParts(s)
+	prefix, state, suffix := sessionRowParts(s, width)
 	switch strings.ToUpper(s.State) {
 	case "ACTIVE":
 		return prefix + StatusActiveStyle.Render(state) + suffix

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/jp2195/pyre/internal/models"
 )
@@ -393,7 +394,10 @@ func (m ObjectsModel) View() string {
 		return RenderLoadingInline(m.spinnerFrame, "Loading...")
 	}
 
-	titleStyle := ViewTitleStyle.MarginBottom(1)
+	// No bottom margin: what follows is appended to the title and belongs on
+	// the same line. With a margin the title renders as a two-line block, so
+	// the tab indicator landed underneath it, indented by the title width.
+	titleStyle := ViewTitleStyle
 	panelStyle := ViewPanelStyle.Width(m.width - 4)
 
 	var b strings.Builder
@@ -422,8 +426,27 @@ func (m ObjectsModel) renderTabIndicator() string {
 		addr = StatusMutedStyle.Render(addr)
 		svc = StatusActiveStyle.Render("[Service]")
 	}
-	hint := BannerInfoStyle.Render("  ([/] or a/s to switch)")
-	return addr + "  " + svc + hint
+	tabs := addr + "  " + svc
+
+	// The hint shares the title's line, so it gets whatever the title and the
+	// tab names leave. Both forms name [ and ] — the keys that actually switch
+	// sub-tabs — and end the same way, so the short one loses only the a/s
+	// alias. Falling back beats wrapping: a wrapped hint pushes the tab
+	// indicator onto its own line and the banner stops reading as one line.
+	avail := objectsBannerBudget(m.width, tabs)
+	for _, h := range []string{"  ([/] or a/s to switch)", "  ([/] to switch)"} {
+		if lipgloss.Width(h) <= avail {
+			return tabs + BannerInfoStyle.Render(h)
+		}
+	}
+	return tabs
+}
+
+// objectsBannerBudget is the width left for the tab hint once the panel
+// chrome, the title and the tab names have taken theirs. The panel is
+// rendered at m.width-4 and spends 2 on its border and 4 on padding.
+func objectsBannerBudget(width int, tabs string) int {
+	return width - 10 - lipgloss.Width(ViewTitleStyle.Render("Objects")) - 2 - lipgloss.Width(tabs)
 }
 
 func (m ObjectsModel) renderAddressTab() string {
@@ -501,13 +524,13 @@ func (m ObjectsModel) renderAddressTable() string {
 	headerStyle := DetailLabelStyle.Bold(true)
 	selectedStyle := TableSelectedRowStyle().Bold(true)
 	dimStyle := DetailDimStyle
-	availableWidth := m.width - 12
+	availableWidth := m.width - tableChromeWidth
 
 	var b strings.Builder
 	header := fmt.Sprintf("%-24s %-12s %-26s %s", "NAME", "TYPE", "VALUE", "TAGS")
 	b.WriteString(headerStyle.Render(header))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(strings.Repeat("-", min(availableWidth, len(header)+10))))
+	b.WriteString(dimStyle.Render(tableSeparator(availableWidth)))
 	b.WriteString("\n")
 
 	visibleRows := t.VisibleRows(8, 14)
@@ -567,13 +590,13 @@ func (m ObjectsModel) renderServiceTable() string {
 	headerStyle := DetailLabelStyle.Bold(true)
 	selectedStyle := TableSelectedRowStyle().Bold(true)
 	dimStyle := DetailDimStyle
-	availableWidth := m.width - 12
+	availableWidth := m.width - tableChromeWidth
 
 	var b strings.Builder
 	header := fmt.Sprintf("%-24s %-8s %-16s %-16s %s", "NAME", "PROTO", "DEST PORT", "SRC PORT", "TAGS")
 	b.WriteString(headerStyle.Render(header))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(strings.Repeat("-", min(availableWidth, len(header)+10))))
+	b.WriteString(dimStyle.Render(tableSeparator(availableWidth)))
 	b.WriteString("\n")
 
 	visibleRows := t.VisibleRows(8, 14)

@@ -67,6 +67,12 @@ const (
 	// Narrow variants.
 	tfActionNarrow = 10
 	tfAppNarrow    = 12
+
+	// Compact variant: the date is dropped from the timestamp and the
+	// application column goes with it. On a terminal this narrow the flow
+	// itself is all that fits, so keep who talked to whom, what the firewall
+	// did about it, and the rule that decided.
+	tfTimeCompact = 8 // "15:04:05"
 )
 
 func (m LogsModel) trafficLayout() logColumnLayout {
@@ -75,11 +81,16 @@ func (m LogsModel) trafficLayout() logColumnLayout {
 	// identifies a flow is who talked to whom, over what application, under
 	// which rule; the volume is context rather than identity.
 	fixedNarrow := tfTime + tfActionNarrow + tfSource + tfDest + tfAppNarrow + 5
-	return logLayout(m.Width, fixedWide, fixedNarrow, 150)
+	fixedCompact := tfTimeCompact + tfActionNarrow + tfSource + tfDest + 4
+	return logLayout(m.Width, [3]int{fixedWide, fixedNarrow, fixedCompact}, 150)
 }
 
 func (m LogsModel) formatTrafficHeader(l logColumnLayout) string {
-	if l.wide {
+	if l.compact() {
+		return formatCompactRow(l, tfTimeCompact, "Time",
+			[]int{tfActionNarrow, tfSource, tfDest}, []string{"Action", "Source", "Dest"}, "Rule")
+	}
+	if l.wide() {
 		return fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
 			tfTime, "Time", tfAction, "Action", tfSource, "Source", tfDest, "Dest",
 			tfApp, "App", l.flex, "Rule", tfBytes, "Bytes")
@@ -91,7 +102,12 @@ func (m LogsModel) formatTrafficHeader(l logColumnLayout) string {
 
 func (m LogsModel) formatTrafficRow(log models.TrafficLogEntry, l logColumnLayout) string {
 	timeStr := log.Time.Format("2006-01-02 15:04:05")
-	if l.wide {
+	if l.compact() {
+		return formatCompactRow(l, tfTimeCompact, log.Time.Format(logTimeOnlyLayout),
+			[]int{tfActionNarrow, tfSource, tfDest},
+			[]string{log.Action, log.SourceIP, log.DestIP}, log.Rule)
+	}
+	if l.wide() {
 		return fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s %-*s %-*s",
 			tfTime, timeStr,
 			tfAction, truncate(log.Action, tfAction),

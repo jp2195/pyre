@@ -123,6 +123,9 @@ func (m *ConnectionFormModel) updateFocus() {
 func (m ConnectionFormModel) SetSize(width, height int) ConnectionFormModel {
 	m.width = width
 	m.height = height
+	inputWidth := modalInputWidth(width)
+	m.hostInput.SetWidth(inputWidth)
+	m.usernameInput.SetWidth(inputWidth)
 	return m
 }
 
@@ -348,7 +351,8 @@ func (m ConnectionFormModel) View() string {
 
 	// Help text
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("[Tab] Next field  [Space] Toggle  [Enter] Submit  [Esc] Cancel"))
+	b.WriteString(helpStyle.Render(fitHints(m.width-modalChromeWidth, "  ",
+		"[Tab] Next field", "[Space] Toggle", "[Enter] Submit", "[Esc] Cancel")))
 
 	content := b.String()
 
