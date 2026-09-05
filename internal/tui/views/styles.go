@@ -123,11 +123,12 @@ func InitStyles() {
 		Foreground(c.TextMuted)
 
 	// Table styles
+	// No horizontal padding: the log tables render their rows without any,
+	// so a padded heading sits one cell right of the values it labels.
 	TableHeaderStyle = lipgloss.NewStyle().
 		Bold(true).
 		Foreground(c.White).
-		Background(c.Border).
-		Padding(0, 1)
+		Background(c.Border)
 
 	TableRowSelectedStyle = lipgloss.NewStyle().
 		Background(c.BackgroundAlt).

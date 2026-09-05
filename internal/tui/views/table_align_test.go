@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"charm.land/lipgloss/v2"
 
@@ -61,5 +62,41 @@ func TestRuleList_RowsShareOneLeftEdge(t *testing.T) {
 		if got := displayColumnOf(r, "local"); got != want {
 			t.Errorf("row %d has its rulebase column at %d, the first row has it at %d: rows do not share a left edge", i+2, got, want)
 		}
+	}
+}
+
+// TestLogsTable_HeaderAlignsWithRows covers the same misalignment in the log
+// tables. Their header is rendered with TableHeaderStyle, which carries
+// horizontal padding, while the rows below it are not, so every column
+// heading sat one cell right of the values it labels.
+func TestLogsTable_HeaderAlignsWithRows(t *testing.T) {
+	InitStyles()
+
+	m := NewLogsModel()
+	m = m.SetSize(200, 40)
+	m = m.SetSystemLogs([]models.SystemLogEntry{
+		{Time: time.Date(2026, 9, 4, 21, 0, 0, 0, time.UTC), Severity: "high", Type: "general", Description: "first"},
+		{Time: time.Date(2026, 9, 4, 20, 0, 0, 0, time.UTC), Severity: "low", Type: "general", Description: "second"},
+	}, nil)
+
+	lines := strings.Split(plain(m.View()), "\n")
+	var header, row string
+	for _, l := range lines {
+		if header == "" && strings.Contains(l, "Description") && strings.Contains(l, "Time") {
+			header = l
+			continue
+		}
+		if header != "" && strings.Contains(l, "2026-09-04 21:00:00") {
+			row = l
+			break
+		}
+	}
+	if header == "" || row == "" {
+		t.Fatalf("could not locate header and row; header=%q row=%q", header, row)
+	}
+
+	// The Time heading must sit directly above the timestamps it labels.
+	if got, want := displayColumnOf(header, "Time"), displayColumnOf(row, "2026-09-04"); got != want {
+		t.Errorf("Time heading is at column %d but its values start at %d", got, want)
 	}
 }
