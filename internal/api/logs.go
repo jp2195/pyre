@@ -22,6 +22,72 @@ var (
 	logPollInterval = 500 * time.Millisecond
 )
 
+const (
+	// maxLogRows is the device's hard ceiling for nlogs. PAN-OS answers
+	// 5001 with HTTP 400, so this is enforced client-side.
+	maxLogRows = 5000
+	// defaultLogRows is one page. Traffic rows run about 4.9 KiB each, so
+	// 500 is roughly 2.4 MiB and a second or two on the wire, while a full
+	// 5000 would be 24.6 MiB against a 50 MB response cap.
+	defaultLogRows = 500
+)
+
+// LogQuery describes one page of a log fetch.
+type LogQuery struct {
+	// Query is a raw PAN-OS log expression, exactly as the operator typed
+	// it. It is passed through unvalidated: the device owns this grammar
+	// and rejects bad input with a better message than we could write.
+	Query string
+	// Since bounds the page below. The zero value means no lower bound.
+	// It is a time.Time rather than a string because the bound must be
+	// formatted in the device's zone, which only the client knows.
+	Since time.Time
+	// Max is rows per page, clamped to [1, maxLogRows].
+	Max int
+	// Skip is how many matching rows to step over, for paging.
+	Skip int
+}
+
+// normalized returns a copy with Max and Skip forced into the range the
+// device accepts.
+func (q LogQuery) normalized() LogQuery {
+	if q.Max <= 0 {
+		q.Max = defaultLogRows
+	}
+	q.Max = min(q.Max, maxLogRows)
+	q.Skip = max(q.Skip, 0)
+	return q
+}
+
+// LogPage is one page of results. HasMore is a heuristic, not a count: the
+// device reports no total anywhere in its response, so a page that came back
+// exactly full is the only evidence that more rows may exist. Query is the
+// assembled expression that was sent, which the view shows when a query
+// matches nothing.
+type LogPage[T any] struct {
+	Entries []T
+	HasMore bool
+	Query   string
+}
+
+// buildLogQuery assembles the device-side expression. The time bound is
+// formatted in the device's own wall clock: a zoneless PAN-OS layout means
+// whatever the device thinks the time is, so formatting in our zone would put
+// every bound out by the device's offset. The operator's clause is wrapped in
+// parentheses so a top-level `or` cannot escape the time bound; PAN-OS accepts
+// redundant parentheses.
+func (c *Client) buildLogQuery(q LogQuery) string {
+	var clauses []string
+	if !q.Since.IsZero() {
+		clauses = append(clauses, fmt.Sprintf("(receive_time geq '%s')",
+			q.Since.In(c.deviceLocation()).Format("2006/01/02 15:04:05")))
+	}
+	if user := strings.TrimSpace(q.Query); user != "" {
+		clauses = append(clauses, "("+user+")")
+	}
+	return strings.Join(clauses, " and ")
+}
+
 // logJobStatus classifies a PAN-OS log-query job state.
 type logJobStatus int
 
@@ -125,8 +191,8 @@ func (c *Client) pollLogJob(ctx context.Context, jobID, target string) (*XMLResp
 // types). Extracting just the shared preamble keeps each caller's
 // log-type-specific schema explicit and avoids forcing a generic over the
 // substantively different per-entry XML shapes.
-func (c *Client) submitAndPollLog(ctx context.Context, logType, query string, maxLogs int, target string) (*XMLResponse, error) {
-	resp, err := c.Log(ctx, logType, maxLogs, query, target)
+func (c *Client) submitAndPollLog(ctx context.Context, logType string, q LogQuery, sent, target string) (*XMLResponse, error) {
+	resp, err := c.Log(ctx, logType, q.Max, q.Skip, sent, target)
 	if err != nil {
 		return nil, err
 	}
@@ -159,16 +225,14 @@ func (c *Client) parseLogTime(timeStr string) time.Time {
 	return time.Time{}
 }
 
-// GetSystemLogs retrieves system logs with optional query filter
-// Uses type=log API which returns a job ID, then polls for results
-func (c *Client) GetSystemLogs(ctx context.Context, query string, maxLogs int, target string) ([]models.SystemLogEntry, error) {
-	if maxLogs <= 0 {
-		maxLogs = 100
-	}
+// GetSystemLogs retrieves one page of system logs.
+func (c *Client) GetSystemLogs(ctx context.Context, q LogQuery, target string) (LogPage[models.SystemLogEntry], error) {
+	q = q.normalized()
+	sent := c.buildLogQuery(q)
 
-	resultResp, err := c.submitAndPollLog(ctx, "system", query, maxLogs, target)
+	resultResp, err := c.submitAndPollLog(ctx, "system", q, sent, target)
 	if err != nil {
-		return nil, err
+		return LogPage[models.SystemLogEntry]{}, err
 	}
 
 	var statusResult struct {
@@ -186,7 +250,7 @@ func (c *Client) GetSystemLogs(ctx context.Context, query string, maxLogs int, t
 		} `xml:"log>logs"`
 	}
 	if err := decodeXML(bytes.NewReader(WrapInner(resultResp.Result.Inner)), &statusResult); err != nil {
-		return nil, fmt.Errorf("parsing system log entries: %w", err)
+		return LogPage[models.SystemLogEntry]{}, fmt.Errorf("parsing system log entries: %w", err)
 	}
 
 	logs := make([]models.SystemLogEntry, 0, len(statusResult.Logs.Entry))
@@ -204,18 +268,21 @@ func (c *Client) GetSystemLogs(ctx context.Context, query string, maxLogs int, t
 		logs = append(logs, entry)
 	}
 
-	return logs, nil
+	return LogPage[models.SystemLogEntry]{
+		Entries: logs,
+		HasMore: len(logs) == q.Max,
+		Query:   sent,
+	}, nil
 }
 
-// GetTrafficLogs retrieves traffic logs with optional query filter
-func (c *Client) GetTrafficLogs(ctx context.Context, query string, maxLogs int, target string) ([]models.TrafficLogEntry, error) {
-	if maxLogs <= 0 {
-		maxLogs = 100
-	}
+// GetTrafficLogs retrieves one page of traffic logs.
+func (c *Client) GetTrafficLogs(ctx context.Context, q LogQuery, target string) (LogPage[models.TrafficLogEntry], error) {
+	q = q.normalized()
+	sent := c.buildLogQuery(q)
 
-	resultResp, err := c.submitAndPollLog(ctx, "traffic", query, maxLogs, target)
+	resultResp, err := c.submitAndPollLog(ctx, "traffic", q, sent, target)
 	if err != nil {
-		return nil, err
+		return LogPage[models.TrafficLogEntry]{}, err
 	}
 
 	var statusResult struct {
@@ -257,7 +324,7 @@ func (c *Client) GetTrafficLogs(ctx context.Context, query string, maxLogs int, 
 		} `xml:"log>logs"`
 	}
 	if err := decodeXML(bytes.NewReader(WrapInner(resultResp.Result.Inner)), &statusResult); err != nil {
-		return nil, fmt.Errorf("parsing traffic log entries: %w", err)
+		return LogPage[models.TrafficLogEntry]{}, fmt.Errorf("parsing traffic log entries: %w", err)
 	}
 
 	logs := make([]models.TrafficLogEntry, 0, len(statusResult.Logs.Entry))
@@ -299,18 +366,21 @@ func (c *Client) GetTrafficLogs(ctx context.Context, query string, maxLogs int, 
 		logs = append(logs, entry)
 	}
 
-	return logs, nil
+	return LogPage[models.TrafficLogEntry]{
+		Entries: logs,
+		HasMore: len(logs) == q.Max,
+		Query:   sent,
+	}, nil
 }
 
-// GetThreatLogs retrieves threat logs with optional query filter
-func (c *Client) GetThreatLogs(ctx context.Context, query string, maxLogs int, target string) ([]models.ThreatLogEntry, error) {
-	if maxLogs <= 0 {
-		maxLogs = 100
-	}
+// GetThreatLogs retrieves one page of threat logs.
+func (c *Client) GetThreatLogs(ctx context.Context, q LogQuery, target string) (LogPage[models.ThreatLogEntry], error) {
+	q = q.normalized()
+	sent := c.buildLogQuery(q)
 
-	resultResp, err := c.submitAndPollLog(ctx, "threat", query, maxLogs, target)
+	resultResp, err := c.submitAndPollLog(ctx, "threat", q, sent, target)
 	if err != nil {
-		return nil, err
+		return LogPage[models.ThreatLogEntry]{}, err
 	}
 
 	var statusResult struct {
@@ -360,7 +430,7 @@ func (c *Client) GetThreatLogs(ctx context.Context, query string, maxLogs int, t
 		} `xml:"log>logs"`
 	}
 	if err := decodeXML(bytes.NewReader(WrapInner(resultResp.Result.Inner)), &statusResult); err != nil {
-		return nil, fmt.Errorf("parsing threat log entries: %w", err)
+		return LogPage[models.ThreatLogEntry]{}, fmt.Errorf("parsing threat log entries: %w", err)
 	}
 
 	logs := make([]models.ThreatLogEntry, 0, len(statusResult.Logs.Entry))
@@ -416,5 +486,9 @@ func (c *Client) GetThreatLogs(ctx context.Context, query string, maxLogs int, t
 		logs = append(logs, entry)
 	}
 
-	return logs, nil
+	return LogPage[models.ThreatLogEntry]{
+		Entries: logs,
+		HasMore: len(logs) == q.Max,
+		Query:   sent,
+	}, nil
 }

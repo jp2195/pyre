@@ -222,10 +222,11 @@ func TestGetSystemLogs_SanitizesOpaqueField(t *testing.T) {
 		}
 	})
 
-	logs, err := c.GetSystemLogs(context.Background(), "", 10, "")
+	page, err := c.GetSystemLogs(context.Background(), LogQuery{Max: 10}, "")
 	if err != nil {
 		t.Fatalf("GetSystemLogs: %v", err)
 	}
+	logs := page.Entries
 	if len(logs) != 1 {
 		t.Fatalf("expected 1 log entry, got %d", len(logs))
 	}
@@ -263,10 +264,11 @@ func TestGetThreatLogs_SanitizesThreatFields(t *testing.T) {
 		}
 	})
 
-	logs, err := c.GetThreatLogs(context.Background(), "", 10, "")
+	page, err := c.GetThreatLogs(context.Background(), LogQuery{Max: 10}, "")
 	if err != nil {
 		t.Fatalf("GetThreatLogs: %v", err)
 	}
+	logs := page.Entries
 	if len(logs) != 1 {
 		t.Fatalf("expected 1 log entry, got %d", len(logs))
 	}
@@ -337,10 +339,11 @@ func TestGetThreatLogs_PANOS11NamedThreatID(t *testing.T) {
 		}
 	})
 
-	logs, err := c.GetThreatLogs(context.Background(), "", 10, "")
+	page, err := c.GetThreatLogs(context.Background(), LogQuery{Max: 10}, "")
 	if err != nil {
 		t.Fatalf("GetThreatLogs: %v", err)
 	}
+	logs := page.Entries
 	if len(logs) != 1 {
 		t.Fatalf("expected 1 log entry, got %d", len(logs))
 	}
@@ -375,10 +378,11 @@ func TestGetThreatLogs_LegacyNumericThreatID(t *testing.T) {
 		}
 	})
 
-	logs, err := c.GetThreatLogs(context.Background(), "", 10, "")
+	page, err := c.GetThreatLogs(context.Background(), LogQuery{Max: 10}, "")
 	if err != nil {
 		t.Fatalf("GetThreatLogs: %v", err)
 	}
+	logs := page.Entries
 	if len(logs) != 1 {
 		t.Fatalf("expected 1 log entry, got %d", len(logs))
 	}

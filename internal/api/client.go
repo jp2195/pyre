@@ -431,13 +431,17 @@ func (c *Client) Show(ctx context.Context, xpath, target string) (*XMLResponse, 
 	return c.request(ctx, params, target)
 }
 
-// Log submits a log query. Returns a job ID that can be polled for results.
-func (c *Client) Log(ctx context.Context, logType string, nlogs int, query, target string) (*XMLResponse, error) {
+// Log submits a log query job. nlogs and skip are assumed already clamped by
+// the caller; query is the assembled expression, empty for "newest rows".
+func (c *Client) Log(ctx context.Context, logType string, nlogs, skip int, query, target string) (*XMLResponse, error) {
 	params := url.Values{}
 	params.Set("type", "log")
 	params.Set("log-type", logType)
 	if nlogs > 0 {
 		params.Set("nlogs", strconv.Itoa(nlogs))
+	}
+	if skip > 0 {
+		params.Set("skip", strconv.Itoa(skip))
 	}
 	if query != "" {
 		params.Set("query", query)

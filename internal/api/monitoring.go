@@ -28,10 +28,11 @@ const threatSummarySample = 100
 // the total accumulated raw packet counts since boot. The threat log is the
 // device's actual record of threats and carries real severities and actions.
 func (c *Client) GetThreatSummary(ctx context.Context, target string) (*models.ThreatSummary, error) {
-	logs, err := c.GetThreatLogs(ctx, "", threatSummarySample, target)
+	page, err := c.GetThreatLogs(ctx, LogQuery{Max: threatSummarySample}, target)
 	if err != nil {
 		return nil, err
 	}
+	logs := page.Entries
 
 	summary := &models.ThreatSummary{SampleLimit: threatSummarySample}
 	for _, l := range logs {

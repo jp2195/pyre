@@ -169,10 +169,11 @@ func TestGetThreatSummary_ReportsItsSampleSize(t *testing.T) {
 func TestGetThreatLogs_ThreatIDIsNotNumeric(t *testing.T) {
 	client, _ := threatServer(t)
 
-	logs, err := client.GetThreatLogs(context.Background(), "", 10, "")
+	page, err := client.GetThreatLogs(context.Background(), api.LogQuery{Max: 10}, "")
 	if err != nil {
 		t.Fatalf("GetThreatLogs: %v", err)
 	}
+	logs := page.Entries
 	if len(logs) != 6 {
 		t.Fatalf("got %d entries, want 6", len(logs))
 	}
@@ -188,10 +189,11 @@ func TestGetThreatLogs_ThreatIDIsNotNumeric(t *testing.T) {
 func TestGetThreatLogs_ThreatNameElement(t *testing.T) {
 	client, _ := threatServer(t)
 
-	logs, err := client.GetThreatLogs(context.Background(), "", 10, "")
+	page, err := client.GetThreatLogs(context.Background(), api.LogQuery{Max: 10}, "")
 	if err != nil {
 		t.Fatalf("GetThreatLogs: %v", err)
 	}
+	logs := page.Entries
 	if got := logs[2].ThreatName; got != "Proxy:mask.test-dns.net" {
 		t.Errorf("ThreatName = %q, want it read from <threat_name>", got)
 	}

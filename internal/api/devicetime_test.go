@@ -100,10 +100,11 @@ func TestLogTimestamps_UseTheDeviceClock(t *testing.T) {
 				t.Fatalf("GetSystemInfo: %v", err)
 			}
 
-			logs, err := client.GetSystemLogs(ctx, "", 10, "")
+			page, err := client.GetSystemLogs(ctx, api.LogQuery{Max: 10}, "")
 			if err != nil {
 				t.Fatalf("GetSystemLogs: %v", err)
 			}
+			logs := page.Entries
 			if len(logs) == 0 {
 				t.Fatal("expected one log entry")
 			}
@@ -130,10 +131,11 @@ func TestAbsoluteTimestamps_RenderInDeviceWallClock(t *testing.T) {
 	if _, err := client.GetSystemInfo(ctx, ""); err != nil {
 		t.Fatalf("GetSystemInfo: %v", err)
 	}
-	logs, err := client.GetSystemLogs(ctx, "", 10, "")
+	page, err := client.GetSystemLogs(ctx, api.LogQuery{Max: 10}, "")
 	if err != nil {
 		t.Fatalf("GetSystemLogs: %v", err)
 	}
+	logs := page.Entries
 	if len(logs) == 0 {
 		t.Fatal("expected one log entry")
 	}

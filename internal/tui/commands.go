@@ -478,28 +478,28 @@ func (m Model) fetchLogs() tea.Cmd {
 
 func (m Model) fetchSystemLogs(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.SystemLogEntry, error) {
-		return conn.Client.GetSystemLogs(ctx, "", 100, target)
-	}, func(logs []models.SystemLogEntry, err error) tea.Msg {
-		return SystemLogsMsg{Logs: logs, Err: err}
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (api.LogPage[models.SystemLogEntry], error) {
+		return conn.Client.GetSystemLogs(ctx, api.LogQuery{Max: 100}, target)
+	}, func(page api.LogPage[models.SystemLogEntry], err error) tea.Msg {
+		return SystemLogsMsg{Logs: page.Entries, Err: err}
 	})
 }
 
 func (m Model) fetchTrafficLogs(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.TrafficLogEntry, error) {
-		return conn.Client.GetTrafficLogs(ctx, "", 100, target)
-	}, func(logs []models.TrafficLogEntry, err error) tea.Msg {
-		return TrafficLogsMsg{Logs: logs, Err: err}
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (api.LogPage[models.TrafficLogEntry], error) {
+		return conn.Client.GetTrafficLogs(ctx, api.LogQuery{Max: 100}, target)
+	}, func(page api.LogPage[models.TrafficLogEntry], err error) tea.Msg {
+		return TrafficLogsMsg{Logs: page.Entries, Err: err}
 	})
 }
 
 func (m Model) fetchThreatLogs(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) ([]models.ThreatLogEntry, error) {
-		return conn.Client.GetThreatLogs(ctx, "", 100, target)
-	}, func(logs []models.ThreatLogEntry, err error) tea.Msg {
-		return ThreatLogsMsg{Logs: logs, Err: err}
+	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (api.LogPage[models.ThreatLogEntry], error) {
+		return conn.Client.GetThreatLogs(ctx, api.LogQuery{Max: 100}, target)
+	}, func(page api.LogPage[models.ThreatLogEntry], err error) tea.Msg {
+		return ThreatLogsMsg{Logs: page.Entries, Err: err}
 	})
 }
 
