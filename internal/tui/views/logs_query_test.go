@@ -191,7 +191,7 @@ func TestLogsModel_ZeroRowsExpressionWrapsInsteadOfWidening(t *testing.T) {
 
 // Switching to a tab with no rows yet triggers a fetch. Until that fetch
 // completes, the tab must show the loading state rather than asserting
-// there are no logs -- the same lie the zero-match empty state exists to
+// there are no logs — the same lie the zero-match empty state exists to
 // fix, just on the way in instead of on the way out.
 func TestLogsModel_SwitchingToUnfetchedTabShowsLoadingNotEmpty(t *testing.T) {
 	m := NewLogsModel().SetSize(120, 40)
@@ -210,5 +210,54 @@ func TestLogsModel_SwitchingToUnfetchedTabShowsLoadingNotEmpty(t *testing.T) {
 	view := m.View()
 	if strings.Contains(view, "No traffic logs found") {
 		t.Errorf("view claims no traffic logs while the fetch is in flight:\n%s", view)
+	}
+}
+
+// A local `/` filter that empties an otherwise-populated tab must blame the
+// filter, not the device: rowCount is > 0, so the device did its job and the
+// sent expression (if any) had nothing to do with the empty table.
+func TestLogsModel_LocalFilterZeroingRowsBlamesTheFilterNotTheDevice(t *testing.T) {
+	m := NewLogsModel().SetSize(120, 40)
+	m = m.SetSystemLogs([]models.SystemLogEntry{
+		{Severity: "informational", Type: "general", Description: "admin login ok"},
+	}, LogPageMeta{}, nil)
+
+	m, _ = m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = typeString(m, "zzz-no-match")
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	view := m.View()
+	if strings.Contains(view, "0 rows matched") {
+		t.Errorf("filter-emptied table read as a device zero match:\n%s", view)
+	}
+	if !strings.Contains(view, "loaded)") {
+		t.Errorf("view does not name the filter as what emptied the table:\n%s", view)
+	}
+}
+
+// Same as above, but with a device query also in play. This is the exact
+// case a review caught: naming the sent expression whenever a tab renders
+// zero filtered rows, without checking whether the raw fetch actually came
+// back empty, misattributes a client-side filter result to the server.
+func TestLogsModel_LocalFilterZeroingRowsIgnoresConcurrentDeviceQuery(t *testing.T) {
+	sent := "(receive_time geq '2026/09/05 11:57:00')"
+	m := NewLogsModel().SetSize(120, 40)
+	m = m.SetSystemLogs([]models.SystemLogEntry{
+		{Severity: "informational", Type: "general", Description: "admin login ok"},
+	}, LogPageMeta{Sent: sent}, nil)
+
+	m, _ = m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = typeString(m, "zzz-no-match")
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	view := m.View()
+	if strings.Contains(view, sent) {
+		t.Errorf("view blames the device expression for a client-side filter result:\n%s", view)
+	}
+	if strings.Contains(view, "0 rows matched") {
+		t.Errorf("filter-emptied table under an active device query read as a device zero match:\n%s", view)
+	}
+	if !strings.Contains(view, "loaded)") {
+		t.Errorf("view does not name the filter as what emptied the table:\n%s", view)
 	}
 }

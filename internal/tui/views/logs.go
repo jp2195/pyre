@@ -344,7 +344,7 @@ func (m LogsModel) onTabSwitch() (LogsModel, tea.Cmd) {
 
 	if m.rowCount(m.activeLogType) == 0 || m.tabStale(m.activeLogType) {
 		// Without this, the first visit to a tab renders its empty state
-		// for however long the fetch takes -- an empty table asserting
+		// for however long the fetch takes — an empty table asserting
 		// there are no logs when it simply has not asked yet.
 		m = m.SetLoading(true)
 		return m, m.fetchRequest(m.activeLogType, 0, false)
@@ -796,7 +796,19 @@ func (m LogsModel) renderHelp() string {
 // expression in play it names what the device was actually asked, because a
 // bound the device accepted but did not honor returns zero rows with no
 // error, and a blank table reads as "nothing happened".
+//
+// That attribution only holds when the device is actually the reason the
+// table is empty. The local `/` filter (TableBase, independent of the
+// device query) can also empty a tab that the device filled: rowCount gives
+// the raw, unfiltered count, so rowCount>0 with IsFiltered means these rows
+// exist and it is the local filter hiding them, not the sent expression.
+// Blaming the device query there would misattribute a client-side result to
+// the server.
 func (m LogsModel) emptyStateFor(kind string) string {
+	if m.IsFiltered() && m.rowCount(m.activeLogType) > 0 {
+		return EmptyMsgStyle.Padding(1, 0).Render(fmt.Sprintf(
+			"No %s logs match the filter %q (%d loaded)", kind, m.FilterValue(), m.rowCount(m.activeLogType)))
+	}
 	sent := m.tabState(m.activeLogType).sent
 	if sent == "" {
 		return EmptyMsgStyle.Padding(1, 0).Render(fmt.Sprintf("No %s logs found", kind))
