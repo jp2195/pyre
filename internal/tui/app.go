@@ -376,7 +376,14 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			s.loading(&m, true)
 		}
 	}
-	return m, tea.Batch(m.refreshCurrentView(), m.spinner.Tick)
+	// Hoisted out of the return statement on purpose. refreshCurrentView has
+	// a pointer receiver and mutates m -- it restarts the logs pagination and
+	// resets the cursor. Go does not specify when a plain operand like m is
+	// read relative to a call in the same operand list, so calling it inline
+	// leaves it open whether the model returned here is the one the refresh
+	// actually changed.
+	cmd := m.refreshCurrentView()
+	return m, tea.Batch(cmd, m.spinner.Tick)
 }
 
 // anyLoading reports whether any visible work is in flight — the condition
