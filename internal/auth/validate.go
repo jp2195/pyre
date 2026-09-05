@@ -25,6 +25,18 @@ func ValidateHost(host string) string {
 	if strings.ContainsAny(host, " \t\n\r") {
 		return "host must not contain whitespace"
 	}
+	// A pasted browser address is the most likely wrong answer here, and it
+	// used to pass: "https://10.0.104.50" holds a single colon, so
+	// net.SplitHostPort below reads the host as "https" and the rest as a
+	// port, and "https" is a valid hostname. The client then prefixes
+	// "https://" and appends "/api/", so the request went somewhere
+	// meaningless and failed with a name-resolution error.
+	if strings.Contains(host, "://") {
+		return "enter the host only, without http:// or https://"
+	}
+	if strings.Contains(host, "/") {
+		return "enter the host only, without a path"
+	}
 	// Valid IP address
 	if net.ParseIP(host) != nil {
 		return ""
