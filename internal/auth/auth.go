@@ -102,9 +102,15 @@ func (s *Session) SetActiveFirewall(name string) bool {
 	return false
 }
 
-// AddConnection creates a new PAN-OS XML API connection for the given host.
-// It returns an error if the underlying API client cannot be constructed
-// (for example, a user-supplied CA bundle that cannot be loaded).
+// AddConnection creates a new PAN-OS XML API connection for the given host
+// and makes it the active connection. It returns an error if the underlying
+// API client cannot be constructed (for example, a user-supplied CA bundle
+// that cannot be loaded).
+//
+// Connecting to a host is always an explicit user action — the login flow or
+// startup credentials — so the new connection takes the active slot. Claiming
+// it only when the slot was empty meant a second login silently left every
+// view pointed at the first firewall.
 func (s *Session) AddConnection(host string, connConfig *config.ConnectionConfig, apiKey string) (*Connection, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -124,10 +130,7 @@ func (s *Session) AddConnection(host string, connConfig *config.ConnectionConfig
 		Connected: true,
 	}
 	s.Connections[host] = conn
-
-	if s.ActiveFirewall == "" {
-		s.ActiveFirewall = host
-	}
+	s.ActiveFirewall = host
 
 	return conn, nil
 }

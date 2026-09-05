@@ -87,6 +87,9 @@ func (m Model) handleAuthMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// the user supplies an API key via --api-key, PYRE_API_KEY, or
 		// PYRE_<HOST>_API_KEY.
 
+		// AddConnection makes the new host active; drop any data cached
+		// for the firewall we were previously pointed at.
+		m.resetViewData()
 		m.currentView = ViewDashboard
 
 		if m.state != nil && host != "" {

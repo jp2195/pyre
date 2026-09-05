@@ -83,8 +83,10 @@ func (m Model) handlePickerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		selected := m.picker.Selected()
 		if selected != "" {
 			m.session.SetActiveFirewall(selected)
+			// Every view now belongs to a different firewall.
+			m.resetViewData()
 			m.currentView = ViewDashboard
-			return m, m.fetchDashboardData()
+			return m, tea.Batch(m.fetchDashboardData(), m.spinner.Tick)
 		}
 		return m, nil
 
@@ -116,6 +118,8 @@ func (m Model) handleDevicePickerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) 
 				m, cmd = m.setError(err)
 				return m, cmd
 			}
+			// Every view now belongs to a different managed device.
+			m.resetViewData()
 			m.currentView = ViewDashboard
 			return m, tea.Batch(m.fetchCurrentDashboardData(), m.spinner.Tick)
 		}

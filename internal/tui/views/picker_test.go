@@ -33,8 +33,10 @@ func TestPickerModel_WithConnections(t *testing.T) {
 	if len(m.connections) != 2 {
 		t.Errorf("expected 2 connections, got %d", len(m.connections))
 	}
-	if m.active != "10.0.0.1" {
-		t.Errorf("expected active='10.0.0.1', got %q", m.active)
+	// The picker mirrors the session's active connection, and AddConnection
+	// focuses the host most recently connected to.
+	if m.active != "10.0.0.2" {
+		t.Errorf("expected active='10.0.0.2', got %q", m.active)
 	}
 }
 

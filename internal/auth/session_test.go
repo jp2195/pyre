@@ -499,3 +499,26 @@ func TestIsConnectionError(t *testing.T) {
 		})
 	}
 }
+
+// TestSession_AddConnection_MakesNewConnectionActive pins the invariant that
+// connecting to a host focuses it. Claiming the active slot only when it was
+// empty left a second login pointed at the first firewall.
+func TestSession_AddConnection_MakesNewConnectionActive(t *testing.T) {
+	session := NewSession(config.DefaultConfig())
+	fwConfig := &config.ConnectionConfig{}
+
+	if _, err := session.AddConnection("10.0.0.1", fwConfig, "key1"); err != nil {
+		t.Fatalf("AddConnection: %v", err)
+	}
+	if _, err := session.AddConnection("10.0.0.2", fwConfig, "key2"); err != nil {
+		t.Fatalf("AddConnection: %v", err)
+	}
+
+	if session.ActiveFirewall != "10.0.0.2" {
+		t.Errorf("ActiveFirewall = %q, want 10.0.0.2 (the most recently connected host)", session.ActiveFirewall)
+	}
+	conn := session.GetActiveConnection()
+	if conn == nil || conn.Host != "10.0.0.2" {
+		t.Errorf("GetActiveConnection did not return the newly added connection")
+	}
+}

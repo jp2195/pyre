@@ -199,17 +199,38 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.width = msg.Width
 	m.height = msg.Height
 	m.help.SetWidth(msg.Width)
-
-	// Calculate content height (minus header and footer)
-	// Header = main row + sub-tab row + border = 3 lines
-	// Footer = 1 line
-	contentH := msg.Height - 4
-
-	for _, s := range viewSlots() {
-		s.resize(&m, msg.Width, msg.Height, contentH)
-	}
+	m.applySize(msg.Width, msg.Height)
 
 	return m, nil
+}
+
+// applySize fans the current terminal dimensions out to every sub-view.
+// Content views get the height minus the chrome:
+// header = main row + sub-tab row + border = 3 lines, footer = 1 line.
+func (m *Model) applySize(w, h int) {
+	contentH := h - 4
+	for _, s := range viewSlots() {
+		s.resize(m, w, h, contentH)
+	}
+}
+
+// resetViewData drops every cached per-device dataset. It must run whenever
+// the active connection or the Panorama target changes: without it the views
+// the user did not happen to be looking at keep the previous device's rules,
+// sessions, and logs, while the header names the new device. Navigation only
+// refetches a view when it reports no data (see navigateToCurrentItem), so
+// stale data is sticky until an explicit refresh.
+//
+// Sizes are re-applied because the freshly constructed models start at zero
+// width and would otherwise render their "Loading..." placeholder until the
+// next terminal resize.
+func (m *Model) resetViewData() {
+	for _, s := range viewSlots() {
+		if s.reset != nil {
+			s.reset(m)
+		}
+	}
+	m.applySize(m.width, m.height)
 }
 
 // handleKeyMsg routes keyboard input to the appropriate view or global handler.
