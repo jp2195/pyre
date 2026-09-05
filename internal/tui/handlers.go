@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"errors"
+
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
@@ -34,14 +36,20 @@ func (m Model) handleLoginKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.login.Submitting() {
 			return m, nil
 		}
-		if m.login.CanSubmit() {
-			m.loading = true
-			m.login = m.login.SetSubmitting(true)
-			return m, tea.Batch(m.doLogin(), m.spinner.Tick)
+		// Say why nothing happened rather than swallowing the key: an empty
+		// field or a pasted URL in the host used to leave the screen
+		// completely unchanged.
+		if blocked := m.login.SubmitBlocker(); blocked != "" {
+			m.login = m.login.SetError(errors.New(blocked))
+			return m, nil
 		}
+		m.loading = true
+		m.login = m.login.SetSubmitting(true)
+		return m, tea.Batch(m.doLogin(), m.spinner.Tick)
 
-	case msg.String() == " ":
-		// Space toggles insecure checkbox when focused
+	case key.Matches(msg, DefaultLoginKeyMap().Toggle):
+		// Space toggles the insecure checkbox when it has focus, and is
+		// ordinary text everywhere else: a space is legal in a password.
 		if m.login.FocusedField() == views.FieldInsecure {
 			m.login = m.login.ToggleInsecure()
 			return m, nil

@@ -133,6 +133,11 @@ func TestLoginSuccess_SecondHostBecomesActive(t *testing.T) {
 	}
 	seedViewData(&m)
 
+	// A login reply is only acted on while the form is waiting for one,
+	// so that escaping the screen abandons an attempt already in flight.
+	// Pressing enter is what sets this in the running program.
+	m.login = m.login.SetSubmitting(true)
+
 	updated, _ := m.Update(LoginSuccessMsg{Host: "10.0.0.2", APIKey: "k2", Username: "admin"})
 	nm := updated.(Model)
 

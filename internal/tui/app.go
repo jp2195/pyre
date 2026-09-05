@@ -419,6 +419,9 @@ func (m Model) handleSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
 	m.spinner, cmd = m.spinner.Update(msg)
 
 	frame := m.spinner.View()
+	// The login screen renders on its own, without the footer that carries
+	// the spinner for every other view, so it needs the frame directly.
+	m.login = m.login.SetSpinner(frame)
 	for _, s := range viewSlots() {
 		if s.spinner != nil {
 			s.spinner(&m, frame)

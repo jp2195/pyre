@@ -140,6 +140,27 @@ func (m LoginModel) SetSpinner(frame string) LoginModel {
 	return m
 }
 
+// SubmitBlocker says what stops the form being submitted, or returns an empty
+// string when nothing does. Pressing enter on a form that cannot be submitted
+// used to do nothing at all and say nothing about why.
+func (m LoginModel) SubmitBlocker() string {
+	if m.Host() == "" {
+		return "enter the firewall host"
+	}
+	if validateHost(m.Host()) != "" {
+		// The host field already spells out what is wrong with it, directly
+		// under the input. Point at the field rather than repeat it.
+		return "fix the firewall host"
+	}
+	if m.Username() == "" {
+		return "enter a username"
+	}
+	if m.Password() == "" {
+		return "enter a password"
+	}
+	return ""
+}
+
 func (m LoginModel) NextField() LoginModel {
 	m.focusedField = (m.focusedField + 1) % 4
 	m.updateFocus()
@@ -187,8 +208,11 @@ func (m LoginModel) ClearPassword() LoginModel {
 	return m
 }
 
+// CanSubmit reports whether the form is ready to send. It is defined as
+// "nothing is blocking it" so the check and the message shown when it fails
+// can never disagree.
 func (m LoginModel) CanSubmit() bool {
-	return m.Host() != "" && validateHost(m.Host()) == "" && m.Username() != "" && m.Password() != ""
+	return m.SubmitBlocker() == ""
 }
 
 func (m LoginModel) Update(msg tea.Msg) (LoginModel, tea.Cmd) {

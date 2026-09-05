@@ -55,6 +55,13 @@ func (m Model) handleAuthMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case LoginSuccessMsg:
+		// The reply outlives the screen that asked for it. If the operator
+		// pressed escape in the meantime the form was reset, so nothing is
+		// waiting on this and connecting anyway would drop them onto the
+		// dashboard of a firewall they had walked away from.
+		if !m.login.Submitting() {
+			return m, nil
+		}
 		m.loading = false
 		m.login = m.login.SetSubmitting(false).ClearPassword()
 
@@ -110,8 +117,11 @@ func (m Model) handleAuthMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, m.fetchCurrentDashboardData(), m.detectPanorama(conn), m.spinner.Tick)
 
 	case LoginErrorMsg:
+		if !m.login.Submitting() {
+			return m, nil
+		}
 		m.loading = false
-		m.login = m.login.SetError(msg.Err)
+		m.login = m.login.SetSubmitting(false).SetError(msg.Err)
 
 	case PanoramaDetectedMsg:
 		conn := m.session.GetActiveConnection()

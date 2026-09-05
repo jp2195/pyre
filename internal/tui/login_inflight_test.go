@@ -7,31 +7,13 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// typeInto sends each rune of s to the login handler as a key press, the
-// same way a user filling the form would.
-func typeInto(t *testing.T, m Model, s string) Model {
+// fillLoginSubmittable returns a login-view Model with every field populated
+// so CanSubmit reports true, asserting that precondition up front: these tests
+// are about what happens after a valid submission, so a form that could not be
+// submitted would make them pass for the wrong reason.
+func fillLoginSubmittable(t *testing.T) Model {
 	t.Helper()
-	for _, r := range s {
-		updated, _ := m.handleLoginKeys(tea.KeyPressMsg{Code: r, Text: string(r)})
-		m = updated.(Model)
-	}
-	return m
-}
-
-// fillLogin returns a login-view Model with every field populated so
-// CanSubmit reports true.
-func fillLogin(t *testing.T) Model {
-	t.Helper()
-	m := newTestModel(t, ViewLogin)
-
-	m = typeInto(t, m, "fw.example.com")
-	updated, _ := m.handleLoginKeys(tea.KeyPressMsg{Code: tea.KeyTab})
-	m = updated.(Model)
-	m = typeInto(t, m, "admin")
-	updated, _ = m.handleLoginKeys(tea.KeyPressMsg{Code: tea.KeyTab})
-	m = updated.(Model)
-	m = typeInto(t, m, "hunter2")
-
+	m := fillLogin(t, "fw.example.com", "admin", "hunter2")
 	if !m.login.CanSubmit() {
 		t.Fatalf("precondition: form should be submittable (host=%q user=%q)",
 			m.login.Host(), m.login.Username())
@@ -44,7 +26,7 @@ func fillLogin(t *testing.T) Model {
 // auth attempt. PAN-OS counts each keygen as a failed login while the MFA
 // push is pending, so re-submitting locks the account out.
 func TestLoginEnterIsIgnoredWhileInFlight(t *testing.T) {
-	m := fillLogin(t)
+	m := fillLoginSubmittable(t)
 
 	updated, cmd := m.handleLoginKeys(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
@@ -69,7 +51,7 @@ func TestLoginEnterIsIgnoredWhileInFlight(t *testing.T) {
 // that authentication is underway. Without it they assume Enter did nothing
 // and keep pressing it.
 func TestLoginViewShowsInFlightFeedback(t *testing.T) {
-	m := fillLogin(t)
+	m := fillLoginSubmittable(t)
 
 	before := m.login.View()
 	if strings.Contains(strings.ToLower(before), "authenticating") {
@@ -88,7 +70,7 @@ func TestLoginViewShowsInFlightFeedback(t *testing.T) {
 // TestLoginEscCancelsInFlight lets the user back out of a stalled login
 // rather than being stuck on a frozen form.
 func TestLoginEscCancelsInFlight(t *testing.T) {
-	m := fillLogin(t)
+	m := fillLoginSubmittable(t)
 
 	updated, _ := m.handleLoginKeys(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
@@ -107,7 +89,7 @@ func TestLoginEscCancelsInFlight(t *testing.T) {
 // TestLoginErrorClearsInFlight ensures a failed login re-arms the form so the
 // user can correct credentials and retry.
 func TestLoginErrorClearsInFlight(t *testing.T) {
-	m := fillLogin(t)
+	m := fillLoginSubmittable(t)
 
 	updated, _ := m.handleLoginKeys(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
@@ -164,7 +146,7 @@ func TestPasteIntoLoginFields(t *testing.T) {
 // TestPasteIgnoredWhileAuthenticating keeps paste consistent with the other
 // input handling: the fields are frozen while a keygen is in flight.
 func TestPasteIgnoredWhileAuthenticating(t *testing.T) {
-	m := fillLogin(t)
+	m := fillLoginSubmittable(t)
 	updated, _ := m.handleLoginKeys(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
 

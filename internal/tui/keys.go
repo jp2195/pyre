@@ -134,6 +134,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 type LoginKeyMap struct {
 	Submit key.Binding
 	Tab    key.Binding
+	Toggle key.Binding
 	Quit   key.Binding
 }
 
@@ -146,6 +147,12 @@ func DefaultLoginKeyMap() LoginKeyMap {
 		Tab: key.NewBinding(
 			key.WithKeys("tab"),
 			key.WithHelp("tab", "next field"),
+		),
+		// Bubble Tea v2 stringifies the space bar as "space", never as a
+		// literal " ", so both spellings have to be bound.
+		Toggle: key.NewBinding(
+			key.WithKeys(" ", "space"),
+			key.WithHelp("space", "toggle"),
 		),
 		Quit: key.NewBinding(
 			key.WithKeys("ctrl+c"),
