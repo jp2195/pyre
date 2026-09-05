@@ -354,3 +354,35 @@ func TestLogs_ErrorWithRowsFitsTheFloor(t *testing.T) {
 		}
 	}
 }
+
+// A time bound written without knowing the device's UTC offset produces a
+// plausible-looking table for the wrong window, so the guess has to reach the
+// screen rather than the log.
+func TestLogs_ClockWarningIsShownAndFitsTheFloor(t *testing.T) {
+	const warning = "device clock unknown: the time bound was written in this computer's zone, so the window may be off by the firewall's UTC offset"
+	const floor = 60
+
+	m := NewLogsModel().SetSize(floor, 30)
+	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}},
+		LogPageMeta{Warning: warning}, nil)
+
+	view := m.View()
+	if !strings.Contains(view, "device clock unknown") {
+		t.Errorf("the view hides a bound written in a guessed zone:\n%s", view)
+	}
+	for _, line := range splitLines(view) {
+		if got := lipgloss.Width(line); got > floor {
+			t.Errorf("width %d: line is %d cells, %d over\n  %q", floor, got, got-floor, line)
+		}
+	}
+}
+
+// A clean fetch says nothing extra.
+func TestLogs_NoWarningWhenTheClockWasKnown(t *testing.T) {
+	m := NewLogsModel().SetSize(120, 40)
+	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
+
+	if view := m.View(); strings.Contains(view, "device clock unknown") {
+		t.Errorf("a clean fetch reported a clock problem:\n%s", view)
+	}
+}

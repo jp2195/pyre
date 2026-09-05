@@ -68,6 +68,10 @@ type LogPage[T any] struct {
 	Entries []T
 	HasMore bool
 	Query   string
+	// Warning is a non-fatal problem with this fetch that the operator
+	// needs to see -- today, that the time bound had to be written without
+	// knowing the device's UTC offset. Empty when there is nothing to say.
+	Warning string
 }
 
 // buildLogQuery assembles the device-side expression. The time bound is
@@ -86,6 +90,38 @@ func (c *Client) buildLogQuery(q LogQuery) string {
 		clauses = append(clauses, "("+user+")")
 	}
 	return strings.Join(clauses, " and ")
+}
+
+// clockUnknownWarning is what the operator is told when a time bound had to
+// be written without knowing the device's UTC offset.
+const clockUnknownWarning = "device clock unknown: the time bound was written in this computer's zone, so the window may be off by the firewall's UTC offset"
+
+// ensureBoundZone makes sure the device's UTC offset is known before a bound
+// is formatted against it, and reports a warning when it still is not.
+//
+// PAN-OS interprets a bound in its own wall clock and reports no time zone
+// anywhere, so the offset is derived by comparing the clock the device
+// reports against ours (learnDeviceClock, driven by GetSystemInfo). Until
+// that has run deviceLocation assumes the operator's zone, which is a fine
+// default for reading timestamps back but the wrong thing to write into a
+// bound: the window silently shifts by the device's offset on the one path
+// the design calls non-negotiable. Learning it costs one op command, once
+// per client, and only when a bound is actually being sent.
+//
+// When the device cannot be asked, the bound is still written. Dropping the
+// time clause would answer "the last hour" with everything, which is its own
+// silent wrong answer; the warning makes the guess visible instead.
+func (c *Client) ensureBoundZone(ctx context.Context, q LogQuery, target string) string {
+	if q.Since.IsZero() || c.deviceLoc.Load() != nil {
+		return ""
+	}
+	if _, err := c.GetSystemInfo(ctx, target); err != nil {
+		debugf("[API] could not learn the device clock for a log time bound: %v", err)
+	}
+	if c.deviceLoc.Load() != nil {
+		return ""
+	}
+	return clockUnknownWarning
 }
 
 // logJobStatus classifies a PAN-OS log-query job state.
@@ -228,6 +264,9 @@ func (c *Client) parseLogTime(timeStr string) time.Time {
 // GetSystemLogs retrieves one page of system logs.
 func (c *Client) GetSystemLogs(ctx context.Context, q LogQuery, target string) (LogPage[models.SystemLogEntry], error) {
 	q = q.normalized()
+	// Before the bound is formatted, not after: it has to be written in the
+	// device's wall clock, and that zone is learned rather than reported.
+	warning := c.ensureBoundZone(ctx, q, target)
 	sent := c.buildLogQuery(q)
 
 	resultResp, err := c.submitAndPollLog(ctx, "system", q, sent, target)
@@ -272,12 +311,16 @@ func (c *Client) GetSystemLogs(ctx context.Context, q LogQuery, target string) (
 		Entries: logs,
 		HasMore: len(logs) == q.Max,
 		Query:   sent,
+		Warning: warning,
 	}, nil
 }
 
 // GetTrafficLogs retrieves one page of traffic logs.
 func (c *Client) GetTrafficLogs(ctx context.Context, q LogQuery, target string) (LogPage[models.TrafficLogEntry], error) {
 	q = q.normalized()
+	// Before the bound is formatted, not after: it has to be written in the
+	// device's wall clock, and that zone is learned rather than reported.
+	warning := c.ensureBoundZone(ctx, q, target)
 	sent := c.buildLogQuery(q)
 
 	resultResp, err := c.submitAndPollLog(ctx, "traffic", q, sent, target)
@@ -370,12 +413,16 @@ func (c *Client) GetTrafficLogs(ctx context.Context, q LogQuery, target string) 
 		Entries: logs,
 		HasMore: len(logs) == q.Max,
 		Query:   sent,
+		Warning: warning,
 	}, nil
 }
 
 // GetThreatLogs retrieves one page of threat logs.
 func (c *Client) GetThreatLogs(ctx context.Context, q LogQuery, target string) (LogPage[models.ThreatLogEntry], error) {
 	q = q.normalized()
+	// Before the bound is formatted, not after: it has to be written in the
+	// device's wall clock, and that zone is learned rather than reported.
+	warning := c.ensureBoundZone(ctx, q, target)
 	sent := c.buildLogQuery(q)
 
 	resultResp, err := c.submitAndPollLog(ctx, "threat", q, sent, target)
@@ -490,5 +537,6 @@ func (c *Client) GetThreatLogs(ctx context.Context, q LogQuery, target string) (
 		Entries: logs,
 		HasMore: len(logs) == q.Max,
 		Query:   sent,
+		Warning: warning,
 	}, nil
 }

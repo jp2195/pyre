@@ -47,6 +47,10 @@ type LogPageMeta struct {
 	HasMore bool
 	// Sent is the assembled expression the device received.
 	Sent string
+	// Warning is a non-fatal problem with the fetch the operator needs to
+	// see -- today, that the time bound had to be written without knowing
+	// the device's UTC offset. Empty when there is nothing to say.
+	Warning string
 }
 
 type LogSortField int
@@ -120,6 +124,11 @@ type logTabState struct {
 	hasMore bool
 	// sent is the assembled expression the device received for this tab.
 	sent string
+	// warning is the last non-fatal complaint about this tab's fetch. It
+	// is shown rather than logged: a bound written in a guessed zone
+	// produces a plausible-looking table for the wrong window, which is
+	// exactly the kind of wrong answer nobody thinks to question.
+	warning string
 	// rng and query are what these rows were fetched under. Staleness is
 	// derived by comparing them against the view's current selection
 	// rather than flagged when the selection changes: nothing has to
@@ -411,6 +420,7 @@ func (m LogsModel) finishPage(t models.LogType, meta LogPageMeta, err error, row
 	s.loading = false
 	s.lastRefresh = time.Now()
 	s.since = meta.Req.Since
+	s.warning = meta.Warning
 	if err == nil {
 		s.errQuery = ""
 		s.fetched = rows
@@ -811,6 +821,11 @@ func (m LogsModel) View() string {
 	// Tab bar for log types
 	sections = append(sections, m.renderTabBar())
 	sections = append(sections, m.statusLine())
+
+	if warning := m.tabState(m.activeLogType).warning; warning != "" {
+		sections = append(sections, WarningMsgStyle.Render(
+			strings.Join(wrapText(warning, m.Width), "\n")))
+	}
 
 	// Device query bar
 	if m.queryMode {

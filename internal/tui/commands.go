@@ -486,19 +486,19 @@ func (m Model) fetchLogsFor(req views.FetchLogsCmd) tea.Cmd {
 		return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (api.LogPage[models.TrafficLogEntry], error) {
 			return conn.Client.GetTrafficLogs(ctx, q, target)
 		}, func(page api.LogPage[models.TrafficLogEntry], err error) tea.Msg {
-			return TrafficLogsMsg{Logs: page.Entries, Req: req, HasMore: page.HasMore, Sent: page.Query, Err: err}
+			return TrafficLogsMsg{Logs: page.Entries, Req: req, HasMore: page.HasMore, Sent: page.Query, Warning: page.Warning, Err: err}
 		})
 	case models.LogTypeThreat:
 		return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (api.LogPage[models.ThreatLogEntry], error) {
 			return conn.Client.GetThreatLogs(ctx, q, target)
 		}, func(page api.LogPage[models.ThreatLogEntry], err error) tea.Msg {
-			return ThreatLogsMsg{Logs: page.Entries, Req: req, HasMore: page.HasMore, Sent: page.Query, Err: err}
+			return ThreatLogsMsg{Logs: page.Entries, Req: req, HasMore: page.HasMore, Sent: page.Query, Warning: page.Warning, Err: err}
 		})
 	default:
 		return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (api.LogPage[models.SystemLogEntry], error) {
 			return conn.Client.GetSystemLogs(ctx, q, target)
 		}, func(page api.LogPage[models.SystemLogEntry], err error) tea.Msg {
-			return SystemLogsMsg{Logs: page.Entries, Req: req, HasMore: page.HasMore, Sent: page.Query, Err: err}
+			return SystemLogsMsg{Logs: page.Entries, Req: req, HasMore: page.HasMore, Sent: page.Query, Warning: page.Warning, Err: err}
 		})
 	}
 }

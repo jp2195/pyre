@@ -116,6 +116,7 @@ type SystemLogsMsg struct {
 	Req     views.FetchLogsCmd
 	HasMore bool
 	Sent    string
+	Warning string
 	Err     error
 }
 
@@ -124,6 +125,7 @@ type TrafficLogsMsg struct {
 	Req     views.FetchLogsCmd
 	HasMore bool
 	Sent    string
+	Warning string
 	Err     error
 }
 
@@ -132,6 +134,7 @@ type ThreatLogsMsg struct {
 	Req     views.FetchLogsCmd
 	HasMore bool
 	Sent    string
+	Warning string
 	Err     error
 }
 

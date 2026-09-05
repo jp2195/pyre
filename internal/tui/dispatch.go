@@ -208,15 +208,15 @@ func (m Model) handleViewDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sessions = m.sessions.SetDetail(msg.Detail, msg.Err)
 	case SystemLogsMsg:
 		m.logs = m.logs.SetSystemLogs(msg.Logs, views.LogPageMeta{
-			Req: msg.Req, HasMore: msg.HasMore, Sent: msg.Sent,
+			Req: msg.Req, HasMore: msg.HasMore, Sent: msg.Sent, Warning: msg.Warning,
 		}, msg.Err)
 	case TrafficLogsMsg:
 		m.logs = m.logs.SetTrafficLogs(msg.Logs, views.LogPageMeta{
-			Req: msg.Req, HasMore: msg.HasMore, Sent: msg.Sent,
+			Req: msg.Req, HasMore: msg.HasMore, Sent: msg.Sent, Warning: msg.Warning,
 		}, msg.Err)
 	case ThreatLogsMsg:
 		m.logs = m.logs.SetThreatLogs(msg.Logs, views.LogPageMeta{
-			Req: msg.Req, HasMore: msg.HasMore, Sent: msg.Sent,
+			Req: msg.Req, HasMore: msg.HasMore, Sent: msg.Sent, Warning: msg.Warning,
 		}, msg.Err)
 	case ARPTableMsg:
 		m.networkDashboard = m.networkDashboard.SetARPTable(msg.Entries, msg.Err)
