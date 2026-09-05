@@ -8,7 +8,10 @@ import (
 	"github.com/jp2195/pyre/internal/tui/views"
 )
 
-const headerLines = 2 // main row + sub-tab row
+// main row + sub-tab row + the bottom border NavHeaderBorder draws. The
+// count was 2 while the tests ran against uninitialized styles, whose zero
+// value has no border.
+const headerLines = 3
 
 func TestRenderHeader_DisconnectedAtStandardWidth(t *testing.T) {
 	m := newTestModel(t, ViewDashboard)
