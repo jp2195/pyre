@@ -1,8 +1,6 @@
 package config
 
 import (
-	"bytes"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,15 +22,13 @@ func TestLoadState_WarnsOnPermissiveMode(t *testing.T) {
 		t.Fatalf("seeding state: %v", err)
 	}
 
-	var buf bytes.Buffer
-	log.SetOutput(&buf)
-	defer log.SetOutput(os.Stderr)
+	buf := captureWarnings(t)
 
 	if _, err := LoadState(); err != nil {
 		t.Fatalf("LoadState: %v", err)
 	}
 	if !strings.Contains(buf.String(), "permissive mode") {
-		t.Errorf("expected permissive-mode warning for 0644 state file, log output:\n%s", buf.String())
+		t.Errorf("expected permissive-mode warning for 0644 state file, got:\n%s", buf.String())
 	}
 
 	// 0600 must NOT warn.

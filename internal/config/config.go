@@ -2,7 +2,7 @@ package config
 
 import (
 	"fmt"
-	"log"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -14,6 +14,26 @@ type Config struct {
 	Default     string                      `yaml:"default,omitempty"`
 	Connections map[string]ConnectionConfig `yaml:"connections,omitempty"`
 	Settings    Settings                    `yaml:"settings"`
+
+	// path is the file this config was loaded from, so saves go back to it.
+	// --config previously selected which file to read while every save
+	// resolved ~/.pyre.yaml, silently splitting reads from writes.
+	// Unexported, so it never round-trips into the YAML.
+	path string
+}
+
+// Path returns the file this config is read from and written to, falling
+// back to ~/.pyre.yaml for a config that was not produced by Load.
+// It returns "" only when the home directory cannot be resolved.
+func (c *Config) Path() string {
+	if c.path != "" {
+		return c.path
+	}
+	p, err := ConfigPath()
+	if err != nil {
+		return ""
+	}
+	return p
 }
 
 // ConnectionConfig describes a single PAN-OS endpoint.
@@ -42,6 +62,33 @@ type Settings struct {
 	Theme string `yaml:"theme"`
 }
 
+// warnOut receives startup warnings such as insecure file permissions.
+//
+// It is deliberately NOT the standard logger: main points that at a debug
+// file or io.Discard before any config is loaded, so warnings written with
+// log.Printf were discarded every time and the permission warning promised
+// by SECURITY.md never reached anyone. Tests swap this writer.
+var warnOut io.Writer = os.Stderr
+
+// warnf writes a startup warning that survives logger reconfiguration.
+func warnf(format string, args ...any) {
+	// Best-effort: a startup warning that cannot be written is not worth
+	// failing the load over.
+	_, _ = fmt.Fprintf(warnOut, "warning: "+format+"\n", args...) //nolint:errcheck // best-effort warning
+}
+
+// warnIfPermissive warns when path is readable or writable by group or other.
+// Both the config and the state file are expected to be 0600.
+func warnIfPermissive(path string) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return
+	}
+	if perm := info.Mode().Perm(); perm&0o077 != 0 {
+		warnf("%s has permissive mode %#o; run `chmod 600 %s`", path, perm, path)
+	}
+}
+
 // ConfigPath returns the path to the config file (~/.pyre.yaml)
 func ConfigPath() (string, error) {
 	homeDir, err := os.UserHomeDir()
@@ -68,15 +115,8 @@ func Load() (*Config, error) {
 		return cfg, nil
 	}
 
-	// Warn if the config file is readable by group/other. Plan A removed
-	// the Warnings slice in favour of direct log.Printf at startup, which
-	// prints before the TUI initialises and is therefore user-visible.
-	if info, statErr := os.Stat(configPath); statErr == nil {
-		if info.Mode().Perm()&0o077 != 0 {
-			log.Printf("warning: %s has permissive mode %#o; run `chmod 600 %s`",
-				configPath, info.Mode().Perm(), configPath)
-		}
-	}
+	cfg.path = configPath
+	warnIfPermissive(configPath)
 
 	data, err := os.ReadFile(configPath) // #nosec G304 -- Path is constructed from user's home directory
 	if err != nil {
@@ -111,13 +151,14 @@ func (c *Config) Marshal() ([]byte, error) {
 	return data, nil
 }
 
-// WriteConfigBytes writes pre-marshaled config data to ~/.pyre.yaml,
-// creating a .bak backup of the previous file first. Safe to call from a
-// background goroutine because it touches no shared in-memory state.
-func WriteConfigBytes(data []byte) error {
-	configPath, err := ConfigPath()
-	if err != nil {
-		return err
+// WriteConfigBytes writes pre-marshaled config data to configPath, creating
+// a .bak backup of the previous file first. The path is passed in rather than
+// resolved here so a config loaded via --config is written back to that same
+// file. Safe to call from a background goroutine because it touches no shared
+// in-memory state; obtain the path from Config.Path on the event loop.
+func WriteConfigBytes(configPath string, data []byte) error {
+	if configPath == "" {
+		return fmt.Errorf("no config path resolved")
 	}
 
 	// Create backup if file exists
@@ -137,13 +178,14 @@ func WriteConfigBytes(data []byte) error {
 	return nil
 }
 
-// Save writes the config to ~/.pyre.yaml, creating a backup first.
+// Save writes the config back to the file it was loaded from, creating a
+// backup first.
 func (c *Config) Save() error {
 	data, err := c.Marshal()
 	if err != nil {
 		return err
 	}
-	return WriteConfigBytes(data)
+	return WriteConfigBytes(c.Path(), data)
 }
 
 // atomicWriteFile writes data to a file atomically by writing to a temp file
@@ -277,7 +319,7 @@ func LoadWithFlags(flags CLIFlags) (*Config, error) {
 	var err error
 
 	if flags.Config != "" {
-		data, readErr := os.ReadFile(flags.Config)
+		data, readErr := os.ReadFile(flags.Config) // #nosec G304 -- path supplied by the user via --config
 		if readErr != nil {
 			return nil, readErr
 		}
@@ -285,6 +327,8 @@ func LoadWithFlags(flags CLIFlags) (*Config, error) {
 		if err = yaml.Unmarshal(data, cfg); err != nil {
 			return nil, err
 		}
+		cfg.path = flags.Config
+		warnIfPermissive(flags.Config)
 		if cfg.Connections == nil {
 			cfg.Connections = make(map[string]ConnectionConfig)
 		}

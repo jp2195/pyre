@@ -535,8 +535,11 @@ func (m Model) saveConfig() tea.Cmd {
 	if err != nil {
 		return func() tea.Msg { return ConfigSavedMsg{Err: err} }
 	}
+	// Resolve the destination on the event loop alongside the marshal, so
+	// the background writer never touches the live Config.
+	path := m.config.Path()
 	return func() tea.Msg {
-		return ConfigSavedMsg{Err: config.WriteConfigBytes(data)}
+		return ConfigSavedMsg{Err: config.WriteConfigBytes(path, data)}
 	}
 }
 
