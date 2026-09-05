@@ -91,6 +91,15 @@ func TestFilterMode_GlobalKeysBypassGlobalHandlers(t *testing.T) {
 			}
 			return m
 		}},
+		{"logs_query", func(t *testing.T) Model {
+			m := newTestModel(t, ViewLogs)
+			m.logs = m.logs.SetSystemLogs([]models.SystemLogEntry{{Description: "test-event"}}, views.LogPageMeta{}, nil)
+			m.logs, _ = m.logs.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
+			if !m.logs.IsQueryMode() {
+				t.Fatal("precondition: logs query mode")
+			}
+			return m
+		}},
 		{"objects", func(t *testing.T) Model {
 			m := newTestModel(t, ViewObjects)
 			m.objects = m.objects.SetAddresses([]models.AddressObject{{Name: "host-q", Type: "ip-netmask", Value: "10.0.0.1/32"}}, nil)

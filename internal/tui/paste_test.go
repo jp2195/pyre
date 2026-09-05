@@ -75,6 +75,26 @@ func TestPaste_ReachesTheFocusedTextField(t *testing.T) {
 			t.Errorf("pasting %q left the view in a different state than typing it", text)
 		}
 	})
+
+	// The device query bar (f) is a separate text field from the / filter,
+	// and needs the same paste routing. A long PAN-OS expression is an
+	// obvious thing to paste rather than type.
+	t.Run("logs device query", func(t *testing.T) {
+		m := newTestModel(t, ViewLogs)
+		next, _ := m.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
+		m = next.(Model)
+		if !m.currentViewFiltering() {
+			t.Fatal("the logs view did not enter query mode on f")
+		}
+
+		const text = "addr.src in 203.0.113.5"
+		next, _ = m.Update(tea.PasteMsg{Content: text})
+		m = next.(Model)
+
+		if got := m.logs.QueryValue(); got != text {
+			t.Errorf("query bar after pasting = %q, want %q", got, text)
+		}
+	})
 }
 
 // TestPaste_IsIgnoredWhereThereIsNoTextField checks a stray paste on a

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -62,6 +63,11 @@ type LogsModel struct {
 	rng LogRange
 	// query is the last expression the device accepted.
 	query string
+
+	// queryInput edits the device-side expression. It is separate from
+	// TableBase.Filter, which filters rows already on screen.
+	queryInput textinput.Model
+	queryMode  bool
 
 	sortBy      LogSortField
 	lastRefresh time.Time
@@ -168,10 +174,16 @@ func (m LogsModel) Query() string { return m.query }
 func NewLogsModel() LogsModel {
 	base := NewTableBase("Filter logs...")
 	base.SortAsc = false // Default to newest first
+
+	qi := textinput.New()
+	qi.Placeholder = "PAN-OS query, e.g. (addr.src in 203.0.113.5)"
+	qi.CharLimit = 512
+
 	return LogsModel{
 		TableBase:     base,
 		activeLogType: models.LogTypeSystem,
 		tabs:          make(map[models.LogType]logTabState, 3),
+		queryInput:    qi,
 	}
 }
 
@@ -350,6 +362,14 @@ func (m LogsModel) IsFilterMode() bool {
 	return m.FilterMode
 }
 
+// IsQueryMode reports whether the device-query bar has focus. The parent
+// routes every key to the input while it does, exactly as it does for the
+// filter.
+func (m LogsModel) IsQueryMode() bool { return m.queryMode }
+
+// QueryValue is the in-progress text in the query bar.
+func (m LogsModel) QueryValue() string { return m.queryInput.Value() }
+
 func (m *LogsModel) ensureCursorValid() {
 	count := m.filteredCount()
 	if m.Cursor >= count && count > 0 {
@@ -432,6 +452,9 @@ func (m LogsModel) statusLine() string {
 }
 
 func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
+	if m.queryMode {
+		return m.updateQueryMode(msg)
+	}
 	if m.FilterMode {
 		return m.updateFilterMode(msg)
 	}
@@ -460,6 +483,12 @@ func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
 		case "T":
 			m.rng = (m.rng + logRangeCount - 1) % logRangeCount
 			return m.onQueryChanged()
+		case "f":
+			m.queryMode = true
+			m.queryInput.SetValue(m.query)
+			m.queryInput.Focus()
+			m.queryInput.CursorEnd()
+			return m, textinput.Blink
 		case "]":
 			// Cycle forward through log types: System -> Traffic -> Threat -> System
 			switch m.activeLogType {
@@ -494,6 +523,28 @@ func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// updateQueryMode edits the device query. Enter commits and refetches; esc
+// abandons the edit and leaves the last accepted query in place.
+func (m LogsModel) updateQueryMode(msg tea.Msg) (LogsModel, tea.Cmd) {
+	if key, ok := msg.(tea.KeyPressMsg); ok {
+		switch key.String() {
+		case "enter":
+			m.queryMode = false
+			m.queryInput.Blur()
+			m.query = strings.TrimSpace(m.queryInput.Value())
+			return m.onQueryChanged()
+		case "esc":
+			m.queryMode = false
+			m.queryInput.Blur()
+			m.queryInput.SetValue(m.query)
+			return m, nil
+		}
+	}
+	var cmd tea.Cmd
+	m.queryInput, cmd = m.queryInput.Update(msg)
+	return m, cmd
 }
 
 func (m LogsModel) updateFilterMode(msg tea.Msg) (LogsModel, tea.Cmd) {
@@ -539,6 +590,11 @@ func (m LogsModel) View() string {
 	// Tab bar for log types
 	sections = append(sections, m.renderTabBar())
 	sections = append(sections, m.statusLine())
+
+	// Device query bar
+	if m.queryMode {
+		sections = append(sections, ViewSubtitleStyle.Render("device query: ")+m.queryInput.View())
+	}
 
 	// Filter bar
 	if m.FilterMode {
@@ -669,6 +725,7 @@ func (m LogsModel) renderHelp() string {
 		{"enter", expandText},
 		{"/", "filter"},
 		{"t", "range"},
+		{"f", "device query"},
 		{"s", "sort field"},
 		{"S", "sort dir"},
 		{"r", "refresh"},

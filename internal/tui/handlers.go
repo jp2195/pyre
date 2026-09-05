@@ -463,7 +463,7 @@ func (m Model) currentViewFiltering() bool {
 	case ViewGPUsers:
 		return m.gpUsers.IsFilterMode()
 	case ViewLogs:
-		return m.logs.IsFilterMode()
+		return m.logs.IsFilterMode() || m.logs.IsQueryMode()
 	case ViewObjects:
 		return m.objects.IsFilterMode()
 	}
