@@ -196,11 +196,35 @@ func (m LogsModel) SetActiveLogType(t models.LogType) LogsModel {
 
 func (m LogsModel) SetSize(width, height int) LogsModel {
 	m.TableBase = m.TableBase.SetSize(width, height)
+	m.queryInput.SetWidth(queryInputWidth(width, m.queryInput.Prompt))
 	m.EnsureCursorValid(m.filteredCount())
 	if visibleRows := m.visibleRows(); visibleRows > 0 {
 		m.EnsureVisible(visibleRows)
 	}
 	return m
+}
+
+// queryBarLabel prefixes the query input in View(). Its width counts toward
+// the input's own width budget below.
+const queryBarLabel = "device query: "
+
+// minQueryInputWidth is a floor so a very narrow terminal cannot drive the
+// input's width to zero or negative. table_base.go was once bitten by a
+// strings.Repeat panic from exactly that below 12 columns.
+const minQueryInputWidth = 10
+
+// queryInputWidth sizes the query bar's text input to fit next to its label
+// inside the terminal. It is computed from termWidth rather than set once in
+// NewLogsModel because the terminal can be resized after construction, and
+// SetSize is where the view learns about that.
+//
+// prompt and a reserved cursor cell also count against the budget: bubbles'
+// textinput renders promptWidth+Width()+1 cells wide, not Width() cells --
+// the trailing +1 is the cursor cell at the end of the visible window.
+// command_palette.go's own sizing carries the same reservation.
+func queryInputWidth(termWidth int, prompt string) int {
+	overhead := lipgloss.Width(queryBarLabel) + lipgloss.Width(prompt) + 1
+	return max(termWidth-overhead, minQueryInputWidth)
 }
 
 func (m LogsModel) SetLoading(loading bool) LogsModel {
@@ -593,7 +617,7 @@ func (m LogsModel) View() string {
 
 	// Device query bar
 	if m.queryMode {
-		sections = append(sections, ViewSubtitleStyle.Render("device query: ")+m.queryInput.View())
+		sections = append(sections, ViewSubtitleStyle.Render(queryBarLabel)+m.queryInput.View())
 	}
 
 	// Filter bar
