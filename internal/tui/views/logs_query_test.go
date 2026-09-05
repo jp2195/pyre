@@ -261,3 +261,54 @@ func TestLogsModel_LocalFilterZeroingRowsIgnoresConcurrentDeviceQuery(t *testing
 		t.Errorf("view does not name the filter as what emptied the table:\n%s", view)
 	}
 }
+
+// Both the filter-emptied-tab empty state and the "Filter: ... (N results)"
+// info line format the user's own filter text into a rendered line with no
+// width bound of their own — the same defect class the sent-expression
+// empty state exists to fix. Filter.CharLimit is 100, so a filter typed all
+// the way to that limit (not a short stand-in) is what actually reaches
+// these lines.
+func TestLogsModel_FilterTextFitsTheTerminalWidth(t *testing.T) {
+	filterVal := strings.Repeat("west ", 20) // exactly 100 chars: the CharLimit
+
+	newFixture := func(width, height int) LogsModel {
+		m := NewLogsModel().SetSize(width, height)
+		return m.SetSystemLogs([]models.SystemLogEntry{
+			{Severity: "informational", Type: "general", Description: "admin login ok"},
+		}, LogPageMeta{}, nil)
+	}
+	applyLongFilter := func(m LogsModel) LogsModel {
+		m.Filter.SetValue(filterVal)
+		m.applyFilter()
+		return m
+	}
+
+	// At the supported floor (60 columns), every line — filter info and
+	// the filter-emptied empty state included — must fit. No exceptions.
+	const floor = 60
+	m := applyLongFilter(newFixture(floor, 30))
+	if !m.IsFiltered() {
+		t.Fatal("filter value did not register as active")
+	}
+	if got := len(m.FilterValue()); got != 100 {
+		t.Fatalf("filter value is %d chars, want the full 100-char CharLimit", got)
+	}
+	for _, line := range splitLines(m.View()) {
+		if got := lipgloss.Width(line); got > floor {
+			t.Errorf("width %d: line is %d cells, %d over\n  %q", floor, got, got-floor, line)
+		}
+	}
+
+	// Below the floor (40 columns), the tab bar itself already overflows
+	// regardless of the filter text — the same pre-existing gap
+	// TestLogsModel_QueryBarFitsTheTerminalWidth documents and pins rather
+	// than tries to close here. What the filter text must not do is make
+	// that any worse.
+	const belowFloor = 40
+	baseline := maxLineWidth(newFixture(belowFloor, 30).View())
+
+	mn := applyLongFilter(newFixture(belowFloor, 30))
+	if got := maxLineWidth(mn.View()); got > baseline {
+		t.Errorf("width %d: filter text widened the screen from %d cells (pre-existing) to %d", belowFloor, baseline, got)
+	}
+}

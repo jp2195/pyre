@@ -637,8 +637,12 @@ func (m LogsModel) View() string {
 	if m.FilterMode {
 		sections = append(sections, m.renderFilterBar())
 	} else if m.IsFiltered() {
-		filterInfo := FilterInfoStyle.Render(fmt.Sprintf("Filter: %s (%d results)  [esc to clear]", m.FilterValue(), m.filteredCount()))
-		sections = append(sections, filterInfo)
+		// Wrapped rather than rendered as-is: the filter text comes from
+		// the user (up to Filter.CharLimit) and an unwrapped long value
+		// would widen this line past the terminal, the same defect class
+		// emptyStateFor below is fixed for.
+		info := fmt.Sprintf("Filter: %s (%d results)  [esc to clear]", m.FilterValue(), m.filteredCount())
+		sections = append(sections, FilterInfoStyle.Render(strings.Join(wrapText(info, m.Width), "\n")))
 	}
 
 	// Error or content
@@ -806,8 +810,8 @@ func (m LogsModel) renderHelp() string {
 // the server.
 func (m LogsModel) emptyStateFor(kind string) string {
 	if m.IsFiltered() && m.rowCount(m.activeLogType) > 0 {
-		return EmptyMsgStyle.Padding(1, 0).Render(fmt.Sprintf(
-			"No %s logs match the filter %q (%d loaded)", kind, m.FilterValue(), m.rowCount(m.activeLogType)))
+		msg := fmt.Sprintf("No %s logs match the filter %q (%d loaded)", kind, m.FilterValue(), m.rowCount(m.activeLogType))
+		return EmptyMsgStyle.Padding(1, 0).Render(strings.Join(wrapText(msg, m.Width), "\n"))
 	}
 	sent := m.tabState(m.activeLogType).sent
 	if sent == "" {
