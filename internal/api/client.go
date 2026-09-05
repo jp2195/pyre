@@ -387,7 +387,11 @@ func (c *Client) request(ctx context.Context, params url.Values, target string) 
 		len(body),
 	)
 	if !xmlResp.IsSuccess() {
-		debugf("[API Response] error: %s", SanitizeForDisplay(xmlResp.Msg.Line))
+		// ErrorMessage, not Msg.Line: PAN-OS reports parameter errors
+		// under <result><msg> instead, so reading only one shape blanks
+		// the trace for exactly the class of failure someone turns
+		// debugging on to investigate.
+		debugf("[API Response] error: %s", SanitizeForDisplay(xmlResp.ErrorMessage()))
 	}
 	if len(xmlResp.Result.Inner) > 0 {
 		debugf("[API Response] body preview: %s", truncateLog(string(xmlResp.Result.Inner), 1000))
