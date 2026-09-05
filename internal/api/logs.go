@@ -115,6 +115,14 @@ func (c *Client) ensureBoundZone(ctx context.Context, q LogQuery, target string)
 	if q.Since.IsZero() || c.deviceLoc.Load() != nil {
 		return ""
 	}
+	// One probe at a time. The three log tabs fetch concurrently, so without
+	// this they each find the zone unknown and each ask the device for the
+	// same answer. Whoever gets the lock second finds it already learned.
+	c.deviceLocMu.Lock()
+	defer c.deviceLocMu.Unlock()
+	if c.deviceLoc.Load() != nil {
+		return ""
+	}
 	if _, err := c.GetSystemInfo(ctx, target); err != nil {
 		debugf("[API] could not learn the device clock for a log time bound: %v", err)
 	}

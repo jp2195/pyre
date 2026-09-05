@@ -75,6 +75,12 @@ type Client struct {
 	// fetches run concurrently.
 	deviceLoc atomic.Pointer[time.Location]
 
+	// deviceLocMu serializes the probe that learns deviceLoc, so the first
+	// bounded query from three concurrently fetching tabs costs one op
+	// command rather than three. It is not sync.Once: a probe that fails
+	// must leave the next bounded query free to try again.
+	deviceLocMu sync.Mutex
+
 	// rulebasePathMu guards rulebasePath.
 	rulebasePathMu sync.RWMutex
 	// rulebasePath remembers which candidate xpath resolved for a given
