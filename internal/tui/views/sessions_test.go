@@ -119,9 +119,9 @@ func TestSessionsModel_Sorting(t *testing.T) {
 	m := NewSessionsModel()
 
 	sessions := []models.Session{
-		{ID: 3, Application: "dns", BytesIn: 100, BytesOut: 50, StartTime: time.Now().Add(-1 * time.Hour)},
-		{ID: 1, Application: "web", BytesIn: 500, BytesOut: 200, StartTime: time.Now().Add(-30 * time.Minute)},
-		{ID: 2, Application: "ssl", BytesIn: 200, BytesOut: 100, StartTime: time.Now().Add(-2 * time.Hour)},
+		{ID: 3, Application: "dns", TotalBytes: 150, StartTime: time.Now().Add(-1 * time.Hour)},
+		{ID: 1, Application: "web", TotalBytes: 700, StartTime: time.Now().Add(-30 * time.Minute)},
+		{ID: 2, Application: "ssl", TotalBytes: 300, StartTime: time.Now().Add(-2 * time.Hour)},
 	}
 
 	m = m.SetSessions(sessions, nil)

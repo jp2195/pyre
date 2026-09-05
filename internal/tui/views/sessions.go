@@ -163,7 +163,7 @@ func matchSession(s models.Session, query string) bool {
 func compareSession(a, b models.Session, sortIdx int) bool {
 	switch sortIdx {
 	case 1: // Bytes
-		return a.BytesIn+a.BytesOut < b.BytesIn+b.BytesOut
+		return a.TotalBytes < b.TotalBytes
 	case 2: // Age
 		return a.StartTime.Before(b.StartTime)
 	case 3: // App
@@ -184,7 +184,7 @@ func sessionRowParts(s models.Session) (prefix, state, suffix string) {
 	zoneFlow := fmt.Sprintf("%s→%s", truncate(s.SourceZone, 7), truncate(s.DestZone, 7))
 	proto := s.Protocol
 	if proto == "" {
-		proto = "tcp"
+		proto = "—"
 	}
 	prefix = fmt.Sprintf("%-7d %-15s %-15s %-5d %-4s %-10s ",
 		s.ID,
@@ -197,7 +197,7 @@ func sessionRowParts(s models.Session) (prefix, state, suffix string) {
 	suffix = fmt.Sprintf(" %-15s %-5s %-8s",
 		truncate(zoneFlow, 15),
 		formatDuration(s.StartTime),
-		formatBytes(s.BytesIn+s.BytesOut))
+		formatBytes(s.TotalBytes))
 	return prefix, state, suffix
 }
 
@@ -260,7 +260,7 @@ func renderSessionDetail(s models.Session, detail *models.SessionDetail, detailL
 	b.WriteString(labelStyle.Render("Application:   ") + valueStyle.Render(s.Application) + "\n")
 	proto := s.Protocol
 	if proto == "" {
-		proto = "tcp"
+		proto = "—"
 	}
 	b.WriteString(labelStyle.Render("Protocol:      ") + valueStyle.Render(proto) + "\n")
 	b.WriteString(labelStyle.Render("State:         ") + valueStyle.Render(s.State) + "\n")
@@ -273,8 +273,10 @@ func renderSessionDetail(s models.Session, detail *models.SessionDetail, detailL
 		b.WriteString(labelStyle.Render("User:          ") + valueStyle.Render(s.User) + "\n")
 	}
 	b.WriteString(labelStyle.Render("Rule:          ") + valueStyle.Render(s.Rule) + "\n")
-	b.WriteString(labelStyle.Render("Bytes In:      ") + valueStyle.Render(formatBytes(s.BytesIn)) + "\n")
-	b.WriteString(labelStyle.Render("Bytes Out:     ") + valueStyle.Render(formatBytes(s.BytesOut)) + "\n")
+	// The session list carries one total, not a directional split. The
+	// per-direction counts appear below in the extended detail, once the
+	// user fetches it.
+	b.WriteString(labelStyle.Render("Total Bytes:   ") + valueStyle.Render(formatBytes(s.TotalBytes)) + "\n")
 	if !s.StartTime.IsZero() {
 		b.WriteString(labelStyle.Render("Start Time:    ") + valueStyle.Render(s.StartTime.Format("2006-01-02 15:04:05")) + "\n")
 		b.WriteString(labelStyle.Render("Duration:      ") + valueStyle.Render(formatDuration(s.StartTime)) + "\n")

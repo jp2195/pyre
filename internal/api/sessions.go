@@ -110,7 +110,7 @@ func (c *Client) GetSessions(ctx context.Context, filter, target string) ([]mode
 			Proto       string `xml:"proto"`
 			Rule        string `xml:"security-rule"`
 			StartTime   string `xml:"start-time"`
-			BytesIn     int64  `xml:"total-byte-count"`
+			TotalBytes  int64  `xml:"total-byte-count"`
 		} `xml:"entry"`
 	}
 	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
@@ -140,7 +140,7 @@ func (c *Client) GetSessions(ctx context.Context, filter, target string) ([]mode
 			DestZone:      e.DstZone,
 			NATSourceIP:   e.NatSrcIP,
 			NATSourcePort: e.NatSrcPort,
-			BytesIn:       e.BytesIn,
+			TotalBytes:    e.TotalBytes,
 			StartTime:     startTime,
 			Rule:          e.Rule,
 		})

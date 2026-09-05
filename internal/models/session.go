@@ -16,10 +16,12 @@ type Session struct {
 	NATSourceIP   string
 	NATSourcePort int
 	User          string
-	BytesIn       int64
-	BytesOut      int64
-	StartTime     time.Time
-	Rule          string
+	// TotalBytes is the session's total byte count. `show session all`
+	// reports one figure per session, not a directional split; the per
+	// direction counts are only available from SessionDetail.
+	TotalBytes int64
+	StartTime  time.Time
+	Rule       string
 }
 
 // SessionDetail contains extended session information fetched on-demand.

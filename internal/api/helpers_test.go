@@ -39,12 +39,35 @@ func TestProtoToName(t *testing.T) {
 		{"6", "tcp"},
 		{"17", "udp"},
 		{"1", "icmp"},
-		{"", "tcp"},  // default
+		{"", ""},     // absent stays absent rather than being reported as TCP
 		{"99", "99"}, // unknown passes through
 	}
 	for _, tc := range tests {
 		if got := protoToName(tc.in); got != tc.want {
 			t.Errorf("protoToName(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+// TestProtoToName_DoesNotInventTCP covers a small piece of fabricated data.
+// An absent protocol was rendered as "tcp", so a session or log entry whose
+// protocol the device did not report looked like a definite TCP flow. In a
+// tool whose job is to report what the firewall actually saw, an unknown
+// value has to look unknown.
+func TestProtoToName_DoesNotInventTCP(t *testing.T) {
+	if got := protoToName(""); got == "tcp" {
+		t.Errorf("protoToName(\"\") = %q; an absent protocol must not be reported as TCP", got)
+	}
+	// Known mappings must still work.
+	for in, want := range map[string]string{
+		"6": "tcp", "17": "udp", "1": "icmp", "58": "icmp6",
+		// PAN-OS logs already send names; those pass through.
+		"tcp": "tcp", "udp": "udp",
+		// An unrecognized number is reported as given rather than guessed at.
+		"253": "253",
+	} {
+		if got := protoToName(in); got != want {
+			t.Errorf("protoToName(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

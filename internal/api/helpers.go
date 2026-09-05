@@ -25,9 +25,9 @@ func protoToName(proto string) string {
 	case "89":
 		return "ospf"
 	default:
-		if proto == "" {
-			return "tcp"
-		}
+		// An absent protocol stays absent. Reporting it as TCP made an
+		// unknown flow look like a definite one, which is exactly the kind
+		// of invented detail this tool must not produce.
 		return proto
 	}
 }
