@@ -96,7 +96,7 @@ func TestLogs_MDoesNothingAtEnd(t *testing.T) {
 func TestLogs_AppendedPageExtendsRows(t *testing.T) {
 	m := NewLogsModel()
 	m = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{HasMore: true}, nil)
-	m = m.SetSystemLogs(make([]models.SystemLogEntry, 300), LogPageMeta{HasMore: false, Append: true}, nil)
+	m = m.SetSystemLogs(make([]models.SystemLogEntry, 300), LogPageMeta{Req: FetchLogsCmd{Append: true}}, nil)
 
 	if got := m.rowCount(models.LogTypeSystem); got != 800 {
 		t.Errorf("rows = %d, want 800", got)
@@ -113,7 +113,7 @@ func TestLogs_StatusLineOffersMoreAndStopsAtEnd(t *testing.T) {
 		t.Errorf("status line %q does not offer more", got)
 	}
 
-	m = m.SetSystemLogs(make([]models.SystemLogEntry, 10), LogPageMeta{HasMore: false, Append: true}, nil)
+	m = m.SetSystemLogs(make([]models.SystemLogEntry, 10), LogPageMeta{Req: FetchLogsCmd{Append: true}}, nil)
 	if got := m.statusLine(); strings.Contains(got, "more available") {
 		t.Errorf("status line %q still offers more after the end", got)
 	}

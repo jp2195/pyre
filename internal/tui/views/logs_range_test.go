@@ -43,8 +43,8 @@ func TestLogsModel_DefaultRangeIsAll(t *testing.T) {
 	if m.Range() != LogRangeAll {
 		t.Errorf("default range = %v, want LogRangeAll", m.Range())
 	}
-	if !m.RangeSince().IsZero() {
-		t.Errorf("default RangeSince() = %v, want zero", m.RangeSince())
+	if since := m.Range().Since(time.Now()); !since.IsZero() {
+		t.Errorf("default range bound = %v, want zero", since)
 	}
 	if m.Query() != "" {
 		t.Errorf("default Query() = %q, want empty", m.Query())
@@ -104,12 +104,16 @@ func TestLogsModel_CompletedPageClearsStaleness(t *testing.T) {
 	m := NewLogsModel()
 	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
 
-	m, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
+	var cmd tea.Cmd
+	m, cmd = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 	if !m.tabStale(models.LogTypeSystem) {
 		t.Fatal("the active tab should read as stale until its new page lands")
 	}
 
-	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
+	// The page has to carry the request it answers: a tab is only marked
+	// with the range and query the rows were actually fetched under.
+	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}},
+		LogPageMeta{Req: mustFetchReq(t, cmd)}, nil)
 	if m.tabStale(models.LogTypeSystem) {
 		t.Error("staleness survived a page fetched under the current range")
 	}

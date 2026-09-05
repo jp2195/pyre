@@ -463,19 +463,16 @@ func (m Model) fetchSessionDetail(id int64) tea.Cmd {
 	})
 }
 
-// fetchLogs loads the tab that is on screen. The three log types are three
-// separate jobs on the device and a page of traffic is a couple of megabytes,
-// so fetching all three to fill tabs nobody is looking at is waste the view
-// used to pay on every entry and every refresh.
-func (m Model) fetchLogs() tea.Cmd {
-	return m.fetchLogsFor(views.FetchLogsCmd{
-		Type:  m.logs.ActiveLogType(),
-		Query: m.logs.Query(),
-		Since: m.logs.RangeSince(),
-	})
-}
-
-// fetchLogsFor performs one page fetch described by a view request.
+// fetchLogsFor performs one page fetch described by a view request. Only the
+// tab on screen is fetched: the three log types are three separate jobs on
+// the device and a page of traffic is a couple of megabytes, so fetching all
+// three to fill tabs nobody is looking at is waste the view used to pay on
+// every entry and every refresh.
+//
+// Requests are minted by the view (LogsModel.RefreshActiveTab and its key
+// handlers) rather than assembled here, because a request is also the
+// fetch's identity: the view has to know what it is waiting for to recognize
+// the answer when it lands.
 func (m Model) fetchLogsFor(req views.FetchLogsCmd) tea.Cmd {
 	conn := m.session.GetActiveConnection()
 	if conn == nil {
@@ -489,24 +486,27 @@ func (m Model) fetchLogsFor(req views.FetchLogsCmd) tea.Cmd {
 		return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (api.LogPage[models.TrafficLogEntry], error) {
 			return conn.Client.GetTrafficLogs(ctx, q, target)
 		}, func(page api.LogPage[models.TrafficLogEntry], err error) tea.Msg {
-			return TrafficLogsMsg{Logs: page.Entries, HasMore: page.HasMore, Sent: page.Query, Append: req.Append, Err: err}
+			return TrafficLogsMsg{Logs: page.Entries, Req: req, HasMore: page.HasMore, Sent: page.Query, Err: err}
 		})
 	case models.LogTypeThreat:
 		return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (api.LogPage[models.ThreatLogEntry], error) {
 			return conn.Client.GetThreatLogs(ctx, q, target)
 		}, func(page api.LogPage[models.ThreatLogEntry], err error) tea.Msg {
-			return ThreatLogsMsg{Logs: page.Entries, HasMore: page.HasMore, Sent: page.Query, Append: req.Append, Err: err}
+			return ThreatLogsMsg{Logs: page.Entries, Req: req, HasMore: page.HasMore, Sent: page.Query, Err: err}
 		})
 	default:
 		return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (api.LogPage[models.SystemLogEntry], error) {
 			return conn.Client.GetSystemLogs(ctx, q, target)
 		}, func(page api.LogPage[models.SystemLogEntry], err error) tea.Msg {
-			return SystemLogsMsg{Logs: page.Entries, HasMore: page.HasMore, Sent: page.Query, Append: req.Append, Err: err}
+			return SystemLogsMsg{Logs: page.Entries, Req: req, HasMore: page.HasMore, Sent: page.Query, Err: err}
 		})
 	}
 }
 
-func (m Model) refreshCurrentView() tea.Cmd {
+// refreshCurrentView re-fetches whatever is on screen. It takes a pointer
+// receiver because the logs view records the fetch it is waiting for, so the
+// refreshed model has to be kept rather than discarded.
+func (m *Model) refreshCurrentView() tea.Cmd {
 	switch m.currentView {
 	case ViewDashboard:
 		return m.fetchCurrentDashboardData()
@@ -535,7 +535,9 @@ func (m Model) refreshCurrentView() tea.Cmd {
 			return m.fetchGlobalProtectUsers(conn)
 		}
 	case ViewLogs:
-		return m.fetchLogs()
+		var cmd tea.Cmd
+		m.logs, cmd = m.logs.RefreshActiveTab()
+		return cmd
 	case ViewObjects:
 		return m.fetchObjects()
 	}

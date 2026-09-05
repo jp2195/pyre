@@ -15,22 +15,38 @@ import (
 // FetchLogsCmd asks the parent model to fetch one page for one log tab. The
 // view owns the range and the query but has no API client, so it describes
 // the fetch and the parent performs it — the same split FetchDetailCmd uses.
+//
+// A request is also the fetch's identity. It travels to the device and comes
+// back on the page, so a response can be matched against what the tab wants
+// by then. Without that, a page issued 1–4 seconds ago is applied to whatever
+// the tab holds now: two presses of m append the same rows twice, and a page
+// from one time range gets appended to rows from another and then labeled
+// with the current selection.
 type FetchLogsCmd struct {
 	Type   models.LogType
 	Query  string
 	Since  time.Time
 	Skip   int
 	Append bool
+	// Range is the preset this fetch was issued under. Rows are only
+	// comparable within one range, so a page whose range no longer matches
+	// the selection is dropped rather than merged.
+	Range LogRange
+	// ReqID identifies this fetch among the ones issued for its tab. It
+	// increases monotonically per tab, so a response carrying any id but
+	// the one the tab is waiting on has been superseded.
+	ReqID int
 }
 
 // LogPageMeta is what a completed fetch reports about the page it returned.
 // It exists so the views package never imports internal/api.
 type LogPageMeta struct {
+	// Req is the request this page answers, echoed back unchanged. Append
+	// lives on it, along with the identity the page is matched against.
+	Req     FetchLogsCmd
 	HasMore bool
 	// Sent is the assembled expression the device received.
 	Sent string
-	// Append adds these rows to the tab instead of replacing them.
-	Append bool
 }
 
 type LogSortField int
@@ -61,16 +77,28 @@ type LogsModel struct {
 
 	// rng is the selected time-range preset, shared by all three tabs.
 	rng LogRange
-	// query is the last expression the device accepted.
+	// query is the expression the view is asking the device for right now.
+	// It is what a fetch sends, what tab staleness is keyed to, and what
+	// the status line names.
 	query string
+	// accepted is the last expression the device answered without an
+	// error. A query the device refuses is never stored: query reverts to
+	// this when a fetch carrying it fails, so a refresh does not keep
+	// retrying an expression the device has already turned down and the
+	// other tabs do not read stale against one.
+	accepted string
+	// committed is the text the operator last put in the query bar with
+	// enter. It is kept even when the device refuses it, so reopening the
+	// bar offers the expression for correction rather than making them
+	// type it again.
+	committed string
 
 	// queryInput edits the device-side expression. It is separate from
 	// TableBase.Filter, which filters rows already on screen.
 	queryInput textinput.Model
 	queryMode  bool
 
-	sortBy      LogSortField
-	lastRefresh time.Time
+	sortBy LogSortField
 }
 
 // logTabState is everything the view knows about one tab that is not the rows
@@ -80,6 +108,11 @@ type logTabState struct {
 	// err is the last fetch error for this tab, so one failed tab does not
 	// blank the other two.
 	err error
+	// errQuery is the expression whose fetch produced err, kept so the
+	// device's message and the query that caused it are read together. The
+	// message alone does not name what was asked, and a refused query is
+	// deliberately not stored anywhere else.
+	errQuery string
 	// fetched is how many rows have been loaded, and therefore the Skip
 	// for the next page.
 	fetched int
@@ -93,6 +126,35 @@ type logTabState struct {
 	// remember to mark the other tabs, and refresh needs no special case.
 	rng   LogRange
 	query string
+	// seq counts the fetches issued for this tab, so every one of them can
+	// be told apart from the one before it.
+	seq int
+	// pending is the fetch this tab is waiting on, or the zero value when
+	// it is waiting on nothing (ReqID 0 means idle; ids start at 1). It
+	// carries the identity every response is matched against, and lets a
+	// tab switch see that the page it would ask for is already on its way.
+	pending FetchLogsCmd
+	// loading is whether this tab has work in flight. It is per tab
+	// because the three tabs are three independent fetches: a System
+	// response landing while Traffic is still fetching must not tell
+	// Traffic it is finished and let it render "No traffic logs found".
+	loading bool
+	// since is the lower bound the current pagination started under. Every
+	// page of one pagination reuses it: recomputing it per page moves the
+	// window forward over a newest-first list that also grows at the head,
+	// so a skip counted from the rows already shown starts repeating them.
+	since time.Time
+	// lastRefresh is when this tab's rows arrived, so the tab bar's
+	// "Updated Ns ago" describes the rows on screen rather than whichever
+	// tab answered most recently.
+	lastRefresh time.Time
+}
+
+// inflightMatches reports whether the fetch this tab is waiting on was issued
+// under the given range and query, and so will return rows the view still
+// wants.
+func (s logTabState) inflightMatches(rng LogRange, query string) bool {
+	return s.pending.ReqID != 0 && s.pending.Range == rng && s.pending.Query == query
 }
 
 func (m LogsModel) tabState(t models.LogType) logTabState {
@@ -104,6 +166,12 @@ func (m *LogsModel) setTabState(t models.LogType, s logTabState) {
 		m.tabs = make(map[models.LogType]logTabState, 3)
 	}
 	m.tabs[t] = s
+}
+
+// syncLoading mirrors the active tab's in-flight state onto TableBase.Loading,
+// which drives the loading banner and the parent's spinner gate.
+func (m *LogsModel) syncLoading() {
+	m.Loading = m.tabState(m.activeLogType).loading
 }
 
 // tabStale reports whether a tab's rows were fetched under a different range
@@ -165,11 +233,9 @@ func (r LogRange) Since(now time.Time) time.Time {
 // Range is the selected time-range preset.
 func (m LogsModel) Range() LogRange { return m.rng }
 
-// RangeSince is the lower bound implied by the selected range.
-func (m LogsModel) RangeSince() time.Time { return m.rng.Since(time.Now()) }
-
-// Query is the last expression the device accepted.
-func (m LogsModel) Query() string { return m.query }
+// Query is the last expression the device accepted. An expression the device
+// refused is never reported here.
+func (m LogsModel) Query() string { return m.accepted }
 
 func NewLogsModel() LogsModel {
 	base := NewTableBase("Filter logs...")
@@ -191,6 +257,7 @@ func NewLogsModel() LogsModel {
 // chosen with the bracket keys; this lets callers address a tab directly.
 func (m LogsModel) SetActiveLogType(t models.LogType) LogsModel {
 	m.activeLogType = t
+	m.syncLoading()
 	return m
 }
 
@@ -227,8 +294,15 @@ func queryInputWidth(termWidth int, prompt string) int {
 	return max(termWidth-overhead, minQueryInputWidth)
 }
 
+// SetLoading marks the tab on screen as loading or idle. Loading is per tab
+// rather than per view: the three tabs are three independent fetches, so a
+// response for one of them must not decide whether the others are still
+// waiting.
 func (m LogsModel) SetLoading(loading bool) LogsModel {
-	m.TableBase = m.TableBase.SetLoading(loading)
+	s := m.tabState(m.activeLogType)
+	s.loading = loading
+	m.setTabState(m.activeLogType, s)
+	m.syncLoading()
 	return m
 }
 
@@ -247,73 +321,120 @@ func (m LogsModel) HasData() bool {
 // existing rows are left alone rather than replaced with nil: a later query
 // the device rejects must not blank rows already on screen.
 func (m LogsModel) SetSystemLogs(logs []models.SystemLogEntry, meta LogPageMeta, err error) LogsModel {
-	s := m.tabState(models.LogTypeSystem)
-	s.err = err
+	t := models.LogTypeSystem
+	m, wanted := m.beginPage(t, meta)
+	if !wanted {
+		return m
+	}
 	if err == nil {
-		if meta.Append {
+		if meta.Req.Append {
 			m.systemLogs = append(m.systemLogs, logs...)
 		} else {
 			m.systemLogs = logs
 		}
-		s.fetched = len(m.systemLogs)
-		s.hasMore = meta.HasMore
-		s.sent = meta.Sent
-		s.rng = m.rng
-		s.query = m.query
 	}
-	m.setTabState(models.LogTypeSystem, s)
-	m.Loading = false
-	m.lastRefresh = time.Now()
-	m.applyFilter()
-	m.ensureCursorValid()
-	return m
+	return m.finishPage(t, meta, err, len(m.systemLogs))
 }
 
 // SetTrafficLogs records the result of a traffic log fetch. See
 // SetSystemLogs for the error-preserves-rows behavior.
 func (m LogsModel) SetTrafficLogs(logs []models.TrafficLogEntry, meta LogPageMeta, err error) LogsModel {
-	s := m.tabState(models.LogTypeTraffic)
-	s.err = err
+	t := models.LogTypeTraffic
+	m, wanted := m.beginPage(t, meta)
+	if !wanted {
+		return m
+	}
 	if err == nil {
-		if meta.Append {
+		if meta.Req.Append {
 			m.trafficLogs = append(m.trafficLogs, logs...)
 		} else {
 			m.trafficLogs = logs
 		}
-		s.fetched = len(m.trafficLogs)
-		s.hasMore = meta.HasMore
-		s.sent = meta.Sent
-		s.rng = m.rng
-		s.query = m.query
 	}
-	m.setTabState(models.LogTypeTraffic, s)
-	m.Loading = false
-	m.lastRefresh = time.Now()
-	m.applyFilter()
-	m.ensureCursorValid()
-	return m
+	return m.finishPage(t, meta, err, len(m.trafficLogs))
 }
 
 // SetThreatLogs records the result of a threat log fetch. See
 // SetSystemLogs for the error-preserves-rows behavior.
 func (m LogsModel) SetThreatLogs(logs []models.ThreatLogEntry, meta LogPageMeta, err error) LogsModel {
-	s := m.tabState(models.LogTypeThreat)
-	s.err = err
+	t := models.LogTypeThreat
+	m, wanted := m.beginPage(t, meta)
+	if !wanted {
+		return m
+	}
 	if err == nil {
-		if meta.Append {
+		if meta.Req.Append {
 			m.threatLogs = append(m.threatLogs, logs...)
 		} else {
 			m.threatLogs = logs
 		}
-		s.fetched = len(m.threatLogs)
+	}
+	return m.finishPage(t, meta, err, len(m.threatLogs))
+}
+
+// beginPage decides what to do with a completed fetch before its rows are
+// touched. The second result reports whether the page is still wanted; when
+// it is not, the returned model has already recorded whatever the tab's
+// in-flight state should become.
+//
+// A page takes 1–4 seconds to arrive, and two things can happen in that time.
+// The tab may have asked again — another page, a refresh, a revisit — in
+// which case a newer fetch is still on its way and this one is simply late.
+// Or the range or query may have moved on, which every tab's rows are keyed
+// to; that tab is then idle but stale, and is refetched when next shown.
+// Applying a page in either state appends rows gathered under one selection
+// onto rows gathered under another and then labels the mixture with the
+// current one.
+func (m LogsModel) beginPage(t models.LogType, meta LogPageMeta) (LogsModel, bool) {
+	s := m.tabState(t)
+	if meta.Req.ReqID != s.pending.ReqID {
+		// Superseded. The newer request is still outstanding, so the tab
+		// stays loading and keeps waiting for it.
+		return m, false
+	}
+	if meta.Req.Range != m.rng || meta.Req.Query != m.query {
+		s.pending = FetchLogsCmd{}
+		s.loading = false
+		m.setTabState(t, s)
+		m.syncLoading()
+		return m, false
+	}
+	return m, true
+}
+
+// finishPage records the outcome of a page the tab was waiting for. rows is
+// how many rows the tab holds now that the caller has stored them.
+func (m LogsModel) finishPage(t models.LogType, meta LogPageMeta, err error, rows int) LogsModel {
+	s := m.tabState(t)
+	s.err = err
+	s.pending = FetchLogsCmd{}
+	s.loading = false
+	s.lastRefresh = time.Now()
+	s.since = meta.Req.Since
+	if err == nil {
+		s.errQuery = ""
+		s.fetched = rows
 		s.hasMore = meta.HasMore
 		s.sent = meta.Sent
-		s.rng = m.rng
-		s.query = m.query
+		// Stamped from the request rather than from the current
+		// selection, so these rows are labeled with what actually
+		// produced them.
+		s.rng = meta.Req.Range
+		s.query = meta.Req.Query
+		m.accepted = meta.Req.Query
+	} else {
+		s.errQuery = meta.Req.Query
+		// The device would not answer this expression, so it is not the
+		// one to keep asking with. Reverting means a refresh re-sends the
+		// last accepted query instead of retrying a refused one, and the
+		// other tabs stop reading stale against something that never
+		// produced a row.
+		if m.query != m.accepted && meta.Req.Query == m.query {
+			m.query = m.accepted
+		}
 	}
-	m.setTabState(models.LogTypeThreat, s)
-	m.Loading = false
-	m.lastRefresh = time.Now()
+	m.setTabState(t, s)
+	m.syncLoading()
 	m.applyFilter()
 	m.ensureCursorValid()
 	return m
@@ -323,16 +444,52 @@ func (m LogsModel) ActiveLogType() models.LogType {
 	return m.activeLogType
 }
 
-// fetchRequest builds the command that asks for one page of a tab.
-func (m LogsModel) fetchRequest(t models.LogType, skip int, appendRows bool) tea.Cmd {
-	req := FetchLogsCmd{
+// fetchRequest mints one page request for a tab and records it as the fetch
+// that tab is now waiting on. Every response is matched back against that
+// record, so a page the view has stopped wanting is dropped rather than
+// merged into rows it does not belong with.
+//
+// It has a pointer receiver because minting a request is a state change:
+// callers must keep the model it returns through, or the tab will not know
+// what it asked for.
+func (m *LogsModel) fetchRequest(t models.LogType, skip int, appendRows bool) tea.Cmd {
+	s := m.tabState(t)
+	s.seq++
+	if !appendRows {
+		// A pagination fixes its lower bound when it starts and every
+		// later page reuses it. Recomputing the bound per page walks the
+		// window forward across a newest-first list that is also growing
+		// at the head, so a skip counted from the rows already on screen
+		// stops pointing past them and rows repeat.
+		s.since = m.rng.Since(time.Now())
+	}
+	s.pending = FetchLogsCmd{
 		Type:   t,
 		Query:  m.query,
-		Since:  m.RangeSince(),
+		Since:  s.since,
 		Skip:   skip,
 		Append: appendRows,
+		Range:  m.rng,
+		ReqID:  s.seq,
 	}
+	s.loading = true
+	m.setTabState(t, s)
+	m.syncLoading()
+
+	req := s.pending
 	return func() tea.Msg { return req }
+}
+
+// needsFetch reports whether a tab has to be asked for a first page: it holds
+// nothing, or its rows predate the current range or query. A fetch for
+// exactly that selection already on its way counts as covered — asking again
+// would spend another couple of megabytes and another device job to receive
+// the same page twice.
+func (m LogsModel) needsFetch(t models.LogType) bool {
+	if m.rowCount(t) > 0 && !m.tabStale(t) {
+		return false
+	}
+	return !m.tabState(t).inflightMatches(m.rng, m.query)
 }
 
 // onTabSwitch resets the cursor and asks for the newly shown tab when it has
@@ -341,13 +498,16 @@ func (m LogsModel) onTabSwitch() (LogsModel, tea.Cmd) {
 	m.Cursor = 0
 	m.Offset = 0
 	m.Expanded = false
+	// The tab on screen changed, so the banner and the spinner gate now
+	// follow a different tab's in-flight state.
+	m.syncLoading()
 
-	if m.rowCount(m.activeLogType) == 0 || m.tabStale(m.activeLogType) {
-		// Without this, the first visit to a tab renders its empty state
-		// for however long the fetch takes — an empty table asserting
-		// there are no logs when it simply has not asked yet.
-		m = m.SetLoading(true)
-		return m, m.fetchRequest(m.activeLogType, 0, false)
+	if m.needsFetch(m.activeLogType) {
+		// Without the loading state, the first visit to a tab renders its
+		// empty state for however long the fetch takes — an empty table
+		// asserting there are no logs when it simply has not asked yet.
+		cmd := m.fetchRequest(m.activeLogType, 0, false)
+		return m, cmd
 	}
 	return m, nil
 }
@@ -365,7 +525,18 @@ func (m LogsModel) onQueryChanged() (LogsModel, tea.Cmd) {
 	m.Cursor = 0
 	m.Offset = 0
 	m.Expanded = false
-	return m, m.fetchRequest(m.activeLogType, 0, false)
+	cmd := m.fetchRequest(m.activeLogType, 0, false)
+	return m, cmd
+}
+
+// RefreshActiveTab resets the tab on screen to its first page and asks for it
+// again under the current range and query. Pages loaded with m are dropped:
+// after paging back through 2,000 rows, a refresh should return the newest
+// page, which is what refresh means. The parent calls this instead of
+// building a request of its own, so every fetch carries an identity and no
+// path can issue one the view does not know it is waiting for.
+func (m LogsModel) RefreshActiveTab() (LogsModel, tea.Cmd) {
+	return m.onQueryChanged()
 }
 
 // rowCount is how many unfiltered rows a tab holds.
@@ -513,19 +684,28 @@ func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
 			return m.onQueryChanged()
 		case "f":
 			m.queryMode = true
-			m.queryInput.SetValue(m.query)
+			// Opened with the last committed text rather than the last
+			// accepted one, so an expression the device refused can be
+			// corrected instead of retyped.
+			m.queryInput.SetValue(m.committed)
 			m.queryInput.Focus()
 			m.queryInput.CursorEnd()
 			return m, textinput.Blink
 		case "m":
 			s := m.tabState(m.activeLogType)
-			if !s.hasMore {
+			if !s.hasMore || s.loading {
+				// A page already on its way carries the skip this
+				// keypress would reuse: fetched only moves when a page
+				// lands, so a second m asks for the same rows again,
+				// appends them twice, and leaves the page after that
+				// starting past a gap of rows nobody ever sees.
 				return m, nil
 			}
 			// Deliberately not automatic on reaching the last row: a
 			// page is a couple of megabytes and a second or more, which
 			// is not what a j keypress should cost.
-			return m, m.fetchRequest(m.activeLogType, s.fetched, true)
+			cmd := m.fetchRequest(m.activeLogType, s.fetched, true)
+			return m, cmd
 		case "]":
 			// Cycle forward through log types: System -> Traffic -> Threat -> System
 			switch m.activeLogType {
@@ -562,20 +742,24 @@ func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
 	return m, nil
 }
 
-// updateQueryMode edits the device query. Enter commits and refetches; esc
-// abandons the edit and leaves the last accepted query in place.
+// updateQueryMode edits the device query. Enter sends it and refetches; esc
+// abandons the edit and leaves the last committed expression in the bar.
 func (m LogsModel) updateQueryMode(msg tea.Msg) (LogsModel, tea.Cmd) {
 	if key, ok := msg.(tea.KeyPressMsg); ok {
 		switch key.String() {
 		case "enter":
 			m.queryMode = false
 			m.queryInput.Blur()
-			m.query = strings.TrimSpace(m.queryInput.Value())
+			// query is what the view now asks for; accepted only moves
+			// once the device answers it without an error, so a refused
+			// expression is never stored.
+			m.committed = strings.TrimSpace(m.queryInput.Value())
+			m.query = m.committed
 			return m.onQueryChanged()
 		case "esc":
 			m.queryMode = false
 			m.queryInput.Blur()
-			m.queryInput.SetValue(m.query)
+			m.queryInput.SetValue(m.committed)
 			return m, nil
 		}
 	}
@@ -645,14 +829,22 @@ func (m LogsModel) View() string {
 		sections = append(sections, FilterInfoStyle.Render(strings.Join(wrapText(info, m.Width), "\n")))
 	}
 
-	// Error or content
-	if activeErr := m.activeErr(); activeErr != nil {
+	// Error and content. A failed fetch is shown above the rows it could
+	// not replace rather than instead of them: the device refusing a query
+	// is no reason to take away the results the operator was reading, and
+	// those rows are what they compare the message against. With nothing
+	// loaded there is no table worth rendering, so the error stands alone.
+	activeErr := m.activeErr()
+	if activeErr != nil {
 		sections = append(sections, m.renderError(activeErr))
-	} else if !m.Loading || m.filteredCount() > 0 {
-		sections = append(sections, m.renderTable())
+	}
+	if activeErr == nil || m.rowCount(m.activeLogType) > 0 {
+		if !m.Loading || m.filteredCount() > 0 {
+			sections = append(sections, m.renderTable())
 
-		if m.Expanded && m.filteredCount() > 0 {
-			sections = append(sections, m.renderDetailPanel())
+			if m.Expanded && m.filteredCount() > 0 {
+				sections = append(sections, m.renderDetailPanel())
+			}
 		}
 	}
 
@@ -693,8 +885,8 @@ func (m LogsModel) renderTabBar() string {
 	sortInfo := StatusMutedStyle.Render(fmt.Sprintf("Sort: %s", m.sortLabel()))
 
 	var updateInfo string
-	if !m.lastRefresh.IsZero() {
-		ago := time.Since(m.lastRefresh).Truncate(time.Second)
+	if last := m.tabState(m.activeLogType).lastRefresh; !last.IsZero() {
+		ago := time.Since(last).Truncate(time.Second)
 		updateInfo = StatusMutedStyle.Render(fmt.Sprintf("  |  Updated %s ago", ago))
 	}
 
@@ -719,8 +911,17 @@ func (m LogsModel) renderFilterBar() string {
 	return FilterBorderStyle.Render(m.Filter.View()) + "\n"
 }
 
+// renderError shows the device's own message, and the expression that
+// produced it when there was one. The message alone rarely names what was
+// asked -- "syntax error at 14:50:57" says nothing about which query -- and a
+// refused expression is deliberately not stored anywhere else, so this is the
+// only place the operator can read the two together.
 func (m LogsModel) renderError(err error) string {
-	return ErrorMsgStyle.Bold(true).Padding(1, 0).Render(fmt.Sprintf("Error: %v", err))
+	lines := wrapText(fmt.Sprintf("Error: %v", err), m.Width)
+	if q := m.tabState(m.activeLogType).errQuery; q != "" {
+		lines = append(lines, wrapText("Query: "+q, m.Width)...)
+	}
+	return ErrorMsgStyle.Bold(true).Padding(1, 0).Render(strings.Join(lines, "\n"))
 }
 
 func (m LogsModel) renderTable() string {

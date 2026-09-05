@@ -35,9 +35,6 @@ func TestLogsModel_QueryCommitsOnEnter(t *testing.T) {
 	if m.IsQueryMode() {
 		t.Error("enter did not leave query mode")
 	}
-	if m.Query() != "addr.src in 203.0.113.5" {
-		t.Errorf("Query() = %q, want the typed expression", m.Query())
-	}
 	if cmd == nil {
 		t.Fatal("committing a query did not refetch")
 	}
@@ -47,6 +44,15 @@ func TestLogsModel_QueryCommitsOnEnter(t *testing.T) {
 	}
 	if req.Query != "addr.src in 203.0.113.5" {
 		t.Errorf("request carried %q", req.Query)
+	}
+	// Enter sends the expression; it becomes the stored query only once the
+	// device answers it, because a refused one is never stored.
+	if got := m.Query(); got != "" {
+		t.Errorf("Query() = %q before the device answered, want empty", got)
+	}
+	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{Req: req}, nil)
+	if m.Query() != "addr.src in 203.0.113.5" {
+		t.Errorf("Query() = %q, want the accepted expression", m.Query())
 	}
 }
 

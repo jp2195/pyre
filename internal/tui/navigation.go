@@ -152,8 +152,12 @@ var navDefs = []navGroupDef{
 				view:    ViewLogs,
 				hasData: func(m *Model) bool { return m.logs.HasData() },
 				fetch: func(m *Model) tea.Cmd {
-					m.logs = m.logs.SetLoading(true)
-					return m.fetchLogs()
+					// The view mints the request so it records what it
+					// is waiting for, and sets the tab's loading state
+					// as it does.
+					var cmd tea.Cmd
+					m.logs, cmd = m.logs.RefreshActiveTab()
+					return cmd
 				},
 			}},
 		},

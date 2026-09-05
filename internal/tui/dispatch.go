@@ -42,7 +42,10 @@ func (m Model) handleDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.fetchSessionDetail(msg.SessionID)
 
 	case views.FetchLogsCmd:
-		return m, m.fetchLogsFor(msg)
+		// Batched with the spinner tick: the view sets the tab's loading
+		// state when it mints the request, and without a tick the banner
+		// it renders sits on one frozen frame.
+		return m, tea.Batch(m.fetchLogsFor(msg), m.spinner.Tick)
 
 	default:
 		// A message type not registered above would otherwise vanish
@@ -205,15 +208,15 @@ func (m Model) handleViewDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sessions = m.sessions.SetDetail(msg.Detail, msg.Err)
 	case SystemLogsMsg:
 		m.logs = m.logs.SetSystemLogs(msg.Logs, views.LogPageMeta{
-			HasMore: msg.HasMore, Sent: msg.Sent, Append: msg.Append,
+			Req: msg.Req, HasMore: msg.HasMore, Sent: msg.Sent,
 		}, msg.Err)
 	case TrafficLogsMsg:
 		m.logs = m.logs.SetTrafficLogs(msg.Logs, views.LogPageMeta{
-			HasMore: msg.HasMore, Sent: msg.Sent, Append: msg.Append,
+			Req: msg.Req, HasMore: msg.HasMore, Sent: msg.Sent,
 		}, msg.Err)
 	case ThreatLogsMsg:
 		m.logs = m.logs.SetThreatLogs(msg.Logs, views.LogPageMeta{
-			HasMore: msg.HasMore, Sent: msg.Sent, Append: msg.Append,
+			Req: msg.Req, HasMore: msg.HasMore, Sent: msg.Sent,
 		}, msg.Err)
 	case ARPTableMsg:
 		m.networkDashboard = m.networkDashboard.SetARPTable(msg.Entries, msg.Err)
@@ -386,8 +389,9 @@ func (m Model) handleSwitchView(msg SwitchViewMsg) (tea.Model, tea.Cmd) {
 		}
 	case ViewLogs:
 		if !m.logs.HasData() {
-			m.logs = m.logs.SetLoading(true)
-			return m, m.fetchLogs()
+			var cmd tea.Cmd
+			m.logs, cmd = m.logs.RefreshActiveTab()
+			return m, tea.Batch(cmd, m.spinner.Tick)
 		}
 	case ViewObjects:
 		if !m.objects.HasData() {

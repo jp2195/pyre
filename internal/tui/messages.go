@@ -107,27 +107,31 @@ type PanoramaDetectedMsg struct {
 	Model      string
 }
 
+// The three log messages carry the request they answer, not just its result.
+// A page takes seconds to arrive and the view may have moved on -- another
+// page, a different range, a query the operator changed -- so the view needs
+// the fetch's identity to tell a page it still wants from one it does not.
 type SystemLogsMsg struct {
 	Logs    []models.SystemLogEntry
+	Req     views.FetchLogsCmd
 	HasMore bool
 	Sent    string
-	Append  bool
 	Err     error
 }
 
 type TrafficLogsMsg struct {
 	Logs    []models.TrafficLogEntry
+	Req     views.FetchLogsCmd
 	HasMore bool
 	Sent    string
-	Append  bool
 	Err     error
 }
 
 type ThreatLogsMsg struct {
 	Logs    []models.ThreatLogEntry
+	Req     views.FetchLogsCmd
 	HasMore bool
 	Sent    string
-	Append  bool
 	Err     error
 }
 
