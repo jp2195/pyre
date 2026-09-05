@@ -1,5 +1,5 @@
 # Binaries
-pyre
+/pyre
 /main
 *.exe
 *.dll
