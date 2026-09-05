@@ -74,7 +74,7 @@ func TestLogs_SecondMoreIsIgnoredWhileAPageIsInFlight(t *testing.T) {
 		t.Fatalf("rows = %d, want 1000", got)
 	}
 
-	m, cmd = m.Update(logKey('m'))
+	_, cmd = m.Update(logKey('m'))
 	if next := mustFetchReq(t, cmd); next.Skip != 1000 {
 		t.Errorf("next page Skip = %d, want 1000: paging stepped over rows nobody saw", next.Skip)
 	}
@@ -207,7 +207,7 @@ func TestLogs_PagingReusesTheBoundThePaginationStartedWith(t *testing.T) {
 	}
 	m = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{Req: first, HasMore: true}, nil)
 
-	m, cmd = m.Update(logKey('m'))
+	_, cmd = m.Update(logKey('m'))
 	next := mustFetchReq(t, cmd)
 	if !next.Since.Equal(first.Since) {
 		t.Errorf("page 2 bound = %v, want page 1's bound %v", next.Since, first.Since)
