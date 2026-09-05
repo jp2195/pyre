@@ -144,6 +144,17 @@ func renderBar(percent float64, width int, c color.Color) string {
 	return bar.String()
 }
 
+// formatThreatTotal renders a threat count that came from a capped query.
+// Hitting the cap means the device had at least that many, so the figure is a
+// floor rather than a total and is shown as such.
+func formatThreatTotal(ts *models.ThreatSummary) string {
+	n := formatNumberWithCommas(ts.TotalThreats)
+	if ts.SampleLimit > 0 && ts.TotalThreats >= int64(ts.SampleLimit) {
+		return n + "+"
+	}
+	return n
+}
+
 func formatThroughput(kbps int64) string {
 	if kbps == 0 {
 		return "0 Kbps"

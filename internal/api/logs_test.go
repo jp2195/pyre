@@ -247,11 +247,14 @@ func TestGetThreatLogs_SanitizesThreatFields(t *testing.T) {
 			fmt.Fprint(w, `<response status="success"><result><job>1</job></result></response>`)
 		default:
 			// Poll: return FIN with a threat log entry that has DEL (0x7F) in
-			// threat name (<threat>), URL (<misc>), and filename (<filename>).
+			// threat name (<threat_name>), URL (<misc>), and filename
+			// (<filename>). The element is threat_name, not threat: a real
+			// PAN-OS threat log has no <threat> element, and this fixture
+			// previously invented one that matched the code's own mistake.
 			fmt.Fprint(w, `<response status="success"><result><log><logs><entry>`+
 				`<time_generated>2026/06/12 12:00:00</time_generated>`+
 				`<type>threat</type><subtype>vulnerability</subtype>`+
-				`<threat>bad`+"\x7f"+`name</threat>`+
+				`<threat_name>bad`+"\x7f"+`name</threat_name>`+
 				`<misc>http://evil`+"\x7f"+`.example.com/path</misc>`+
 				`<filename>mal`+"\x7f"+`ware.exe</filename>`+
 				`<src>10.0.0.1</src><dst>10.0.0.2</dst>`+
@@ -344,8 +347,10 @@ func TestGetThreatLogs_PANOS11NamedThreatID(t *testing.T) {
 	if logs[0].ThreatName != "Proxy:mask.test-dns.net" {
 		t.Errorf("ThreatName = %q, want %q", logs[0].ThreatName, "Proxy:mask.test-dns.net")
 	}
-	if logs[0].ThreatID != 109010004 {
-		t.Errorf("ThreatID = %d, want 109010004", logs[0].ThreatID)
+	// threatid is the name-shaped value on 11.x; the numeric id lives in
+	// <tid>, which nothing consumes yet.
+	if logs[0].ThreatID != "Proxy:mask.test-dns.net" {
+		t.Errorf("ThreatID = %q, want %q", logs[0].ThreatID, "Proxy:mask.test-dns.net")
 	}
 	if logs[0].Severity != "low" {
 		t.Errorf("Severity = %q, want %q", logs[0].Severity, "low")
@@ -377,8 +382,8 @@ func TestGetThreatLogs_LegacyNumericThreatID(t *testing.T) {
 	if len(logs) != 1 {
 		t.Fatalf("expected 1 log entry, got %d", len(logs))
 	}
-	if logs[0].ThreatID != 30003 {
-		t.Errorf("ThreatID = %d, want 30003", logs[0].ThreatID)
+	if logs[0].ThreatID != "30003" {
+		t.Errorf("ThreatID = %q, want %q", logs[0].ThreatID, "30003")
 	}
 	if logs[0].ThreatName != "Trojan.GenericKD" {
 		t.Errorf("ThreatName = %q, want %q", logs[0].ThreatName, "Trojan.GenericKD")

@@ -100,6 +100,9 @@ type Interface struct {
 	Comment       string
 }
 
+// ThreatSummary aggregates the most recent threat log entries. It is a
+// sample, not a census: the query is capped at SampleLimit, so a view showing
+// these figures should say what they cover rather than implying a total.
 type ThreatSummary struct {
 	TotalThreats  int64
 	CriticalCount int64
@@ -108,6 +111,10 @@ type ThreatSummary struct {
 	LowCount      int64
 	BlockedCount  int64
 	AlertedCount  int64
+
+	// SampleLimit is how many entries were requested. TotalThreats reaching
+	// it means the device had at least that many and the real count is higher.
+	SampleLimit int
 }
 
 type GlobalProtectInfo struct {

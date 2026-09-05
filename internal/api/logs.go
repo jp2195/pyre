@@ -336,13 +336,15 @@ func (c *Client) GetThreatLogs(ctx context.Context, query string, maxLogs int, t
 				Action      string `xml:"action"`
 				SessionID   int64  `xml:"sessionid"`
 				User        string `xml:"srcuser"`
-				// threatid is int64 on pre-11.x PAN-OS but carries the
-				// threat *name* on 11.x ("Proxy:mask.test-dns.net"), with
-				// the numeric id moved to <tid>. Decode as string and sort
-				// it out below — an int64 here fails the whole batch.
 				ThreatID    string `xml:"threatid"`
-				TID         int64  `xml:"tid"`
-				ThreatName  string `xml:"threat"`
+				// PAN-OS 11.x sends the readable name in threat_name, and threatid
+				// itself carries a name-shaped value ("Proxy:mask.test-dns.net")
+				// with the numeric id moved to <tid>. Verified on a PA-440 running
+				// 11.2.10-h8. Decoding threatid as int64 failed the whole batch.
+				ThreatName string `xml:"threat_name"`
+				// LegacyName is the pre-11.x <threat> element. No pre-11.x device
+				// was available to verify it, so it is only ever a fallback.
+				LegacyName  string `xml:"threat"`
 				ThreatCat   string `xml:"thr_category"`
 				Severity    string `xml:"severity"`
 				Direction   string `xml:"direction"`
@@ -363,19 +365,17 @@ func (c *Client) GetThreatLogs(ctx context.Context, query string, maxLogs int, t
 
 	logs := make([]models.ThreatLogEntry, 0, len(statusResult.Logs.Entry))
 	for _, e := range statusResult.Logs.Entry {
-		// Reconcile the two PAN-OS threatid shapes:
-		//   pre-11.x: <threatid>30003</threatid><threat>Trojan.GenericKD</threat>
-		//   11.x:     <threatid>Proxy:mask.test-dns.net</threatid><tid>109010004</tid>
-		threatID := e.TID
+		// Resolve the readable name across the three shapes PAN-OS has used:
+		// 11.x threat_name, pre-11.x <threat>, and 11.x threatid when it is
+		// name-shaped rather than numeric.
 		threatName := e.ThreatName
-		if n, err := strconv.ParseInt(e.ThreatID, 10, 64); err == nil {
-			// Numeric threatid — the legacy shape.
-			if threatID == 0 {
-				threatID = n
+		if threatName == "" {
+			threatName = e.LegacyName
+		}
+		if threatName == "" && e.ThreatID != "" {
+			if _, err := strconv.ParseInt(e.ThreatID, 10, 64); err != nil {
+				threatName = e.ThreatID
 			}
-		} else if e.ThreatID != "" && threatName == "" {
-			// Non-numeric threatid is the threat name on 11.x.
-			threatName = e.ThreatID
 		}
 
 		entry := models.ThreatLogEntry{
@@ -397,7 +397,7 @@ func (c *Client) GetThreatLogs(ctx context.Context, query string, maxLogs int, t
 			Action:         e.Action,
 			SessionID:      e.SessionID,
 			User:           e.User,
-			ThreatID:       threatID,
+			ThreatID:       e.ThreatID,
 			ThreatName:     threatName,
 			ThreatCategory: e.ThreatCat,
 			Severity:       e.Severity,

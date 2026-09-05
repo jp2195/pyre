@@ -90,8 +90,11 @@ type ThreatLogEntry struct {
 	User        string
 	SessionID   int64
 
-	// Threat details
-	ThreatID       int64
+	// Threat details.
+	// ThreatID is a name, not a number: PAN-OS reports values like
+	// "Proxy:mask.test-dns.net" and "generic:example-threat.com". Typing it as an
+	// integer made every threat log fetch fail to decode.
+	ThreatID       string
 	ThreatName     string
 	ThreatCategory string
 	Severity       string // critical, high, medium, low, informational

@@ -335,3 +335,24 @@ func makeLines(n int) []string {
 	}
 	return out
 }
+
+// TestFormatThreatTotal_MarksACappedCount checks the threat figure reads as a
+// floor when the query hit its cap, rather than as a complete total.
+func TestFormatThreatTotal_MarksACappedCount(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		in   models.ThreatSummary
+		want string
+	}{
+		{"below the cap", models.ThreatSummary{TotalThreats: 42, SampleLimit: 100}, "42"},
+		{"at the cap", models.ThreatSummary{TotalThreats: 100, SampleLimit: 100}, "100+"},
+		{"no cap recorded", models.ThreatSummary{TotalThreats: 7}, "7"},
+		{"thousands separator", models.ThreatSummary{TotalThreats: 1234, SampleLimit: 5000}, "1,234"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := formatThreatTotal(&tc.in); got != tc.want {
+				t.Errorf("formatThreatTotal = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

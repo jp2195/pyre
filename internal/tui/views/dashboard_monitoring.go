@@ -298,7 +298,7 @@ func (m DashboardModel) renderJobs(width int) string {
 
 func (m DashboardModel) renderThreatSummary(width int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle().Render("Threats"))
+	b.WriteString(titleStyle().Render("Threats (recent)"))
 	b.WriteString("\n")
 
 	if m.threatErr != nil || m.threatSummary == nil {

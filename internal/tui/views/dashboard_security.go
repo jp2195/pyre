@@ -2,7 +2,6 @@ package views
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -147,9 +146,10 @@ func (m SecurityDashboardModel) renderThreatBreakdown(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 
-	// Total count
-	b.WriteString(dimStyle().Render("Total: "))
-	b.WriteString(valueStyle().Render(strconv.FormatInt(ts.TotalThreats, 10)))
+	// The summary aggregates the most recent threat log entries, so label it
+	// as such rather than implying it counts every threat on the device.
+	b.WriteString(dimStyle().Render("Recent threats: "))
+	b.WriteString(valueStyle().Render(formatThreatTotal(ts)))
 	b.WriteString("\n\n")
 
 	// Action breakdown

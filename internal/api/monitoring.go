@@ -13,63 +13,63 @@ import (
 	"github.com/jp2195/pyre/internal/models"
 )
 
+// threatSummarySample caps how many threat log entries the summary examines.
+// The log query is capped server-side, so the result describes the most
+// recent threats rather than every threat the device has ever recorded.
+const threatSummarySample = 100
+
+// GetThreatSummary aggregates recent threat log entries by severity and action.
+//
+// This used to read dataplane global counters matching flow_threat_*, which
+// was wrong twice over on a PA-440 running 11.2.10-h8. The filtered counter
+// command fails outright there, so the panel showed nothing at all. And the
+// counters it would have read carry a severity of drop / info / warn, which
+// never matches a threat severity, so every severity bucket was zero while
+// the total accumulated raw packet counts since boot. The threat log is the
+// device's actual record of threats and carries real severities and actions.
 func (c *Client) GetThreatSummary(ctx context.Context, target string) (*models.ThreatSummary, error) {
-	// Fetch the global counters and filter for threat-related ones below.
-	//
-	// This used to pass <name>flow_threat_*</name>, but `show counter global`
-	// has no wildcard <name> filter — PAN-OS 11.2 rejects it outright
-	// ("An error occurred. See dagger.log"), so the threat panels on the
-	// Security dashboard could never populate on a real firewall.
-	resp, err := c.Op(ctx, "<show><counter><global></global></counter></show>", target)
+	logs, err := c.GetThreatLogs(ctx, "", threatSummarySample, target)
 	if err != nil {
 		return nil, err
 	}
-	if err := CheckResponse(resp); err != nil {
-		return nil, err
-	}
 
-	summary := &models.ThreatSummary{}
-
-	var result struct {
-		Entry []struct {
-			Name     string `xml:"name"`
-			Value    int64  `xml:"value"`
-			Rate     int64  `xml:"rate"`
-			Aspect   string `xml:"aspect"`
-			Desc     string `xml:"desc"`
-			Severity string `xml:"severity"`
-		} `xml:"global>counters>entry"`
-	}
-	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
-		// Return empty summary if parsing fails (device may not have threat
-		// prevention), but log it: schema drift would otherwise silently
-		// render as "0 threats" forever.
-		log.Printf("[API Warning] failed to parse threat summary counters: %v", err)
-		return summary, nil
-	}
-
-	for _, e := range result.Entry {
-		if strings.Contains(e.Name, "threat") || strings.Contains(e.Desc, "threat") {
-			summary.TotalThreats += e.Value
-			switch strings.ToLower(e.Severity) {
-			case "critical":
-				summary.CriticalCount += e.Value
-			case "high":
-				summary.HighCount += e.Value
-			case "medium":
-				summary.MediumCount += e.Value
-			case "low", "informational":
-				summary.LowCount += e.Value
-			}
-			if strings.Contains(e.Name, "block") || strings.Contains(e.Desc, "block") {
-				summary.BlockedCount += e.Value
-			} else {
-				summary.AlertedCount += e.Value
-			}
+	summary := &models.ThreatSummary{SampleLimit: threatSummarySample}
+	for _, l := range logs {
+		summary.TotalThreats++
+		switch strings.ToLower(l.Severity) {
+		case "critical":
+			summary.CriticalCount++
+		case "high":
+			summary.HighCount++
+		case "medium":
+			summary.MediumCount++
+		case "low", "informational":
+			summary.LowCount++
+		}
+		if threatActionStopped(l.Action) {
+			summary.BlockedCount++
+		} else {
+			summary.AlertedCount++
 		}
 	}
-
 	return summary, nil
+}
+
+// threatActionStopped reports whether a threat log action intervened in the
+// traffic rather than merely recording it.
+//
+// The vocabulary is PAN-OS's. alert and allow observe; everything else
+// intervenes, including sinkhole, which answers a DNS query with a controlled
+// address instead of the real one. Listing the observe-only actions rather
+// than the intervening ones means an action this code has not seen before
+// counts as an intervention, which is the safer way to be wrong in a panel
+// that tells an operator whether something was stopped.
+func threatActionStopped(action string) bool {
+	switch strings.ToLower(action) {
+	case "", "alert", "allow", "continue", "override":
+		return false
+	}
+	return true
 }
 
 func (c *Client) GetGlobalProtectInfo(ctx context.Context, target string) (*models.GlobalProtectInfo, error) {
