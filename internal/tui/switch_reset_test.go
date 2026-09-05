@@ -12,6 +12,7 @@ import (
 
 	"github.com/jp2195/pyre/internal/config"
 	"github.com/jp2195/pyre/internal/models"
+	"github.com/jp2195/pyre/internal/tui/views"
 )
 
 // seedViewData fills a representative spread of sub-views with data so a
@@ -21,7 +22,7 @@ func seedViewData(m *Model) {
 	m.dashboard = m.dashboard.SetSystemInfo(&models.SystemInfo{Hostname: "old-fw"}, nil)
 	m.policies = m.policies.SetPolicies([]models.SecurityRule{{Name: "old-rule"}}, nil)
 	m.sessions = m.sessions.SetSessions([]models.Session{{ID: 1}}, nil)
-	m.logs = m.logs.SetSystemLogs([]models.SystemLogEntry{{Description: "old"}}, nil)
+	m.logs = m.logs.SetSystemLogs([]models.SystemLogEntry{{Description: "old"}}, views.LogPageMeta{}, nil)
 	m.objects = m.objects.SetAddresses([]models.AddressObject{{Name: "old-addr"}}, nil)
 }
 

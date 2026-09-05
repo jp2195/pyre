@@ -6,6 +6,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/jp2195/pyre/internal/models"
+	"github.com/jp2195/pyre/internal/tui/views"
 )
 
 // TestFilterMode_GlobalKeysBypassGlobalHandlers guards against the
@@ -83,7 +84,7 @@ func TestFilterMode_GlobalKeysBypassGlobalHandlers(t *testing.T) {
 		}},
 		{"logs", func(t *testing.T) Model {
 			m := newTestModel(t, ViewLogs)
-			m.logs = m.logs.SetSystemLogs([]models.SystemLogEntry{{Description: "test-event"}}, nil)
+			m.logs = m.logs.SetSystemLogs([]models.SystemLogEntry{{Description: "test-event"}}, views.LogPageMeta{}, nil)
 			m.logs, _ = m.logs.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 			if !m.logs.IsFilterMode() {
 				t.Fatal("precondition: logs filter mode")

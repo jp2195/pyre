@@ -41,13 +41,13 @@ func TestLogTables_FitTheTerminalWidth(t *testing.T) {
 		set  func(LogsModel) LogsModel
 	}{
 		{"system", func(m LogsModel) LogsModel {
-			return m.SetSystemLogs(system, nil).SetActiveLogType(models.LogTypeSystem)
+			return m.SetSystemLogs(system, LogPageMeta{}, nil).SetActiveLogType(models.LogTypeSystem)
 		}},
 		{"traffic", func(m LogsModel) LogsModel {
-			return m.SetTrafficLogs(traffic, nil).SetActiveLogType(models.LogTypeTraffic)
+			return m.SetTrafficLogs(traffic, LogPageMeta{}, nil).SetActiveLogType(models.LogTypeTraffic)
 		}},
 		{"threat", func(m LogsModel) LogsModel {
-			return m.SetThreatLogs(threat, nil).SetActiveLogType(models.LogTypeThreat)
+			return m.SetThreatLogs(threat, LogPageMeta{}, nil).SetActiveLogType(models.LogTypeThreat)
 		}},
 	}
 

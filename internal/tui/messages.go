@@ -108,18 +108,27 @@ type PanoramaDetectedMsg struct {
 }
 
 type SystemLogsMsg struct {
-	Logs []models.SystemLogEntry
-	Err  error
+	Logs    []models.SystemLogEntry
+	HasMore bool
+	Sent    string
+	Append  bool
+	Err     error
 }
 
 type TrafficLogsMsg struct {
-	Logs []models.TrafficLogEntry
-	Err  error
+	Logs    []models.TrafficLogEntry
+	HasMore bool
+	Sent    string
+	Append  bool
+	Err     error
 }
 
 type ThreatLogsMsg struct {
-	Logs []models.ThreatLogEntry
-	Err  error
+	Logs    []models.ThreatLogEntry
+	HasMore bool
+	Sent    string
+	Append  bool
+	Err     error
 }
 
 // SwitchViewMsg requests switching to a specific view

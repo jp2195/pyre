@@ -41,6 +41,9 @@ func (m Model) handleDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case views.FetchDetailCmd:
 		return m, m.fetchSessionDetail(msg.SessionID)
 
+	case views.FetchLogsCmd:
+		return m, m.fetchLogsFor(msg)
+
 	default:
 		// A message type not registered above would otherwise vanish
 		// silently and look like "the fetch never returned".
@@ -201,11 +204,17 @@ func (m Model) handleViewDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SessionDetailMsg:
 		m.sessions = m.sessions.SetDetail(msg.Detail, msg.Err)
 	case SystemLogsMsg:
-		m.logs = m.logs.SetSystemLogs(msg.Logs, msg.Err)
+		m.logs = m.logs.SetSystemLogs(msg.Logs, views.LogPageMeta{
+			HasMore: msg.HasMore, Sent: msg.Sent, Append: msg.Append,
+		}, msg.Err)
 	case TrafficLogsMsg:
-		m.logs = m.logs.SetTrafficLogs(msg.Logs, msg.Err)
+		m.logs = m.logs.SetTrafficLogs(msg.Logs, views.LogPageMeta{
+			HasMore: msg.HasMore, Sent: msg.Sent, Append: msg.Append,
+		}, msg.Err)
 	case ThreatLogsMsg:
-		m.logs = m.logs.SetThreatLogs(msg.Logs, msg.Err)
+		m.logs = m.logs.SetThreatLogs(msg.Logs, views.LogPageMeta{
+			HasMore: msg.HasMore, Sent: msg.Sent, Append: msg.Append,
+		}, msg.Err)
 	case ARPTableMsg:
 		m.networkDashboard = m.networkDashboard.SetARPTable(msg.Entries, msg.Err)
 		if msg.Err == nil {

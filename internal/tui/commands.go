@@ -463,44 +463,47 @@ func (m Model) fetchSessionDetail(id int64) tea.Cmd {
 	})
 }
 
+// fetchLogs loads the tab that is on screen. The three log types are three
+// separate jobs on the device and a page of traffic is a couple of megabytes,
+// so fetching all three to fill tabs nobody is looking at is waste the view
+// used to pay on every entry and every refresh.
 func (m Model) fetchLogs() tea.Cmd {
+	return m.fetchLogsFor(views.FetchLogsCmd{
+		Type:  m.logs.ActiveLogType(),
+		Query: m.logs.Query(),
+		Since: m.logs.RangeSince(),
+	})
+}
+
+// fetchLogsFor performs one page fetch described by a view request.
+func (m Model) fetchLogsFor(req views.FetchLogsCmd) tea.Cmd {
 	conn := m.session.GetActiveConnection()
 	if conn == nil {
 		return nil
 	}
-
-	return tea.Batch(
-		m.fetchSystemLogs(conn),
-		m.fetchTrafficLogs(conn),
-		m.fetchThreatLogs(conn),
-	)
-}
-
-func (m Model) fetchSystemLogs(conn *auth.Connection) tea.Cmd {
 	target := conn.Target()
-	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (api.LogPage[models.SystemLogEntry], error) {
-		return conn.Client.GetSystemLogs(ctx, api.LogQuery{Max: 100}, target)
-	}, func(page api.LogPage[models.SystemLogEntry], err error) tea.Msg {
-		return SystemLogsMsg{Logs: page.Entries, Err: err}
-	})
-}
+	q := api.LogQuery{Query: req.Query, Since: req.Since, Skip: req.Skip}
 
-func (m Model) fetchTrafficLogs(conn *auth.Connection) tea.Cmd {
-	target := conn.Target()
-	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (api.LogPage[models.TrafficLogEntry], error) {
-		return conn.Client.GetTrafficLogs(ctx, api.LogQuery{Max: 100}, target)
-	}, func(page api.LogPage[models.TrafficLogEntry], err error) tea.Msg {
-		return TrafficLogsMsg{Logs: page.Entries, Err: err}
-	})
-}
-
-func (m Model) fetchThreatLogs(conn *auth.Connection) tea.Cmd {
-	target := conn.Target()
-	return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (api.LogPage[models.ThreatLogEntry], error) {
-		return conn.Client.GetThreatLogs(ctx, api.LogQuery{Max: 100}, target)
-	}, func(page api.LogPage[models.ThreatLogEntry], err error) tea.Msg {
-		return ThreatLogsMsg{Logs: page.Entries, Err: err}
-	})
+	switch req.Type {
+	case models.LogTypeTraffic:
+		return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (api.LogPage[models.TrafficLogEntry], error) {
+			return conn.Client.GetTrafficLogs(ctx, q, target)
+		}, func(page api.LogPage[models.TrafficLogEntry], err error) tea.Msg {
+			return TrafficLogsMsg{Logs: page.Entries, HasMore: page.HasMore, Sent: page.Query, Append: req.Append, Err: err}
+		})
+	case models.LogTypeThreat:
+		return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (api.LogPage[models.ThreatLogEntry], error) {
+			return conn.Client.GetThreatLogs(ctx, q, target)
+		}, func(page api.LogPage[models.ThreatLogEntry], err error) tea.Msg {
+			return ThreatLogsMsg{Logs: page.Entries, HasMore: page.HasMore, Sent: page.Query, Append: req.Append, Err: err}
+		})
+	default:
+		return fetchCmd(m.ctx, m.connEpoch, func(ctx context.Context) (api.LogPage[models.SystemLogEntry], error) {
+			return conn.Client.GetSystemLogs(ctx, q, target)
+		}, func(page api.LogPage[models.SystemLogEntry], err error) tea.Msg {
+			return SystemLogsMsg{Logs: page.Entries, HasMore: page.HasMore, Sent: page.Query, Append: req.Append, Err: err}
+		})
+	}
 }
 
 func (m Model) refreshCurrentView() tea.Cmd {

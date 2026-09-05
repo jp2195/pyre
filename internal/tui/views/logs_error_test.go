@@ -22,8 +22,8 @@ func TestLogsModel_ErrorIsScopedToItsLogType(t *testing.T) {
 	m = m.SetSize(120, 40)
 	m = m.SetSystemLogs([]models.SystemLogEntry{
 		{Time: time.Now(), Severity: "high", Type: "general", Description: "system-entry-marker"},
-	}, nil)
-	m = m.SetTrafficLogs(nil, errors.New("traffic-fetch-failed"))
+	}, LogPageMeta{}, nil)
+	m = m.SetTrafficLogs(nil, LogPageMeta{}, errors.New("traffic-fetch-failed"))
 
 	// The System tab is active by default and its fetch succeeded.
 	out := m.View()
@@ -48,9 +48,9 @@ func TestLogsModel_PerTypeErrorsDoNotOverwrite(t *testing.T) {
 	threatErr := errors.New("threat-failed")
 
 	m := NewLogsModel()
-	m = m.SetSystemLogs(nil, sysErr)
-	m = m.SetThreatLogs(nil, threatErr)
-	m = m.SetTrafficLogs([]models.TrafficLogEntry{{Time: time.Now()}}, nil)
+	m = m.SetSystemLogs(nil, LogPageMeta{}, sysErr)
+	m = m.SetThreatLogs(nil, LogPageMeta{}, threatErr)
+	m = m.SetTrafficLogs([]models.TrafficLogEntry{{Time: time.Now()}}, LogPageMeta{}, nil)
 
 	if !errors.Is(m.tabState(models.LogTypeSystem).err, sysErr) {
 		t.Errorf("systemErr = %v, want %v", m.tabState(models.LogTypeSystem).err, sysErr)

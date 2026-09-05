@@ -28,7 +28,7 @@ func threatLogsModel(t *testing.T, width int) LogsModel {
 		DestIP:         "203.0.113.99",
 		Action:         "sinkhole",
 		ThreatCategory: "adns-proxy",
-	}}, nil)
+	}}, LogPageMeta{}, nil)
 	m.activeLogType = models.LogTypeThreat
 	return m
 }
@@ -83,7 +83,7 @@ func TestTrafficLogTable_ShowsFullActionAndUsesWidth(t *testing.T) {
 		Application: "web-browsing",
 		Rule:        "permit-with-a-long-rule-name",
 		Bytes:       8877,
-	}}, nil)
+	}}, LogPageMeta{}, nil)
 	m.activeLogType = models.LogTypeTraffic
 
 	out := plain(m.View())

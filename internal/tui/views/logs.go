@@ -11,6 +11,27 @@ import (
 	"github.com/jp2195/pyre/internal/models"
 )
 
+// FetchLogsCmd asks the parent model to fetch one page for one log tab. The
+// view owns the range and the query but has no API client, so it describes
+// the fetch and the parent performs it — the same split FetchDetailCmd uses.
+type FetchLogsCmd struct {
+	Type   models.LogType
+	Query  string
+	Since  time.Time
+	Skip   int
+	Append bool
+}
+
+// LogPageMeta is what a completed fetch reports about the page it returned.
+// It exists so the views package never imports internal/api.
+type LogPageMeta struct {
+	HasMore bool
+	// Sent is the assembled expression the device received.
+	Sent string
+	// Append adds these rows to the tab instead of replacing them.
+	Append bool
+}
+
 type LogSortField int
 
 const (
@@ -186,10 +207,24 @@ func (m LogsModel) HasData() bool {
 	return m.systemLogs != nil || m.trafficLogs != nil || m.threatLogs != nil
 }
 
-func (m LogsModel) SetSystemLogs(logs []models.SystemLogEntry, err error) LogsModel {
-	m.systemLogs = logs
+// SetSystemLogs records the result of a system log fetch. On error the
+// existing rows are left alone rather than replaced with nil: a later query
+// the device rejects must not blank rows already on screen.
+func (m LogsModel) SetSystemLogs(logs []models.SystemLogEntry, meta LogPageMeta, err error) LogsModel {
 	s := m.tabState(models.LogTypeSystem)
 	s.err = err
+	if err == nil {
+		if meta.Append {
+			m.systemLogs = append(m.systemLogs, logs...)
+		} else {
+			m.systemLogs = logs
+		}
+		s.fetched = len(m.systemLogs)
+		s.hasMore = meta.HasMore
+		s.sent = meta.Sent
+		s.rng = m.rng
+		s.query = m.query
+	}
 	m.setTabState(models.LogTypeSystem, s)
 	m.Loading = false
 	m.lastRefresh = time.Now()
@@ -198,10 +233,23 @@ func (m LogsModel) SetSystemLogs(logs []models.SystemLogEntry, err error) LogsMo
 	return m
 }
 
-func (m LogsModel) SetTrafficLogs(logs []models.TrafficLogEntry, err error) LogsModel {
-	m.trafficLogs = logs
+// SetTrafficLogs records the result of a traffic log fetch. See
+// SetSystemLogs for the error-preserves-rows behavior.
+func (m LogsModel) SetTrafficLogs(logs []models.TrafficLogEntry, meta LogPageMeta, err error) LogsModel {
 	s := m.tabState(models.LogTypeTraffic)
 	s.err = err
+	if err == nil {
+		if meta.Append {
+			m.trafficLogs = append(m.trafficLogs, logs...)
+		} else {
+			m.trafficLogs = logs
+		}
+		s.fetched = len(m.trafficLogs)
+		s.hasMore = meta.HasMore
+		s.sent = meta.Sent
+		s.rng = m.rng
+		s.query = m.query
+	}
 	m.setTabState(models.LogTypeTraffic, s)
 	m.Loading = false
 	m.lastRefresh = time.Now()
@@ -210,10 +258,23 @@ func (m LogsModel) SetTrafficLogs(logs []models.TrafficLogEntry, err error) Logs
 	return m
 }
 
-func (m LogsModel) SetThreatLogs(logs []models.ThreatLogEntry, err error) LogsModel {
-	m.threatLogs = logs
+// SetThreatLogs records the result of a threat log fetch. See
+// SetSystemLogs for the error-preserves-rows behavior.
+func (m LogsModel) SetThreatLogs(logs []models.ThreatLogEntry, meta LogPageMeta, err error) LogsModel {
 	s := m.tabState(models.LogTypeThreat)
 	s.err = err
+	if err == nil {
+		if meta.Append {
+			m.threatLogs = append(m.threatLogs, logs...)
+		} else {
+			m.threatLogs = logs
+		}
+		s.fetched = len(m.threatLogs)
+		s.hasMore = meta.HasMore
+		s.sent = meta.Sent
+		s.rng = m.rng
+		s.query = m.query
+	}
 	m.setTabState(models.LogTypeThreat, s)
 	m.Loading = false
 	m.lastRefresh = time.Now()
@@ -224,6 +285,43 @@ func (m LogsModel) SetThreatLogs(logs []models.ThreatLogEntry, err error) LogsMo
 
 func (m LogsModel) ActiveLogType() models.LogType {
 	return m.activeLogType
+}
+
+// fetchRequest builds the command that asks for one page of a tab.
+func (m LogsModel) fetchRequest(t models.LogType, skip int, appendRows bool) tea.Cmd {
+	req := FetchLogsCmd{
+		Type:   t,
+		Query:  m.query,
+		Since:  m.RangeSince(),
+		Skip:   skip,
+		Append: appendRows,
+	}
+	return func() tea.Msg { return req }
+}
+
+// onTabSwitch resets the cursor and asks for the newly shown tab when it has
+// no rows yet or its rows predate the current range or query.
+func (m LogsModel) onTabSwitch() (LogsModel, tea.Cmd) {
+	m.Cursor = 0
+	m.Offset = 0
+	m.Expanded = false
+
+	if m.rowCount(m.activeLogType) == 0 || m.tabStale(m.activeLogType) {
+		return m, m.fetchRequest(m.activeLogType, 0, false)
+	}
+	return m, nil
+}
+
+// rowCount is how many unfiltered rows a tab holds.
+func (m LogsModel) rowCount(t models.LogType) int {
+	switch t {
+	case models.LogTypeTraffic:
+		return len(m.trafficLogs)
+	case models.LogTypeThreat:
+		return len(m.threatLogs)
+	default:
+		return len(m.systemLogs)
+	}
 }
 
 // activeErr returns the error for the tab currently on screen, so a failed
@@ -327,10 +425,7 @@ func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
 			case models.LogTypeThreat:
 				m.activeLogType = models.LogTypeSystem
 			}
-			m.Cursor = 0
-			m.Offset = 0
-			m.Expanded = false
-			return m, nil
+			return m.onTabSwitch()
 		case "[":
 			// Cycle backward through log types: System -> Threat -> Traffic -> System
 			switch m.activeLogType {
@@ -341,10 +436,7 @@ func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
 			case models.LogTypeThreat:
 				m.activeLogType = models.LogTypeTraffic
 			}
-			m.Cursor = 0
-			m.Offset = 0
-			m.Expanded = false
-			return m, nil
+			return m.onTabSwitch()
 		}
 
 		// Delegate to TableBase for common navigation
