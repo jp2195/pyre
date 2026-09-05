@@ -189,7 +189,6 @@ func (c *Client) GetJobs(ctx context.Context, target string) ([]models.Job, erro
 		return cmp.Compare(b.ID, a.ID)
 	})
 
-	sanitizeAllStrings(&jobs)
 	return jobs, nil
 }
 
@@ -360,7 +359,6 @@ func (c *Client) GetEnvironmentals(ctx context.Context, target string) ([]models
 		}
 	}
 
-	sanitizeAllStrings(&envs)
 	return envs, nil
 }
 
@@ -442,6 +440,5 @@ func (c *Client) GetCertificates(ctx context.Context, target string) ([]models.C
 		certs = append(certs, cert)
 	}
 
-	sanitizeAllStrings(&certs)
 	return certs, nil
 }

@@ -204,7 +204,6 @@ func (c *Client) GetSystemLogs(ctx context.Context, query string, maxLogs int, t
 		logs = append(logs, entry)
 	}
 
-	sanitizeAllStrings(&logs)
 	return logs, nil
 }
 
@@ -300,7 +299,6 @@ func (c *Client) GetTrafficLogs(ctx context.Context, query string, maxLogs int, 
 		logs = append(logs, entry)
 	}
 
-	sanitizeAllStrings(&logs)
 	return logs, nil
 }
 
@@ -418,6 +416,5 @@ func (c *Client) GetThreatLogs(ctx context.Context, query string, maxLogs int, t
 		logs = append(logs, entry)
 	}
 
-	sanitizeAllStrings(&logs)
 	return logs, nil
 }

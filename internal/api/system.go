@@ -122,7 +122,6 @@ func (c *Client) GetSystemInfo(ctx context.Context, target string) (*models.Syst
 		}
 	}
 
-	sanitizeAllStrings(info)
 	return info, nil
 }
 
@@ -184,7 +183,6 @@ func (c *Client) GetLoggedInAdmins(ctx context.Context, target string) ([]models
 		admins = append(admins, admin)
 	}
 
-	sanitizeAllStrings(&admins)
 	return admins, nil
 }
 
@@ -391,6 +389,5 @@ func (c *Client) GetLicenseInfo(ctx context.Context, target string) ([]models.Li
 		licenses = append(licenses, lic)
 	}
 
-	sanitizeAllStrings(&licenses)
 	return licenses, nil
 }

@@ -8,8 +8,14 @@ import (
 )
 
 // decodeXML parses XML from r into v, rejecting DOCTYPE directives and
-// any inline entity declarations. All API responses MUST be decoded
-// through this function.
+// any inline entity declarations, then sanitizes every string it decoded.
+// All API responses MUST be decoded through this function.
+//
+// Sanitizing here rather than in each fetcher is what makes the guarantee
+// real. It used to be a call every fetcher had to remember, and roughly
+// fifteen of them did not, including the ones for security rules, NAT rules,
+// sessions, and interfaces. Doing it at the single point where untrusted
+// bytes become Go strings means a new fetcher cannot forget.
 func decodeXML(r io.Reader, v any) error {
 	dec := xml.NewDecoder(r)
 	dec.Strict = true
@@ -37,7 +43,11 @@ func decodeXML(r io.Reader, v any) error {
 		case xml.Comment:
 			continue
 		case xml.StartElement:
-			return dec.DecodeElement(v, &t)
+			if err := dec.DecodeElement(v, &t); err != nil {
+				return err
+			}
+			sanitizeAllStrings(v)
+			return nil
 		}
 	}
 }
