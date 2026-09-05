@@ -38,6 +38,13 @@ go fix ./...                  # Apply modernizers (safe, behavior-preserving)
   disagree about missing nodes: `show` errors with "No such node" while `get`
   returns success with code 7 and an empty result, so use
   `XMLResponse.NodeAbsent()` rather than checking success alone.
+- **Log queries**: `api.LogQuery`/`api.LogPage` carry one page. The time bound
+  is a `time.Time` formatted in `c.deviceLocation()` — never format a bound in
+  the local zone. `nlogs` clamps to 5000 (the device answers 5001 with HTTP
+  400) and `HasMore` is `len(entries) == Max`, because a PAN-OS log response
+  reports no total match count anywhere. The view describes a fetch with
+  `views.FetchLogsCmd` and the parent performs it, the same split as
+  `views.FetchDetailCmd`.
 - `saveConfig()` / `saveState()` return `tea.Cmd` (avoid goroutine race conditions)
 - `setError()` is a value receiver that returns an updated Model with `m.err` set plus an auto-dismiss tick Cmd
 - Navigation has a single source of truth: the ordered `navDefs` table in `tui/navigation.go` derives the navbar groups (`navbarGroups()`), `navTargets`, and `viewToNavbar`. Adding a nav item = one `navDefs` entry; `views.NewNavbarModel(groups)` takes the groups as a parameter.

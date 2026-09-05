@@ -44,6 +44,28 @@ are routed to the filter input**. Global keys (`q`, `r`, `1`–`3`, `?`,
 `:`, `Tab`) do not fire while the user is typing a filter query. Press
 `Enter` or `Esc` to leave filter mode before using global keys.
 
+Logs' device-query bar (`f`) takes keys the same way: while it is
+focused, everything but `Ctrl+C` goes to the query input, and global
+keys resume once `Enter` or `Esc` closes it.
+
+## Logs
+
+| Key         | Action                                              |
+|-------------|-----------------------------------------------------|
+| `[` / `]`   | Previous / next log type                            |
+| `/`         | Filter the rows already loaded (client-side)        |
+| `f`         | Device query — a raw PAN-OS expression              |
+| `t` / `T`   | Cycle the time range: 15m · 1h · 24h · 7d · all     |
+| `m`         | Load the next page                                  |
+| `s` / `S`   | Sort field / direction                              |
+
+`/` and `f` compose: `f` narrows what the firewall sends, `/` narrows what
+is on screen. The query bar is `f` because `q` quits.
+
+The status line never reports a total — PAN-OS returns no match count for a
+log query, so pyre shows "500 shown, more available" rather than inventing
+"500 of N".
+
 ## Global
 
 Active only when a main view is displayed and no filter input is focused.
@@ -167,6 +189,11 @@ Routes has no detail panel.
 |---------|-----------------------------------------------------|
 | `[`     | Cycle to previous log type (System → Threat → Traffic) |
 | `]`     | Cycle to next log type (System → Traffic → Threat)  |
+| `/`     | Filter the rows already loaded (client-side)        |
+| `f`     | Device query — a raw PAN-OS expression              |
+| `t`     | Cycle time range forward: 15m → 1h → 24h → 7d → all |
+| `T`     | Cycle time range backward                           |
+| `m`     | Load the next page                                  |
 | `s`     | Cycle sort field                                    |
 | `S`     | Toggle sort direction                               |
 | `Enter` | Toggle log detail panel                             |
