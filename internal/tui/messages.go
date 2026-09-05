@@ -219,6 +219,10 @@ type ConnectionSelectedMsg struct {
 
 // ConnectionFormSubmitMsg is sent when the connection form is submitted
 type ConnectionFormSubmitMsg struct {
+	// OriginalHost is the host the edit form opened with. It differs from
+	// Host when the user renamed the connection, and is empty for the add
+	// and quick-connect modes.
+	OriginalHost string
 	Host         string
 	Config       config.ConnectionConfig
 	SaveToConfig bool

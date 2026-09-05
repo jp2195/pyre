@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"log"
 
 	tea "charm.land/bubbletea/v2"
@@ -62,17 +63,24 @@ func (m Model) handleAuthMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if m.selectedConnection != "" {
 			host = m.selectedConnection
-			connConfig = &m.selectedConnectionConfig
+			// Copy rather than alias the model's own field: the Connection
+			// outlives this Model value, which Bubble Tea copies per update.
+			connCopy := m.selectedConnectionConfig
+			connConfig = &connCopy
 		} else {
 			if conn, ok := m.config.Connections[host]; ok {
 				connCopy := conn
 				connConfig = &connCopy
 			} else {
-				connConfig = &config.ConnectionConfig{
-					Insecure: m.login.Insecure(),
-				}
+				connConfig = &config.ConnectionConfig{}
 			}
 		}
+
+		// The login screen's insecure checkbox is a session-level override of
+		// whatever the saved connection says. It already governed keygen, so
+		// the API client has to agree — otherwise login appears to succeed and
+		// then every request fails the handshake keygen just passed.
+		connConfig.Insecure = msg.Insecure
 
 		conn, err := m.session.AddConnection(host, connConfig, msg.APIKey)
 		if err != nil {
@@ -389,16 +397,72 @@ func (m Model) handleShowConnectionForm(msg ShowConnectionFormMsg) (tea.Model, t
 	return m, nil
 }
 
+// applyConnectionEdit writes an edited connection back to the config.
+//
+// The form lets the user change the host, which is the config map key, so an
+// edit can be a rename and the entry has to move. The previous code called
+// UpdateConnection under the *new* key, which never matched an existing
+// entry, so the rename and every other change in the same submission were
+// dropped without a word.
+func (m Model) applyConnectionEdit(msg ConnectionFormSubmitMsg) error {
+	orig := msg.OriginalHost
+	if orig == "" || orig == msg.Host {
+		m.config.SetConnection(msg.Host, msg.Config)
+		return nil
+	}
+	if _, exists := m.config.GetConnection(msg.Host); exists {
+		return fmt.Errorf("cannot rename %q to %q: that connection already exists", orig, msg.Host)
+	}
+
+	// DeleteConnection clears Default when it points at the removed host, so
+	// capture that before the delete and re-point it at the new name.
+	wasDefault := m.config.Default == orig
+	if err := m.config.DeleteConnection(orig); err != nil {
+		return err
+	}
+	m.config.SetConnection(msg.Host, msg.Config)
+	if wasDefault {
+		m.config.Default = msg.Host
+	}
+	return nil
+}
+
+// renameConnectionState moves the last-connected record onto the new host so
+// a rename does not reset the connection's history to "Never connected".
+// Reports whether anything moved, so the caller can persist the change.
+func (m Model) renameConnectionState(oldHost, newHost string) bool {
+	if m.state == nil || oldHost == "" || oldHost == newHost {
+		return false
+	}
+	prev := m.state.GetConnection(oldHost)
+	if prev == nil {
+		return false
+	}
+	m.state.Connections[newHost] = *prev
+	m.state.DeleteConnection(oldHost)
+	return true
+}
+
 // handleConnectionFormSubmit processes form submission, saving to config if requested.
 func (m Model) handleConnectionFormSubmit(msg ConnectionFormSubmitMsg) (tea.Model, tea.Cmd) {
-	var saveCmd tea.Cmd
+	var cmds []tea.Cmd
 	if msg.SaveToConfig {
 		if msg.Mode == views.FormModeEdit {
-			_ = m.config.UpdateConnection(msg.Host, msg.Config) //nolint:errcheck // UI flow continues regardless
+			if err := m.applyConnectionEdit(msg); err != nil {
+				// A rename onto an existing host would clobber that other
+				// connection, so refuse and say why rather than writing
+				// nothing and looking like it worked.
+				var errCmd tea.Cmd
+				m, errCmd = m.setError(err)
+				return m, errCmd
+			}
 		} else {
-			_ = m.config.AddConnection(msg.Host, msg.Config) //nolint:errcheck // UI flow continues regardless
+			m.config.SetConnection(msg.Host, msg.Config)
 		}
-		saveCmd = m.saveConfig()
+		if m.renameConnectionState(msg.OriginalHost, msg.Host) {
+			cmds = append(cmds, m.saveState())
+		}
+		cmds = append(cmds, m.saveConfig())
 		m.connectionHub = m.connectionHub.SetConnections(m.config, m.state)
 	}
 
@@ -411,7 +475,7 @@ func (m Model) handleConnectionFormSubmit(msg ConnectionFormSubmitMsg) (tea.Mode
 	})
 	m.login = m.login.SetSize(m.width, m.height)
 	m.currentView = ViewLogin
-	return m, saveCmd
+	return m, tea.Batch(cmds...)
 }
 
 // handleConnectionDeleted removes a connection from config and state.

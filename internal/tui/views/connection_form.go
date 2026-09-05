@@ -32,8 +32,12 @@ const (
 
 // ConnectionFormModel is the model for the connection form view
 type ConnectionFormModel struct {
-	mode          FormMode
-	editingHost   string // Original host when editing (for detecting changes)
+	mode        FormMode
+	editingHost string // Original host when editing (for detecting changes)
+	// original is the config the form opened with. GetConfig overlays the
+	// visible fields onto it so settings the form does not expose — today
+	// ca_cert_path — survive an edit instead of being reset to zero.
+	original      config.ConnectionConfig
 	hostInput     textinput.Model
 	usernameInput textinput.Model
 	connType      string // "firewall" or "panorama"
@@ -70,6 +74,7 @@ func NewEditConnectionForm(host string, conn config.ConnectionConfig) Connection
 	m := newBaseForm()
 	m.mode = FormModeEdit
 	m.editingHost = host
+	m.original = conn
 	m.hostInput.SetValue(host)
 	m.usernameInput.SetValue(conn.Username)
 	m.connType = conn.Type
@@ -235,13 +240,16 @@ func (m ConnectionFormModel) CanSubmit() bool {
 	return m.Host() != "" && validateHost(m.Host()) == ""
 }
 
-// GetConfig returns the connection config from form values
+// GetConfig returns the connection config from form values, overlaid on the
+// config the form opened with. Rebuilding from the visible fields alone would
+// silently drop ca_cert_path on every edit, downgrading a connection that
+// pinned a private CA to system-root verification.
 func (m ConnectionFormModel) GetConfig() config.ConnectionConfig {
-	return config.ConnectionConfig{
-		Username: m.Username(),
-		Type:     m.connType,
-		Insecure: m.insecure,
-	}
+	cfg := m.original
+	cfg.Username = m.Username()
+	cfg.Type = m.connType
+	cfg.Insecure = m.insecure
+	return cfg
 }
 
 // Update handles input updates

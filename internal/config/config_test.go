@@ -408,27 +408,6 @@ func TestConfig_AddConnection(t *testing.T) {
 	}
 }
 
-func TestConfig_UpdateConnection(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.Connections["10.0.0.1"] = ConnectionConfig{}
-
-	err := cfg.UpdateConnection("10.0.0.1", ConnectionConfig{Insecure: true})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	conn, _ := cfg.GetConnection("10.0.0.1")
-	if !conn.Insecure {
-		t.Error("expected Insecure to be true")
-	}
-
-	// Try to update nonexistent
-	err = cfg.UpdateConnection("nonexistent", ConnectionConfig{})
-	if err == nil {
-		t.Error("expected error for nonexistent connection")
-	}
-}
-
 func TestConfig_DeleteConnection(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Connections["10.0.0.1"] = ConnectionConfig{}
@@ -691,7 +670,7 @@ func TestConfig_Save_NoBackupOnFirstWrite(t *testing.T) {
 
 func TestConfig_CRUD_NilConnectionsMap(t *testing.T) {
 	// A zero-value Config (nil Connections) must behave: Add initializes
-	// the map; Update and Delete report not-found instead of panicking.
+	// the map; Set creates it too, and Delete reports not-found instead of panicking.
 	c := &Config{}
 	if err := c.AddConnection("10.0.0.1", ConnectionConfig{}); err != nil {
 		t.Errorf("AddConnection on nil map: %v", err)
@@ -701,8 +680,9 @@ func TestConfig_CRUD_NilConnectionsMap(t *testing.T) {
 	}
 
 	c2 := &Config{}
-	if err := c2.UpdateConnection("10.0.0.1", ConnectionConfig{}); err == nil {
-		t.Error("expected error from UpdateConnection on nil map")
+	c2.SetConnection("10.0.0.1", ConnectionConfig{Insecure: true})
+	if conn, ok := c2.GetConnection("10.0.0.1"); !ok || !conn.Insecure {
+		t.Error("expected SetConnection to create the entry on a nil map")
 	}
 	c3 := &Config{}
 	if err := c3.DeleteConnection("10.0.0.1"); err == nil {

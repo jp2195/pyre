@@ -400,6 +400,7 @@ func (m Model) handleConnectionFormKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd
 		if m.connectionForm.CanSubmit() {
 			return m, func() tea.Msg {
 				return ConnectionFormSubmitMsg{
+					OriginalHost: m.connectionForm.EditingHost(),
 					Host:         m.connectionForm.Host(),
 					Config:       m.connectionForm.GetConfig(),
 					SaveToConfig: m.connectionForm.SaveToConfig(),

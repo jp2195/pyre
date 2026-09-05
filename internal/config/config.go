@@ -206,16 +206,17 @@ func (c *Config) AddConnection(host string, conn ConnectionConfig) error {
 	return nil
 }
 
-// UpdateConnection updates an existing connection in the config
-func (c *Config) UpdateConnection(host string, conn ConnectionConfig) error {
+// SetConnection stores conn under host, replacing any existing entry.
+//
+// Unlike AddConnection it does not treat an existing host as an error:
+// saving a connection the user already tracks means updating it, and the
+// caller has no useful recovery from "already exists" other than doing
+// exactly this.
+func (c *Config) SetConnection(host string, conn ConnectionConfig) {
 	if c.Connections == nil {
-		return fmt.Errorf("connection %q not found", host)
-	}
-	if _, exists := c.Connections[host]; !exists {
-		return fmt.Errorf("connection %q not found", host)
+		c.Connections = make(map[string]ConnectionConfig)
 	}
 	c.Connections[host] = conn
-	return nil
 }
 
 // DeleteConnection removes a connection from the config
