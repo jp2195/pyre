@@ -47,7 +47,8 @@ func noFetch(t *testing.T, cmd tea.Cmd, what string) {
 func seedSystemPage(t *testing.T) LogsModel {
 	t.Helper()
 	m := NewLogsModel().SetSize(120, 40)
-	return m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{HasMore: true}, nil)
+	m, _ = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{HasMore: true}, nil)
+	return m
 }
 
 // A page takes one to four seconds to arrive, so m is easy to press twice
@@ -69,7 +70,7 @@ func TestLogs_SecondMoreIsIgnoredWhileAPageIsInFlight(t *testing.T) {
 	noFetch(t, second, "a second m while the first page was still in flight")
 
 	// The one page that was asked for lands, and appends exactly once.
-	m = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{Req: first, HasMore: true}, nil)
+	m, _ = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{Req: first, HasMore: true}, nil)
 	if got := m.rowCount(models.LogTypeSystem); got != 1000 {
 		t.Fatalf("rows = %d, want 1000", got)
 	}
@@ -97,10 +98,10 @@ func TestLogs_PageFromASupersededRangeIsDropped(t *testing.T) {
 	if fresh.Range == stalePage.Range {
 		t.Fatal("t did not change the range")
 	}
-	m = m.SetSystemLogs(make([]models.SystemLogEntry, 20), LogPageMeta{Req: fresh}, nil)
+	m, _ = m.SetSystemLogs(make([]models.SystemLogEntry, 20), LogPageMeta{Req: fresh}, nil)
 
 	// Only now does the page from the previous range arrive.
-	m = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{Req: stalePage, HasMore: true}, nil)
+	m, _ = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{Req: stalePage, HasMore: true}, nil)
 
 	if got := m.rowCount(models.LogTypeSystem); got != 20 {
 		t.Errorf("rows = %d, want 20: a page from the previous range was applied", got)
@@ -117,7 +118,7 @@ func TestLogs_PageFromASupersededRangeIsDropped(t *testing.T) {
 // never be applied.
 func TestLogs_BackgroundTabPageFromAnOldRangeIsDropped(t *testing.T) {
 	m := NewLogsModel().SetSize(120, 40)
-	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
 
 	m, cmd := m.Update(logKey(']')) // System -> Traffic, which fetches
 	trafficReq := mustFetchReq(t, cmd)
@@ -126,7 +127,7 @@ func TestLogs_BackgroundTabPageFromAnOldRangeIsDropped(t *testing.T) {
 	noFetch(t, cmd, "returning to a tab that already holds current rows")
 
 	m, _ = m.Update(logKey('t')) // the range changes while Traffic is still fetching
-	m = m.SetTrafficLogs(make([]models.TrafficLogEntry, 5), LogPageMeta{Req: trafficReq}, nil)
+	m, _ = m.SetTrafficLogs(make([]models.TrafficLogEntry, 5), LogPageMeta{Req: trafficReq}, nil)
 
 	if got := m.rowCount(models.LogTypeTraffic); got != 0 {
 		t.Errorf("traffic rows = %d, want 0: a page from the previous range was kept", got)
@@ -153,7 +154,7 @@ func TestLogs_ResponseForOneTabDoesNotClearAnothersLoading(t *testing.T) {
 	}
 
 	// A System page issued before the switch lands.
-	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
 
 	if !m.Loading {
 		t.Error("a System response cleared the Traffic tab's loading state")
@@ -205,7 +206,7 @@ func TestLogs_PagingReusesTheBoundThePaginationStartedWith(t *testing.T) {
 	if first.Since.IsZero() {
 		t.Fatal("the 15m preset produced no lower bound")
 	}
-	m = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{Req: first, HasMore: true}, nil)
+	m, _ = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{Req: first, HasMore: true}, nil)
 
 	_, cmd = m.Update(logKey('m'))
 	next := mustFetchReq(t, cmd)
@@ -220,7 +221,7 @@ func TestLogs_RestartingAPaginationTakesAFreshBound(t *testing.T) {
 
 	m, cmd := m.Update(logKey('t'))
 	first := mustFetchReq(t, cmd)
-	m = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{Req: first, HasMore: true}, nil)
+	m, _ = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{Req: first, HasMore: true}, nil)
 
 	_, cmd = m.RefreshActiveTab()
 	if again := mustFetchReq(t, cmd); !again.Since.After(first.Since) {
@@ -234,8 +235,8 @@ func TestLogs_RestartingAPaginationTakesAFreshBound(t *testing.T) {
 // it as one the device had accepted.
 func TestLogs_RejectedQueryIsNotStored(t *testing.T) {
 	m := NewLogsModel().SetSize(120, 40)
-	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM", Description: "keep me"}}, LogPageMeta{}, nil)
-	m = m.SetTrafficLogs([]models.TrafficLogEntry{{Action: "allow"}}, LogPageMeta{}, nil)
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM", Description: "keep me"}}, LogPageMeta{}, nil)
+	m, _ = m.SetTrafficLogs([]models.TrafficLogEntry{{Action: "allow"}}, LogPageMeta{}, nil)
 
 	m, _ = m.Update(logKey('f'))
 	m = typeString(m, "bogus_field eq x")
@@ -245,7 +246,7 @@ func TestLogs_RejectedQueryIsNotStored(t *testing.T) {
 		t.Fatalf("the fetch carried %q, want the typed expression", req.Query)
 	}
 
-	m = m.SetSystemLogs(nil, LogPageMeta{Req: req}, errors.New("Invalid operator eq for field bogus_field"))
+	m, _ = m.SetSystemLogs(nil, LogPageMeta{Req: req}, errors.New("Invalid operator eq for field bogus_field"))
 
 	if got := m.Query(); got != "" {
 		t.Errorf("Query() = %q, want empty: the device refused this expression", got)
@@ -265,13 +266,13 @@ func TestLogs_RejectedQueryIsNotStored(t *testing.T) {
 // and the refused expression is deliberately stored nowhere else.
 func TestLogs_RejectedQueryIsShownWithTheExpression(t *testing.T) {
 	m := NewLogsModel().SetSize(120, 40)
-	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM", Description: "keep me"}}, LogPageMeta{}, nil)
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM", Description: "keep me"}}, LogPageMeta{}, nil)
 
 	m, _ = m.Update(logKey('f'))
 	m = typeString(m, "bogus_field eq x")
 	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	req := mustFetchReq(t, cmd)
-	m = m.SetSystemLogs(nil, LogPageMeta{Req: req}, errors.New("Invalid operator eq for field bogus_field"))
+	m, _ = m.SetSystemLogs(nil, LogPageMeta{Req: req}, errors.New("Invalid operator eq for field bogus_field"))
 
 	view := m.View()
 	if !strings.Contains(view, "Invalid operator eq for field bogus_field") {
@@ -290,7 +291,7 @@ func TestLogs_AcceptedQueryIsStored(t *testing.T) {
 	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	req := mustFetchReq(t, cmd)
 
-	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{Req: req}, nil)
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{Req: req}, nil)
 
 	if got := m.Query(); got != "action eq deny" {
 		t.Errorf("Query() = %q, want the accepted expression", got)
@@ -303,11 +304,11 @@ func TestLogs_AcceptedQueryIsStored(t *testing.T) {
 // that they stay on screen.
 func TestLogs_ErrorAccompaniesTheRowsRatherThanReplacingThem(t *testing.T) {
 	m := NewLogsModel().SetSize(120, 40)
-	m = m.SetSystemLogs([]models.SystemLogEntry{
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{
 		{Severity: "high", Type: "general", Description: "system-entry-marker"},
 	}, LogPageMeta{}, nil)
 
-	m = m.SetSystemLogs(nil, LogPageMeta{}, errors.New("syntax error at 14:50:57"))
+	m, _ = m.SetSystemLogs(nil, LogPageMeta{}, errors.New("syntax error at 14:50:57"))
 
 	view := m.View()
 	if !strings.Contains(view, "syntax error at 14:50:57") {
@@ -322,7 +323,7 @@ func TestLogs_ErrorAccompaniesTheRowsRatherThanReplacingThem(t *testing.T) {
 // its own rather than being paired with "No system logs found".
 func TestLogs_ErrorWithNoRowsStandsAlone(t *testing.T) {
 	m := NewLogsModel().SetSize(120, 40)
-	m = m.SetSystemLogs(nil, LogPageMeta{}, errors.New("connection refused"))
+	m, _ = m.SetSystemLogs(nil, LogPageMeta{}, errors.New("connection refused"))
 
 	view := m.View()
 	if !strings.Contains(view, "connection refused") {
@@ -337,7 +338,7 @@ func TestLogs_ErrorWithNoRowsStandsAlone(t *testing.T) {
 func TestLogs_ErrorWithRowsFitsTheFloor(t *testing.T) {
 	const floor = 60
 	m := NewLogsModel().SetSize(floor, 30)
-	m = m.SetSystemLogs([]models.SystemLogEntry{
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{
 		{Severity: "high", Type: "general", Description: "an entry worth keeping on screen"},
 	}, LogPageMeta{}, nil)
 
@@ -345,7 +346,7 @@ func TestLogs_ErrorWithRowsFitsTheFloor(t *testing.T) {
 	m = typeString(m, "receive_time geq '2025/13/45 99:99:99' and addr.src in 203.0.113.5")
 	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	req := mustFetchReq(t, cmd)
-	m = m.SetSystemLogs(nil, LogPageMeta{Req: req},
+	m, _ = m.SetSystemLogs(nil, LogPageMeta{Req: req},
 		errors.New("Invalid value not-a-time for field receive_time at line 1 column 42"))
 
 	for _, line := range splitLines(m.View()) {
@@ -363,7 +364,7 @@ func TestLogs_ClockWarningIsShownAndFitsTheFloor(t *testing.T) {
 	const floor = 60
 
 	m := NewLogsModel().SetSize(floor, 30)
-	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}},
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}},
 		LogPageMeta{Warning: warning}, nil)
 
 	view := m.View()
@@ -380,7 +381,7 @@ func TestLogs_ClockWarningIsShownAndFitsTheFloor(t *testing.T) {
 // A clean fetch says nothing extra.
 func TestLogs_NoWarningWhenTheClockWasKnown(t *testing.T) {
 	m := NewLogsModel().SetSize(120, 40)
-	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
 
 	if view := m.View(); strings.Contains(view, "device clock unknown") {
 		t.Errorf("a clean fetch reported a clock problem:\n%s", view)

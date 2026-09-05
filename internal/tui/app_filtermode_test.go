@@ -84,7 +84,7 @@ func TestFilterMode_GlobalKeysBypassGlobalHandlers(t *testing.T) {
 		}},
 		{"logs", func(t *testing.T) Model {
 			m := newTestModel(t, ViewLogs)
-			m.logs = m.logs.SetSystemLogs([]models.SystemLogEntry{{Description: "test-event"}}, views.LogPageMeta{}, nil)
+			m.logs, _ = m.logs.SetSystemLogs([]models.SystemLogEntry{{Description: "test-event"}}, views.LogPageMeta{}, nil)
 			m.logs, _ = m.logs.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
 			if !m.logs.IsFilterMode() {
 				t.Fatal("precondition: logs filter mode")
@@ -93,7 +93,7 @@ func TestFilterMode_GlobalKeysBypassGlobalHandlers(t *testing.T) {
 		}},
 		{"logs_query", func(t *testing.T) Model {
 			m := newTestModel(t, ViewLogs)
-			m.logs = m.logs.SetSystemLogs([]models.SystemLogEntry{{Description: "test-event"}}, views.LogPageMeta{}, nil)
+			m.logs, _ = m.logs.SetSystemLogs([]models.SystemLogEntry{{Description: "test-event"}}, views.LogPageMeta{}, nil)
 			m.logs, _ = m.logs.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
 			if !m.logs.IsQueryMode() {
 				t.Fatal("precondition: logs query mode")

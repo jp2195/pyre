@@ -74,7 +74,7 @@ func TestLogsTable_HeaderAlignsWithRows(t *testing.T) {
 
 	m := NewLogsModel()
 	m = m.SetSize(200, 40)
-	m = m.SetSystemLogs([]models.SystemLogEntry{
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{
 		{Time: time.Date(2026, 9, 4, 21, 0, 0, 0, time.UTC), Severity: "high", Type: "general", Description: "first"},
 		{Time: time.Date(2026, 9, 4, 20, 0, 0, 0, time.UTC), Severity: "low", Type: "general", Description: "second"},
 	}, LogPageMeta{}, nil)

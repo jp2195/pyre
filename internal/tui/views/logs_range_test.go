@@ -53,7 +53,7 @@ func TestLogsModel_DefaultRangeIsAll(t *testing.T) {
 
 func TestLogsModel_TCyclesRangeAndRefetches(t *testing.T) {
 	m := NewLogsModel()
-	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
 
 	want := []LogRange{LogRange15m, LogRange1h, LogRange24h, LogRange7d, LogRangeAll}
 	for i, wantRange := range want {
@@ -84,8 +84,8 @@ func TestLogsModel_ShiftTCyclesBackward(t *testing.T) {
 // shown rather than silently mixing two ranges in one table.
 func TestLogsModel_RangeChangeMakesOtherTabsStale(t *testing.T) {
 	m := NewLogsModel()
-	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
-	m = m.SetTrafficLogs([]models.TrafficLogEntry{{Action: "allow"}}, LogPageMeta{}, nil)
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
+	m, _ = m.SetTrafficLogs([]models.TrafficLogEntry{{Action: "allow"}}, LogPageMeta{}, nil)
 
 	if m.tabStale(models.LogTypeTraffic) {
 		t.Fatal("traffic was stale before anything changed")
@@ -102,7 +102,7 @@ func TestLogsModel_RangeChangeMakesOtherTabsStale(t *testing.T) {
 // because the rows now carry the range they were fetched under.
 func TestLogsModel_CompletedPageClearsStaleness(t *testing.T) {
 	m := NewLogsModel()
-	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
 
 	var cmd tea.Cmd
 	m, cmd = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
@@ -112,7 +112,7 @@ func TestLogsModel_CompletedPageClearsStaleness(t *testing.T) {
 
 	// The page has to carry the request it answers: a tab is only marked
 	// with the range and query the rows were actually fetched under.
-	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}},
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}},
 		LogPageMeta{Req: mustFetchReq(t, cmd)}, nil)
 	if m.tabStale(models.LogTypeSystem) {
 		t.Error("staleness survived a page fetched under the current range")
@@ -121,7 +121,7 @@ func TestLogsModel_CompletedPageClearsStaleness(t *testing.T) {
 
 func TestLogsModel_StatusLineShowsRange(t *testing.T) {
 	m := NewLogsModel().SetSize(100, 40)
-	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
 	m, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 
 	if got := m.statusLine(); !strings.Contains(got, "15m") {
@@ -134,7 +134,7 @@ func TestLogsModel_StatusLineShowsRange(t *testing.T) {
 func TestLogsModel_StatusLineFitsEveryWidth(t *testing.T) {
 	for _, width := range []int{60, 80, 120} {
 		m := NewLogsModel().SetSize(width, 40)
-		m = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{HasMore: true}, nil)
+		m, _ = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{HasMore: true}, nil)
 		m, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 
 		line := m.statusLine()
@@ -179,7 +179,7 @@ func TestLogsModel_StatusLineQueryThresholdAt80(t *testing.T) {
 // more available" phrasing, which does not fit down there.
 func TestLogsModel_StatusLineBelowFloorUsesCompactForm(t *testing.T) {
 	m := NewLogsModel().SetSize(40, 40)
-	m = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{HasMore: true}, nil)
+	m, _ = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{HasMore: true}, nil)
 
 	got := m.statusLine()
 	if !strings.Contains(got, "500+") {

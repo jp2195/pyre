@@ -50,7 +50,7 @@ func TestLogsModel_QueryCommitsOnEnter(t *testing.T) {
 	if got := m.Query(); got != "" {
 		t.Errorf("Query() = %q before the device answered, want empty", got)
 	}
-	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{Req: req}, nil)
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{Req: req}, nil)
 	if m.Query() != "addr.src in 203.0.113.5" {
 		t.Errorf("Query() = %q, want the accepted expression", m.Query())
 	}
@@ -74,9 +74,9 @@ func TestLogsModel_QueryCancelsOnEsc(t *testing.T) {
 // must stay on screen and the device's own message must be shown.
 func TestLogsModel_RejectedQueryKeepsRowsAndShowsMessage(t *testing.T) {
 	m := NewLogsModel().SetSize(100, 40)
-	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM", Description: "keep me"}}, LogPageMeta{}, nil)
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM", Description: "keep me"}}, LogPageMeta{}, nil)
 
-	m = m.SetSystemLogs(nil, LogPageMeta{}, errors.New("syntax error at 14:50:57"))
+	m, _ = m.SetSystemLogs(nil, LogPageMeta{}, errors.New("syntax error at 14:50:57"))
 
 	if got := m.rowCount(models.LogTypeSystem); got != 1 {
 		t.Errorf("rows after a rejected query = %d, want 1 (previous rows kept)", got)
@@ -155,7 +155,7 @@ func TestLogsModel_QueryBarFitsTheTerminalWidth(t *testing.T) {
 func TestLogsModel_ZeroRowsNamesTheSentExpression(t *testing.T) {
 	sent := "(receive_time geq '2026/09/05 11:57:00') and ((receive_time geq '2025/13/45 99:99:99'))"
 	m := NewLogsModel().SetSize(120, 40)
-	m = m.SetSystemLogs(nil, LogPageMeta{Sent: sent}, nil)
+	m, _ = m.SetSystemLogs(nil, LogPageMeta{Sent: sent}, nil)
 
 	view := m.View()
 	if !strings.Contains(view, "0 rows matched") {
@@ -169,7 +169,7 @@ func TestLogsModel_ZeroRowsNamesTheSentExpression(t *testing.T) {
 // With no query at all, the plain empty state is still the right message.
 func TestLogsModel_ZeroRowsWithNoQueryKeepsPlainMessage(t *testing.T) {
 	m := NewLogsModel().SetSize(120, 40)
-	m = m.SetSystemLogs(nil, LogPageMeta{}, nil)
+	m, _ = m.SetSystemLogs(nil, LogPageMeta{}, nil)
 
 	view := m.View()
 	if !strings.Contains(view, "No system logs found") {
@@ -186,7 +186,7 @@ func TestLogsModel_ZeroRowsExpressionWrapsInsteadOfWidening(t *testing.T) {
 	sent := strings.Repeat("(receive_time geq '2026/09/05 11:57:00') and ", 10)
 	const width = 60
 	m := NewLogsModel().SetSize(width, 40)
-	m = m.SetSystemLogs(nil, LogPageMeta{Sent: sent}, nil)
+	m, _ = m.SetSystemLogs(nil, LogPageMeta{Sent: sent}, nil)
 
 	for _, line := range splitLines(m.View()) {
 		if got := lipgloss.Width(line); got > width {
@@ -224,7 +224,7 @@ func TestLogsModel_SwitchingToUnfetchedTabShowsLoadingNotEmpty(t *testing.T) {
 // sent expression (if any) had nothing to do with the empty table.
 func TestLogsModel_LocalFilterZeroingRowsBlamesTheFilterNotTheDevice(t *testing.T) {
 	m := NewLogsModel().SetSize(120, 40)
-	m = m.SetSystemLogs([]models.SystemLogEntry{
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{
 		{Severity: "informational", Type: "general", Description: "admin login ok"},
 	}, LogPageMeta{}, nil)
 
@@ -248,7 +248,7 @@ func TestLogsModel_LocalFilterZeroingRowsBlamesTheFilterNotTheDevice(t *testing.
 func TestLogsModel_LocalFilterZeroingRowsIgnoresConcurrentDeviceQuery(t *testing.T) {
 	sent := "(receive_time geq '2026/09/05 11:57:00')"
 	m := NewLogsModel().SetSize(120, 40)
-	m = m.SetSystemLogs([]models.SystemLogEntry{
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{
 		{Severity: "informational", Type: "general", Description: "admin login ok"},
 	}, LogPageMeta{Sent: sent}, nil)
 
@@ -279,9 +279,10 @@ func TestLogsModel_FilterTextFitsTheTerminalWidth(t *testing.T) {
 
 	newFixture := func(width, height int) LogsModel {
 		m := NewLogsModel().SetSize(width, height)
-		return m.SetSystemLogs([]models.SystemLogEntry{
+		m, _ = m.SetSystemLogs([]models.SystemLogEntry{
 			{Severity: "informational", Type: "general", Description: "admin login ok"},
 		}, LogPageMeta{}, nil)
+		return m
 	}
 	applyLongFilter := func(m LogsModel) LogsModel {
 		m.Filter.SetValue(filterVal)

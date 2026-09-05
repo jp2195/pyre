@@ -20,7 +20,7 @@ func threatLogsModel(t *testing.T, width int) LogsModel {
 	t.Helper()
 	InitStyles()
 	m := NewLogsModel().SetSize(width, 40)
-	m = m.SetThreatLogs([]models.ThreatLogEntry{{
+	m, _ = m.SetThreatLogs([]models.ThreatLogEntry{{
 		Time:           time.Date(2026, 9, 4, 21, 0, 0, 0, time.UTC),
 		Severity:       "informational",
 		ThreatName:     "Proxy:mask.test-dns.net-a-rather-long-indicator",
@@ -75,7 +75,7 @@ func TestThreatLogTable_FitsNarrowTerminals(t *testing.T) {
 func TestTrafficLogTable_ShowsFullActionAndUsesWidth(t *testing.T) {
 	InitStyles()
 	m := NewLogsModel().SetSize(200, 40)
-	m = m.SetTrafficLogs([]models.TrafficLogEntry{{
+	m, _ = m.SetTrafficLogs([]models.TrafficLogEntry{{
 		Time:        time.Date(2026, 9, 4, 21, 0, 0, 0, time.UTC),
 		Action:      "reset-both",
 		SourceIP:    "10.0.0.5",

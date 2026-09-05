@@ -329,11 +329,11 @@ func (m LogsModel) HasData() bool {
 // SetSystemLogs records the result of a system log fetch. On error the
 // existing rows are left alone rather than replaced with nil: a later query
 // the device rejects must not blank rows already on screen.
-func (m LogsModel) SetSystemLogs(logs []models.SystemLogEntry, meta LogPageMeta, err error) LogsModel {
+func (m LogsModel) SetSystemLogs(logs []models.SystemLogEntry, meta LogPageMeta, err error) (LogsModel, tea.Cmd) {
 	t := models.LogTypeSystem
-	m, wanted := m.beginPage(t, meta)
+	m, cmd, wanted := m.beginPage(t, meta)
 	if !wanted {
-		return m
+		return m, cmd
 	}
 	if err == nil {
 		if meta.Req.Append {
@@ -342,16 +342,16 @@ func (m LogsModel) SetSystemLogs(logs []models.SystemLogEntry, meta LogPageMeta,
 			m.systemLogs = logs
 		}
 	}
-	return m.finishPage(t, meta, err, len(m.systemLogs))
+	return m.finishPage(t, meta, err, len(m.systemLogs)), nil
 }
 
 // SetTrafficLogs records the result of a traffic log fetch. See
 // SetSystemLogs for the error-preserves-rows behavior.
-func (m LogsModel) SetTrafficLogs(logs []models.TrafficLogEntry, meta LogPageMeta, err error) LogsModel {
+func (m LogsModel) SetTrafficLogs(logs []models.TrafficLogEntry, meta LogPageMeta, err error) (LogsModel, tea.Cmd) {
 	t := models.LogTypeTraffic
-	m, wanted := m.beginPage(t, meta)
+	m, cmd, wanted := m.beginPage(t, meta)
 	if !wanted {
-		return m
+		return m, cmd
 	}
 	if err == nil {
 		if meta.Req.Append {
@@ -360,16 +360,16 @@ func (m LogsModel) SetTrafficLogs(logs []models.TrafficLogEntry, meta LogPageMet
 			m.trafficLogs = logs
 		}
 	}
-	return m.finishPage(t, meta, err, len(m.trafficLogs))
+	return m.finishPage(t, meta, err, len(m.trafficLogs)), nil
 }
 
 // SetThreatLogs records the result of a threat log fetch. See
 // SetSystemLogs for the error-preserves-rows behavior.
-func (m LogsModel) SetThreatLogs(logs []models.ThreatLogEntry, meta LogPageMeta, err error) LogsModel {
+func (m LogsModel) SetThreatLogs(logs []models.ThreatLogEntry, meta LogPageMeta, err error) (LogsModel, tea.Cmd) {
 	t := models.LogTypeThreat
-	m, wanted := m.beginPage(t, meta)
+	m, cmd, wanted := m.beginPage(t, meta)
 	if !wanted {
-		return m
+		return m, cmd
 	}
 	if err == nil {
 		if meta.Req.Append {
@@ -378,7 +378,7 @@ func (m LogsModel) SetThreatLogs(logs []models.ThreatLogEntry, meta LogPageMeta,
 			m.threatLogs = logs
 		}
 	}
-	return m.finishPage(t, meta, err, len(m.threatLogs))
+	return m.finishPage(t, meta, err, len(m.threatLogs)), nil
 }
 
 // beginPage decides what to do with a completed fetch before its rows are
@@ -394,21 +394,32 @@ func (m LogsModel) SetThreatLogs(logs []models.ThreatLogEntry, meta LogPageMeta,
 // Applying a page in either state appends rows gathered under one selection
 // onto rows gathered under another and then labels the mixture with the
 // current one.
-func (m LogsModel) beginPage(t models.LogType, meta LogPageMeta) (LogsModel, bool) {
+func (m LogsModel) beginPage(t models.LogType, meta LogPageMeta) (LogsModel, tea.Cmd, bool) {
 	s := m.tabState(t)
 	if meta.Req.ReqID != s.pending.ReqID {
 		// Superseded. The newer request is still outstanding, so the tab
 		// stays loading and keeps waiting for it.
-		return m, false
+		return m, nil, false
 	}
 	if meta.Req.Range != m.rng || meta.Req.Query != m.query {
 		s.pending = FetchLogsCmd{}
 		s.loading = false
 		m.setTabState(t, s)
 		m.syncLoading()
-		return m, false
+		// A background tab is left idle and stale on purpose: it is
+		// refetched when next shown. The tab on screen has no such later
+		// trigger, so leaving it idle strands it -- it renders its empty
+		// state as though the device had answered with nothing, showing
+		// neither an error nor a spinner until the operator presses r.
+		// This is reachable without touching the visible tab at all: a
+		// refused query on another tab reverts the view's expression,
+		// which orphans the visible tab's in-flight fetch.
+		if t == m.activeLogType && m.needsFetch(t) {
+			return m, m.fetchRequest(t, 0, false), false
+		}
+		return m, nil, false
 	}
-	return m, true
+	return m, nil, true
 }
 
 // finishPage records the outcome of a page the tab was waiting for. rows is

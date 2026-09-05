@@ -188,6 +188,11 @@ func (m Model) handleDashboardDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // handleViewDataMsg processes data messages for detail views (policies, logs, network, etc.).
 func (m Model) handleViewDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// A log page the view drops can require an immediate refetch: the tab on
+	// screen must not be left idle and empty. Nothing else here emits a
+	// command, so one variable carries it out.
+	var logCmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case InterfacesMsg:
 		m.dashboard = m.dashboard.SetInterfaces(msg.Interfaces, msg.Err)
@@ -207,15 +212,15 @@ func (m Model) handleViewDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SessionDetailMsg:
 		m.sessions = m.sessions.SetDetail(msg.Detail, msg.Err)
 	case SystemLogsMsg:
-		m.logs = m.logs.SetSystemLogs(msg.Logs, views.LogPageMeta{
+		m.logs, logCmd = m.logs.SetSystemLogs(msg.Logs, views.LogPageMeta{
 			Req: msg.Req, HasMore: msg.HasMore, Sent: msg.Sent, Warning: msg.Warning,
 		}, msg.Err)
 	case TrafficLogsMsg:
-		m.logs = m.logs.SetTrafficLogs(msg.Logs, views.LogPageMeta{
+		m.logs, logCmd = m.logs.SetTrafficLogs(msg.Logs, views.LogPageMeta{
 			Req: msg.Req, HasMore: msg.HasMore, Sent: msg.Sent, Warning: msg.Warning,
 		}, msg.Err)
 	case ThreatLogsMsg:
-		m.logs = m.logs.SetThreatLogs(msg.Logs, views.LogPageMeta{
+		m.logs, logCmd = m.logs.SetThreatLogs(msg.Logs, views.LogPageMeta{
 			Req: msg.Req, HasMore: msg.HasMore, Sent: msg.Sent, Warning: msg.Warning,
 		}, msg.Err)
 	case ARPTableMsg:
@@ -246,7 +251,7 @@ func (m Model) handleViewDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.objects = m.objects.SetServices(msg.Items, msg.Err)
 	}
 
-	return m, nil
+	return m, logCmd
 }
 
 // handleNavigationMsg processes view transitions and UI navigation messages.

@@ -13,7 +13,7 @@ import (
 // view no longer fetches all three types up front.
 func TestLogs_TabSwitchRequestsUnfetchedTab(t *testing.T) {
 	m := NewLogsModel()
-	m = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{{Type: "SYSTEM"}}, LogPageMeta{}, nil)
 
 	m, cmd := m.Update(tea.KeyPressMsg{Code: ']', Text: "]"})
 	if m.ActiveLogType() != models.LogTypeTraffic {
@@ -38,7 +38,7 @@ func TestLogs_TabSwitchRequestsUnfetchedTab(t *testing.T) {
 // time it is shown.
 func TestLogs_TabSwitchDoesNotRefetchFreshTab(t *testing.T) {
 	m := NewLogsModel()
-	m = m.SetTrafficLogs([]models.TrafficLogEntry{{Action: "allow"}}, LogPageMeta{}, nil)
+	m, _ = m.SetTrafficLogs([]models.TrafficLogEntry{{Action: "allow"}}, LogPageMeta{}, nil)
 	m = m.SetActiveLogType(models.LogTypeSystem)
 
 	// System -> Traffic, which already holds rows fetched under this range.
@@ -57,7 +57,7 @@ func TestLogs_TabSwitchDoesNotRefetchFreshTab(t *testing.T) {
 func TestLogs_MRequestsNextPage(t *testing.T) {
 	m := NewLogsModel()
 	rows := make([]models.SystemLogEntry, 500)
-	m = m.SetSystemLogs(rows, LogPageMeta{HasMore: true}, nil)
+	m, _ = m.SetSystemLogs(rows, LogPageMeta{HasMore: true}, nil)
 	m.Cursor = 7
 
 	m2, cmd := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
@@ -82,7 +82,7 @@ func TestLogs_MRequestsNextPage(t *testing.T) {
 // A short page is the end of the results, so m must stop offering more.
 func TestLogs_MDoesNothingAtEnd(t *testing.T) {
 	m := NewLogsModel()
-	m = m.SetSystemLogs(make([]models.SystemLogEntry, 12), LogPageMeta{HasMore: false}, nil)
+	m, _ = m.SetSystemLogs(make([]models.SystemLogEntry, 12), LogPageMeta{HasMore: false}, nil)
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
 	if cmd != nil {
@@ -95,8 +95,8 @@ func TestLogs_MDoesNothingAtEnd(t *testing.T) {
 // The appended page extends the rows rather than replacing them.
 func TestLogs_AppendedPageExtendsRows(t *testing.T) {
 	m := NewLogsModel()
-	m = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{HasMore: true}, nil)
-	m = m.SetSystemLogs(make([]models.SystemLogEntry, 300), LogPageMeta{Req: FetchLogsCmd{Append: true}}, nil)
+	m, _ = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{HasMore: true}, nil)
+	m, _ = m.SetSystemLogs(make([]models.SystemLogEntry, 300), LogPageMeta{Req: FetchLogsCmd{Append: true}}, nil)
 
 	if got := m.rowCount(models.LogTypeSystem); got != 800 {
 		t.Errorf("rows = %d, want 800", got)
@@ -108,12 +108,12 @@ func TestLogs_AppendedPageExtendsRows(t *testing.T) {
 
 func TestLogs_StatusLineOffersMoreAndStopsAtEnd(t *testing.T) {
 	m := NewLogsModel().SetSize(100, 40)
-	m = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{HasMore: true}, nil)
+	m, _ = m.SetSystemLogs(make([]models.SystemLogEntry, 500), LogPageMeta{HasMore: true}, nil)
 	if got := m.statusLine(); !strings.Contains(got, "more available") {
 		t.Errorf("status line %q does not offer more", got)
 	}
 
-	m = m.SetSystemLogs(make([]models.SystemLogEntry, 10), LogPageMeta{Req: FetchLogsCmd{Append: true}}, nil)
+	m, _ = m.SetSystemLogs(make([]models.SystemLogEntry, 10), LogPageMeta{Req: FetchLogsCmd{Append: true}}, nil)
 	if got := m.statusLine(); strings.Contains(got, "more available") {
 		t.Errorf("status line %q still offers more after the end", got)
 	}

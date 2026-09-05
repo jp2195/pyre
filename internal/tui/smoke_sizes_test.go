@@ -86,9 +86,9 @@ func seedEverything(m *Model) {
 		mm.sessions = mm.sessions.SetSessions([]models.Session{{ID: 1, SourceIP: "10.0.0.5", Protocol: "tcp"}}, nil)
 		mm.objects = mm.objects.SetAddresses([]models.AddressObject{{Name: "a", Type: "ip-netmask", Value: "1.1.1.1"}}, nil)
 		mm.objects = mm.objects.SetServices([]models.ServiceObject{{Name: "s", Protocol: "tcp", DestPort: "443"}}, nil)
-		mm.logs = mm.logs.SetSystemLogs([]models.SystemLogEntry{{Time: time.Now(), Severity: "high", Description: "d"}}, views.LogPageMeta{}, nil)
-		mm.logs = mm.logs.SetTrafficLogs([]models.TrafficLogEntry{{Time: time.Now(), Action: "allow", SourceIP: "1.1.1.1"}}, views.LogPageMeta{}, nil)
-		mm.logs = mm.logs.SetThreatLogs([]models.ThreatLogEntry{{Time: time.Now(), Severity: "high", ThreatName: "t"}}, views.LogPageMeta{}, nil)
+		mm.logs, _ = mm.logs.SetSystemLogs([]models.SystemLogEntry{{Time: time.Now(), Severity: "high", Description: "d"}}, views.LogPageMeta{}, nil)
+		mm.logs, _ = mm.logs.SetTrafficLogs([]models.TrafficLogEntry{{Time: time.Now(), Action: "allow", SourceIP: "1.1.1.1"}}, views.LogPageMeta{}, nil)
+		mm.logs, _ = mm.logs.SetThreatLogs([]models.ThreatLogEntry{{Time: time.Now(), Severity: "high", ThreatName: "t"}}, views.LogPageMeta{}, nil)
 		return mm
 	}()
 }

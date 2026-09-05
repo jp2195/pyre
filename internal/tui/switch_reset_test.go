@@ -22,7 +22,7 @@ func seedViewData(m *Model) {
 	m.dashboard = m.dashboard.SetSystemInfo(&models.SystemInfo{Hostname: "old-fw"}, nil)
 	m.policies = m.policies.SetPolicies([]models.SecurityRule{{Name: "old-rule"}}, nil)
 	m.sessions = m.sessions.SetSessions([]models.Session{{ID: 1}}, nil)
-	m.logs = m.logs.SetSystemLogs([]models.SystemLogEntry{{Description: "old"}}, views.LogPageMeta{}, nil)
+	m.logs, _ = m.logs.SetSystemLogs([]models.SystemLogEntry{{Description: "old"}}, views.LogPageMeta{}, nil)
 	m.objects = m.objects.SetAddresses([]models.AddressObject{{Name: "old-addr"}}, nil)
 }
 

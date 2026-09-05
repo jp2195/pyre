@@ -59,7 +59,7 @@ func TestLogsModel_SetSystemLogs(t *testing.T) {
 		{Time: time.Now(), Severity: "info", Description: "Test info"},
 	}
 
-	m = m.SetSystemLogs(logs, LogPageMeta{}, nil)
+	m, _ = m.SetSystemLogs(logs, LogPageMeta{}, nil)
 
 	if len(m.systemLogs) != 2 {
 		t.Errorf("expected 2 system logs, got %d", len(m.systemLogs))
@@ -73,7 +73,7 @@ func TestLogsModel_SetSystemLogs_WithError(t *testing.T) {
 	m := NewLogsModel()
 
 	err := errors.New("API error")
-	m = m.SetSystemLogs(nil, LogPageMeta{}, err)
+	m, _ = m.SetSystemLogs(nil, LogPageMeta{}, err)
 
 	if m.tabState(models.LogTypeSystem).err != err {
 		t.Error("expected error to be set")
@@ -88,7 +88,7 @@ func TestLogsModel_SetTrafficLogs(t *testing.T) {
 		{Time: time.Now(), Action: "deny", SourceIP: "192.168.1.1"},
 	}
 
-	m = m.SetTrafficLogs(logs, LogPageMeta{}, nil)
+	m, _ = m.SetTrafficLogs(logs, LogPageMeta{}, nil)
 
 	if len(m.trafficLogs) != 2 {
 		t.Errorf("expected 2 traffic logs, got %d", len(m.trafficLogs))
@@ -102,7 +102,7 @@ func TestLogsModel_SetTrafficLogs_WithError(t *testing.T) {
 	m := NewLogsModel()
 
 	err := errors.New("API error")
-	m = m.SetTrafficLogs(nil, LogPageMeta{}, err)
+	m, _ = m.SetTrafficLogs(nil, LogPageMeta{}, err)
 
 	if m.tabState(models.LogTypeTraffic).err != err {
 		t.Error("expected error to be set")
@@ -117,7 +117,7 @@ func TestLogsModel_SetThreatLogs(t *testing.T) {
 		{Time: time.Now(), Severity: "high", ThreatName: "Another Threat"},
 	}
 
-	m = m.SetThreatLogs(logs, LogPageMeta{}, nil)
+	m, _ = m.SetThreatLogs(logs, LogPageMeta{}, nil)
 
 	if len(m.threatLogs) != 2 {
 		t.Errorf("expected 2 threat logs, got %d", len(m.threatLogs))
@@ -131,7 +131,7 @@ func TestLogsModel_SetThreatLogs_WithError(t *testing.T) {
 	m := NewLogsModel()
 
 	err := errors.New("API error")
-	m = m.SetThreatLogs(nil, LogPageMeta{}, err)
+	m, _ = m.SetThreatLogs(nil, LogPageMeta{}, err)
 
 	if m.tabState(models.LogTypeThreat).err != err {
 		t.Error("expected error to be set")
@@ -147,7 +147,7 @@ func TestLogsModel_Update_Navigation(t *testing.T) {
 		{Time: time.Now(), Description: "Log 2"},
 		{Time: time.Now(), Description: "Log 3"},
 	}
-	m = m.SetSystemLogs(logs, LogPageMeta{}, nil)
+	m, _ = m.SetSystemLogs(logs, LogPageMeta{}, nil)
 
 	// Move down
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
@@ -176,7 +176,7 @@ func TestLogsModel_View(t *testing.T) {
 	logs := []models.SystemLogEntry{
 		{Time: time.Now(), Severity: "warning", Description: "Test"},
 	}
-	m = m.SetSystemLogs(logs, LogPageMeta{}, nil)
+	m, _ = m.SetSystemLogs(logs, LogPageMeta{}, nil)
 
 	view = m.View()
 	if view == "" {
@@ -277,7 +277,7 @@ func TestLogsModel_SetSize_ClampsCursor(t *testing.T) {
 		{Time: time.Now(), Description: "Log 4"},
 		{Time: time.Now(), Description: "Log 5"},
 	}
-	m = m.SetSystemLogs(logs, LogPageMeta{}, nil)
+	m, _ = m.SetSystemLogs(logs, LogPageMeta{}, nil)
 
 	// Move cursor to end
 	m.Cursor = 4
@@ -300,8 +300,8 @@ func TestLogsModel_SetSize_ClampsCursor(t *testing.T) {
 
 func TestLogsModel_SetSystemLogs_ClearsPreviousError(t *testing.T) {
 	m := NewLogsModel()
-	m = m.SetSystemLogs(nil, LogPageMeta{}, errors.New("fetch failed"))
-	m = m.SetSystemLogs([]models.SystemLogEntry{{Severity: "info", Description: "ok"}}, LogPageMeta{}, nil)
+	m, _ = m.SetSystemLogs(nil, LogPageMeta{}, errors.New("fetch failed"))
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{{Severity: "info", Description: "ok"}}, LogPageMeta{}, nil)
 	if err := m.tabState(models.LogTypeSystem).err; err != nil {
 		t.Errorf("systemErr = %v, want nil after successful refresh", err)
 	}
@@ -309,8 +309,8 @@ func TestLogsModel_SetSystemLogs_ClearsPreviousError(t *testing.T) {
 
 func TestLogsModel_SetTrafficLogs_ClearsPreviousError(t *testing.T) {
 	m := NewLogsModel()
-	m = m.SetTrafficLogs(nil, LogPageMeta{}, errors.New("fetch failed"))
-	m = m.SetTrafficLogs([]models.TrafficLogEntry{{Action: "allow", SourceIP: "10.0.0.1"}}, LogPageMeta{}, nil)
+	m, _ = m.SetTrafficLogs(nil, LogPageMeta{}, errors.New("fetch failed"))
+	m, _ = m.SetTrafficLogs([]models.TrafficLogEntry{{Action: "allow", SourceIP: "10.0.0.1"}}, LogPageMeta{}, nil)
 	if err := m.tabState(models.LogTypeTraffic).err; err != nil {
 		t.Errorf("trafficErr = %v, want nil after successful refresh", err)
 	}
@@ -318,8 +318,8 @@ func TestLogsModel_SetTrafficLogs_ClearsPreviousError(t *testing.T) {
 
 func TestLogsModel_SetThreatLogs_ClearsPreviousError(t *testing.T) {
 	m := NewLogsModel()
-	m = m.SetThreatLogs(nil, LogPageMeta{}, errors.New("fetch failed"))
-	m = m.SetThreatLogs([]models.ThreatLogEntry{{Severity: "high", ThreatName: "X"}}, LogPageMeta{}, nil)
+	m, _ = m.SetThreatLogs(nil, LogPageMeta{}, errors.New("fetch failed"))
+	m, _ = m.SetThreatLogs([]models.ThreatLogEntry{{Severity: "high", ThreatName: "X"}}, LogPageMeta{}, nil)
 	if err := m.tabState(models.LogTypeThreat).err; err != nil {
 		t.Errorf("threatErr = %v, want nil after successful refresh", err)
 	}
@@ -329,7 +329,7 @@ func TestLogsModel_View_SystemRowContent(t *testing.T) {
 	InitStyles()
 	m := NewLogsModel()
 	m = m.SetSize(120, 30)
-	m = m.SetSystemLogs([]models.SystemLogEntry{
+	m, _ = m.SetSystemLogs([]models.SystemLogEntry{
 		{Time: time.Now(), Severity: "critical", Type: "general", Description: "fan failure imminent"},
 		{Time: time.Now(), Severity: "informational", Type: "auth", Description: "admin login ok"},
 	}, LogPageMeta{}, nil)
@@ -348,7 +348,7 @@ func TestLogsModel_View_TrafficRowContent(t *testing.T) {
 	InitStyles()
 	m := NewLogsModel()
 	m = m.SetSize(120, 30)
-	m = m.SetTrafficLogs([]models.TrafficLogEntry{
+	m, _ = m.SetTrafficLogs([]models.TrafficLogEntry{
 		{Time: time.Now(), Action: "allow", SourceIP: "10.1.2.3", DestIP: "8.8.4.4", Application: "dns"},
 	}, LogPageMeta{}, nil)
 	m, _ = m.Update(tea.KeyPressMsg{Code: ']', Text: "]"}) // System -> Traffic
@@ -365,7 +365,7 @@ func TestLogsModel_View_ThreatRowContent(t *testing.T) {
 	InitStyles()
 	m := NewLogsModel()
 	m = m.SetSize(120, 30)
-	m = m.SetThreatLogs([]models.ThreatLogEntry{
+	m, _ = m.SetThreatLogs([]models.ThreatLogEntry{
 		{Time: time.Now(), Severity: "high", ThreatName: "Trojan.GenericKD", SourceIP: "203.0.113.5"},
 	}, LogPageMeta{}, nil)
 	m, _ = m.Update(tea.KeyPressMsg{Code: '[', Text: "["}) // System -> Threat
