@@ -225,22 +225,54 @@ func parseRuleHitCounts(inner []byte) map[string]hitStats {
 	return hitMap
 }
 
-// fetchRulesFromPaths tries to fetch rules from multiple XPaths, using the provided parse function.
-func fetchRulesFromPaths[T any](c *Client, ctx context.Context, xpaths []string, target string, parse func([]byte) []T) []T {
+// rulesAt fetches and parses one xpath, reporting separately whether the node
+// exists at all. That distinction is what makes caching safe: a rulebase that
+// answers "no such node" can be skipped next time, while one that exists but
+// happens to be empty must be asked again, since rules may be added to it.
+func rulesAt[T any](c *Client, ctx context.Context, xpath, target string, parse func([]byte) []T) (entries []T, nodeExists bool) {
+	for _, fetch := range []func(context.Context, string, string) (*XMLResponse, error){c.Show, c.Get} {
+		resp, err := fetch(ctx, xpath, target)
+		if err != nil || !resp.IsSuccess() || resp.NodeAbsent() {
+			continue
+		}
+		nodeExists = true
+		if len(resp.Result.Inner) == 0 {
+			continue
+		}
+		if e := parse(resp.Result.Inner); len(e) > 0 {
+			return e, true
+		}
+	}
+	return nil, nodeExists
+}
+
+// fetchRulesFromPaths tries the candidate XPaths for one rulebase, caching
+// which one resolved so later loads go straight to it. cacheKey must identify
+// the rulebase and the Panorama target, since one managed device having no
+// pre-rulebase says nothing about the next.
+func fetchRulesFromPaths[T any](c *Client, ctx context.Context, cacheKey string, xpaths []string, target string, parse func([]byte) []T) []T {
+	if cached, ok := c.cachedRulebasePath(cacheKey); ok {
+		if cached == "" {
+			return nil
+		}
+		if entries, _ := rulesAt(c, ctx, cached, target, parse); len(entries) > 0 {
+			return entries
+		}
+		// The remembered path stopped producing rules. Fall through and
+		// re-resolve rather than silently showing an empty rulebase.
+	}
+
+	anyNodeExists := false
 	for _, xpath := range xpaths {
-		resp, err := c.Show(ctx, xpath, target)
-		if err == nil && resp.IsSuccess() && len(resp.Result.Inner) > 0 {
-			if entries := parse(resp.Result.Inner); len(entries) > 0 {
-				return entries
-			}
+		entries, exists := rulesAt(c, ctx, xpath, target, parse)
+		anyNodeExists = anyNodeExists || exists
+		if len(entries) > 0 {
+			c.setRulebasePath(cacheKey, xpath)
+			return entries
 		}
-		// Try Get if Show didn't work
-		resp, err = c.Get(ctx, xpath, target)
-		if err == nil && resp.IsSuccess() && len(resp.Result.Inner) > 0 {
-			if entries := parse(resp.Result.Inner); len(entries) > 0 {
-				return entries
-			}
-		}
+	}
+	if !anyNodeExists {
+		c.setRulebasePath(cacheKey, "")
 	}
 	return nil
 }
@@ -285,13 +317,13 @@ func fetchRulebase[TEntry, TModel any](c *Client, ctx context.Context, target st
 	// round trips (each of which may itself try several candidate XPaths).
 	var pre, local, post []TEntry
 	var wg sync.WaitGroup
-	wg.Go(func() {
-		pre = fetchRulesFromPaths(c, ctx, rulebasePaths("pre-rulebase", spec.kind), target, spec.parse)
-	})
-	wg.Go(func() { local = fetchRulesFromPaths(c, ctx, rulebasePaths("rulebase", spec.kind), target, spec.parse) })
-	wg.Go(func() {
-		post = fetchRulesFromPaths(c, ctx, rulebasePaths("post-rulebase", spec.kind), target, spec.parse)
-	})
+	fetch := func(location string, dst *[]TEntry) {
+		key := spec.kind + "|" + location + "|" + target
+		*dst = fetchRulesFromPaths(c, ctx, key, rulebasePaths(location, spec.kind), target, spec.parse)
+	}
+	wg.Go(func() { fetch("pre-rulebase", &pre) })
+	wg.Go(func() { fetch("rulebase", &local) })
+	wg.Go(func() { fetch("post-rulebase", &post) })
 	wg.Wait()
 
 	rules := make([]TModel, 0, len(pre)+len(local)+len(post))

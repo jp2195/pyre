@@ -145,6 +145,10 @@ are managed by Renovate.
   per firewall.
 - Every request sends `User-Agent: pyre`, so calls are attributable in
   the firewall's own API log.
+- Rulebase xpaths are resolved once per connection and remembered, so a
+  refresh does not re-probe rulebases the device has already said it does
+  not have. On a standalone firewall this took a policy refresh from 13
+  config requests to 1.
 - `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY` are honored, so traffic can
   be routed through a corporate egress proxy or an inspection proxy.
 - The same permissions a user needs in PAN-OS also apply here — pyre

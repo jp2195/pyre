@@ -13,6 +13,8 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -72,6 +74,36 @@ type Client struct {
 	// own reported time. Nil until GetSystemInfo has run. Atomic because
 	// fetches run concurrently.
 	deviceLoc atomic.Pointer[time.Location]
+
+	// rulebasePathMu guards rulebasePath.
+	rulebasePathMu sync.RWMutex
+	// rulebasePath remembers which candidate xpath resolved for a given
+	// rulebase, keyed by kind, location, and Panorama target. An empty value
+	// records that every candidate reported "no such node", which is the
+	// normal answer for the Panorama pre/post rulebases on a standalone
+	// firewall. Without this a policy load spent twelve of its fourteen
+	// requests re-confirming that a standalone box is still standalone.
+	rulebasePath map[string]string
+}
+
+// cachedRulebasePath returns the remembered xpath for key. The second result
+// reports whether anything is remembered; an empty first result means every
+// candidate was absent.
+func (c *Client) cachedRulebasePath(key string) (string, bool) {
+	c.rulebasePathMu.RLock()
+	defer c.rulebasePathMu.RUnlock()
+	p, ok := c.rulebasePath[key]
+	return p, ok
+}
+
+// setRulebasePath records the resolved xpath for key, or "" for absent.
+func (c *Client) setRulebasePath(key, xpath string) {
+	c.rulebasePathMu.Lock()
+	defer c.rulebasePathMu.Unlock()
+	if c.rulebasePath == nil {
+		c.rulebasePath = make(map[string]string)
+	}
+	c.rulebasePath[key] = xpath
 }
 
 // deviceLocation returns the zone to interpret this device's timestamps in.
@@ -228,6 +260,23 @@ type XMLResponse struct {
 
 func (r *XMLResponse) IsSuccess() bool {
 	return r.Status == "success"
+}
+
+// codeObjectNotPresent is the PAN-OS status code for "the node you asked for
+// does not exist". A `get` for a missing xpath does not fail: it returns
+// success with this code and an empty result, where the equivalent `show`
+// returns an error saying "No such node". Telling the two apart matters,
+// because a node that is absent can be skipped next time while one that
+// exists and is merely empty must be asked again.
+const codeObjectNotPresent = "7"
+
+// NodeAbsent reports whether the response says the requested node does not
+// exist, in either of the two forms PAN-OS uses.
+func (r *XMLResponse) NodeAbsent() bool {
+	if r.Code == codeObjectNotPresent {
+		return true
+	}
+	return !r.IsSuccess() && strings.Contains(strings.ToLower(r.Msg.Line), "no such node")
 }
 
 func (r *XMLResponse) Error() string {

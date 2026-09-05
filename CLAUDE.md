@@ -31,7 +31,13 @@ go fix ./...                  # Apply modernizers (safe, behavior-preserving)
 - **Value receivers** on Bubbletea Models (immutable Update pattern), **pointer receivers** for mutation + Cmd return
 - Generic `fetchCmd[T any]()` helper in `commands.go` reduces fetch boilerplate
 - Generic `RuleListModel[T]`/`RuleListConfig[T]` in `views/rule_list.go` powers the policies, NAT, interfaces, IPSec tunnels, GP users, and sessions views; per-view wrappers hold only config + format/render functions. Logs intentionally keeps a custom shell (tab bar + cross-type filtering).
-- Generic `fetchRulesFromPaths[T any]()` in `api/policies.go` for XPath rule fetching
+- Generic `fetchRulesFromPaths[T any]()` in `api/policies.go` for XPath rule
+  fetching. It caches which candidate xpath resolved per rulebase and target,
+  because a standalone firewall answers all six Panorama pre/post probes with
+  "not present" and used to be asked every single load. `show` and `get`
+  disagree about missing nodes: `show` errors with "No such node" while `get`
+  returns success with code 7 and an empty result, so use
+  `XMLResponse.NodeAbsent()` rather than checking success alone.
 - `saveConfig()` / `saveState()` return `tea.Cmd` (avoid goroutine race conditions)
 - `setError()` is a value receiver that returns an updated Model with `m.err` set plus an auto-dismiss tick Cmd
 - Navigation has a single source of truth: the ordered `navDefs` table in `tui/navigation.go` derives the navbar groups (`navbarGroups()`), `navTargets`, and `viewToNavbar`. Adding a nav item = one `navDefs` entry; `views.NewNavbarModel(groups)` takes the groups as a parameter.
