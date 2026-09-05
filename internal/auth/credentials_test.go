@@ -147,3 +147,68 @@ func TestResolveCredentials_RejectsMalformedHost(t *testing.T) {
 		t.Errorf("err = %v, want to mention 'invalid host'", err)
 	}
 }
+
+// TestResolveCredentials_ConnectionFlagUsesItsOwnHostKey covers a credential
+// mix-up: -c overwrote the host *after* resolution, so the host-scoped lookup
+// ran against the default connection. A key belonging to one firewall was
+// paired with a different firewall's host, and the -c host's own key was
+// never consulted.
+func TestResolveCredentials_ConnectionFlagUsesItsOwnHostKey(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Connections["default.example.com"] = config.ConnectionConfig{}
+	cfg.Connections["target.example.com"] = config.ConnectionConfig{
+		Username: "operator",
+		Insecure: true,
+	}
+	cfg.Default = "default.example.com"
+
+	t.Setenv("PYRE_DEFAULT_EXAMPLE_COM_API_KEY", "wrong-key")
+	t.Setenv("PYRE_TARGET_EXAMPLE_COM_API_KEY", "right-key")
+
+	creds, err := auth.ResolveCredentials(cfg, config.CLIFlags{Connection: "target.example.com"})
+	if err != nil {
+		t.Fatalf("ResolveCredentials: %v", err)
+	}
+
+	if creds.Host != "target.example.com" {
+		t.Errorf("Host = %q, want target.example.com", creds.Host)
+	}
+	if creds.APIKey != "right-key" {
+		t.Errorf("APIKey = %q, want right-key (the -c host's own key)", creds.APIKey)
+	}
+	if creds.Username != "operator" {
+		t.Errorf("Username = %q, want operator (from the selected connection)", creds.Username)
+	}
+	if !creds.Insecure {
+		t.Error("Insecure = false, want true (from the selected connection)")
+	}
+	if creds.PromptForPassword {
+		t.Error("PromptForPassword = true, but a key was resolved for this host")
+	}
+}
+
+// TestResolveCredentials_ConnectionFlagUnknownHost checks the -c lookup fails
+// loudly rather than resolving credentials for some other host.
+func TestResolveCredentials_ConnectionFlagUnknownHost(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Connections["known.example.com"] = config.ConnectionConfig{}
+
+	if _, err := auth.ResolveCredentials(cfg, config.CLIFlags{Connection: "missing.example.com"}); err == nil {
+		t.Fatal("expected an error for a -c host that is not in the config")
+	}
+}
+
+// TestResolveCredentials_ConnectionFlagPromptsWhenNoKey confirms the flag
+// still falls through to the interactive login when no key is available.
+func TestResolveCredentials_ConnectionFlagPromptsWhenNoKey(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Connections["target.example.com"] = config.ConnectionConfig{Username: "operator"}
+
+	creds, err := auth.ResolveCredentials(cfg, config.CLIFlags{Connection: "target.example.com"})
+	if err != nil {
+		t.Fatalf("ResolveCredentials: %v", err)
+	}
+	if !creds.PromptForPassword {
+		t.Error("PromptForPassword = false, want true when no API key is available")
+	}
+}

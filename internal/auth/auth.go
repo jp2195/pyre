@@ -191,41 +191,50 @@ type Credentials struct {
 func ResolveCredentials(cfg *config.Config, flags config.CLIFlags) (*Credentials, error) {
 	creds := &Credentials{}
 
-	// CLI flags take highest priority
-	if flags.Host != "" {
+	// --- Host selection ---
+	// The host has to settle before anything host-scoped is looked up.
+	// Resolving credentials first and overwriting the host afterwards (which
+	// is what the -c flag used to do in main) paired one firewall's API key
+	// with a different firewall's address.
+	switch {
+	case flags.Connection != "":
+		// -c names a saved connection and carries its username and TLS
+		// settings with it. It wins over --host, matching the previous
+		// behavior where -c was applied last.
+		conn, ok := cfg.GetConnection(flags.Connection)
+		if !ok {
+			return nil, fmt.Errorf("connection %q not found in config", flags.Connection)
+		}
+		creds.Host = flags.Connection
+		creds.Username = conn.Username
+		creds.Insecure = conn.Insecure
+	case flags.Host != "":
 		creds.Host = flags.Host
+	case os.Getenv("PYRE_HOST") != "":
+		creds.Host = os.Getenv("PYRE_HOST")
+	default:
+		if host, conn, ok := cfg.GetDefaultConnection(); ok {
+			creds.Host = host
+			creds.Username = conn.Username
+			creds.Insecure = conn.Insecure
+		}
 	}
+
+	// --- Overrides, highest priority first ---
 	if flags.Username != "" {
 		creds.Username = flags.Username
 	}
 	if flags.APIKey != "" {
 		creds.APIKey = flags.APIKey
 	}
-	// If --insecure flag is explicitly true, use it
 	if flags.Insecure {
 		creds.Insecure = true
 	}
-
-	// Environment variables (if not set by flags)
-	if envHost := os.Getenv("PYRE_HOST"); envHost != "" && creds.Host == "" {
-		creds.Host = envHost
+	if os.Getenv("PYRE_INSECURE") == "true" {
+		creds.Insecure = true
 	}
 	if envKey := os.Getenv("PYRE_API_KEY"); envKey != "" && creds.APIKey == "" {
 		creds.APIKey = envKey
-	}
-	if os.Getenv("PYRE_INSECURE") == "true" && !creds.Insecure {
-		creds.Insecure = true
-	}
-
-	// Config file defaults (if not set by flags or env)
-	if creds.Host == "" {
-		if host, conn, ok := cfg.GetDefaultConnection(); ok {
-			creds.Host = host
-			// Use config insecure if not already set by flags or env
-			if !creds.Insecure && conn.Insecure {
-				creds.Insecure = true
-			}
-		}
 	}
 
 	// Host-based API key resolution order (documented in CLAUDE.md):
@@ -233,6 +242,7 @@ func ResolveCredentials(cfg *config.Config, flags config.CLIFlags) (*Credentials
 	//   2. Fall through to PromptForPassword=true so the TUI prompts.
 	// pyre does not persist credentials. Users manage them via env vars,
 	// CLI flags, or the interactive login flow (session-only).
+	// This runs against the final host, so it covers -c as well.
 	if creds.Host != "" && creds.APIKey == "" {
 		envName := normalizeHostForEnv(creds.Host)
 		if envKey := os.Getenv("PYRE_" + envName + "_API_KEY"); envKey != "" {

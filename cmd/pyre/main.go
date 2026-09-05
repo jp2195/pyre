@@ -123,21 +123,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Determine starting view based on flags and config
+	// Determine starting view based on flags and config. The -c flag is
+	// resolved inside ResolveCredentials, which validates that the named
+	// connection exists and looks up its host-scoped API key.
 	startView := determineStartView(cfg, flags, creds)
-
-	// Handle -c flag: validate connection exists (flags.Connection is the host)
-	if flags.Connection != "" {
-		conn, ok := cfg.GetConnection(flags.Connection)
-		if !ok {
-			fmt.Fprintf(os.Stderr, "Error: connection %q not found in config\n", flags.Connection)
-			os.Exit(1)
-		}
-		// Set up credentials for the specified connection
-		creds.Host = flags.Connection // Host is now the key
-		creds.Insecure = conn.Insecure
-		creds.PromptForPassword = true
-	}
 
 	model, err := tui.NewModel(cfg, state, creds, startView)
 	if err != nil {
