@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
 
@@ -102,29 +103,74 @@ func cleanValue(s string) string {
 	return s
 }
 
-// wrapText wraps text to the specified width.
+// wrapText wraps text to the specified width, measured in terminal cells.
+//
+// Width is counted with lipgloss.Width rather than len: len counts bytes, so
+// any non-ASCII content wraps far earlier than it needs to, and a double-width
+// rune would wrap too late.
+//
+// A run with no space in it that is wider than the box is broken rather than
+// emitted whole. The strings this helper is given -- PAN-OS expressions, URLs
+// in a log description, file digests -- routinely contain one, and letting it
+// through overflows the panel, which is what the caller wrapped to prevent.
 func wrapText(text string, width int) []string {
 	if width <= 0 {
 		return []string{text}
 	}
 
-	var lines []string
 	words := strings.Fields(text)
 	if len(words) == 0 {
 		return []string{}
 	}
 
-	currentLine := words[0]
-	for _, word := range words[1:] {
-		if len(currentLine)+1+len(word) <= width {
-			currentLine += " " + word
-		} else {
-			lines = append(lines, currentLine)
-			currentLine = word
+	var lines []string
+	current := ""
+	flush := func() {
+		if current != "" {
+			lines = append(lines, current)
+			current = ""
 		}
 	}
-	lines = append(lines, currentLine)
+
+	for _, word := range words {
+		for lipgloss.Width(word) > width {
+			flush()
+			var head string
+			head, word = splitAtWidth(word, width)
+			lines = append(lines, head)
+		}
+		switch {
+		case current == "":
+			current = word
+		case lipgloss.Width(current)+1+lipgloss.Width(word) <= width:
+			current += " " + word
+		default:
+			flush()
+			current = word
+		}
+	}
+	flush()
 	return lines
+}
+
+// splitAtWidth cuts s after the last rune that still fits in width cells,
+// returning that head and the remainder. It always consumes at least one rune,
+// so a rune wider than the whole box overflows its own line rather than
+// leaving the caller's loop with nothing to make progress on.
+func splitAtWidth(s string, width int) (head, rest string) {
+	used := 0
+	for i, r := range s {
+		w := lipgloss.Width(string(r))
+		if used+w > width {
+			if i == 0 {
+				_, size := utf8.DecodeRuneInString(s)
+				return s[:size], s[size:]
+			}
+			return s[:i], s[i:]
+		}
+		used += w
+	}
+	return s, ""
 }
 
 // tableSeparator renders the horizontal rule under a table header. It spans
