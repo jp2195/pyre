@@ -513,6 +513,15 @@ func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
 			m.queryInput.Focus()
 			m.queryInput.CursorEnd()
 			return m, textinput.Blink
+		case "m":
+			s := m.tabState(m.activeLogType)
+			if !s.hasMore {
+				return m, nil
+			}
+			// Deliberately not automatic on reaching the last row: a
+			// page is a couple of megabytes and a second or more, which
+			// is not what a j keypress should cost.
+			return m, m.fetchRequest(m.activeLogType, s.fetched, true)
 		case "]":
 			// Cycle forward through log types: System -> Traffic -> Threat -> System
 			switch m.activeLogType {
@@ -750,6 +759,7 @@ func (m LogsModel) renderHelp() string {
 		{"/", "filter"},
 		{"t", "range"},
 		{"f", "device query"},
+		{"m", "more"},
 		{"s", "sort field"},
 		{"S", "sort dir"},
 		{"r", "refresh"},
