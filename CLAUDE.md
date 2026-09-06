@@ -72,6 +72,19 @@ go fix ./...                  # Apply modernizers (safe, behavior-preserving)
 - Theme palette fields are `image/color.Color`, not a string alias. Construct concrete values via `lipgloss.Color("#RRGGBB")`.
 - **Three navigation levels, three key sets**: `1`/`2`/`3` switch groups, `Tab`/`Shift+Tab` move between views in a group, `[`/`]` switch sub-tabs *within* a view (Objects, Routes, Logs). A view must never consume `Tab` — Objects used to, and became the one view you could not `Tab` out of.
 - **Free-form op output is CDATA-wrapped on real hardware.** `Result.Inner` is `xml:",innerxml"`, so it keeps the literal `<![CDATA[` marker. Parse text output (`df`, `top`) with `api.InnerText()`, never `string(resp.Result.Inner)`. Tests that feed bare text will pass while hardware fails.
+- **Certificates come from the config, never an op command, and never with
+  the private key.** PAN-OS 11.2.10-h8 rejects
+  `<show><sslmgr-store><certificate><all>` ("show -> sslmgr-store ->
+  certificate is unexpected"); the `<certificate><entry>` shape lives in the
+  config at `/config/shared/certificate` and the vsys equivalent.
+  `certificateXPath` selects `entry/@name` unioned with
+  `entry/*[not(self::private-key or self::public-key)]` so key material is
+  never put on the wire, buffered, or written to the `PYRE_DEBUG` response
+  preview. Selecting `entry` itself drags the whole subtree, keys included.
+  PAN-OS returns matched nodes with **no ancestor context**, so the result is
+  a flat stream — `<entry name="..."/>` then that entry's own children — and
+  `parseCertificateNodes` binds each field to the entry preceding it. Prefer
+  `<expiry-epoch>` (an absolute instant) over the bare wall clock.
 - **Dashboards clamp to the terminal.** `DashboardBase.ClampToHeight` windows the panel stack and `ScrollBy` moves the offset; each dashboard's `View()` is a thin wrapper over `content()` so `ContentHeight()` can measure the untrimmed stack. Dashboard scrolling is handled in the TUI layer (`dashboard_scroll.go`), not per-dashboard `Update`, because `handleViewKeys` routes `ViewDashboard` keys to `m.dashboard` (Overview) whatever is on screen.
 - **`HasData()` gates the app-wide spinner** via `Model.anyLoading()`. It must report settled only when *every* source has produced data **or** an error; returning true early drops the tick chain and freezes other panels' spinners mid-frame.
 - **Table rows share one column grid.** `TableRowSelectedStyle`/`TableRowDisabledStyle` carry `Padding(0, 1)`; tables that render an unpadded header must use the `TableSelectedRowStyle()`/`TableDisabledRowStyle()` flush variants, or the selected row shifts a column and the table twitches as the cursor moves.
