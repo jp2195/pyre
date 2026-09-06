@@ -12,17 +12,18 @@ func TestGetCertificates_SanitizesSubjectAndIssuer(t *testing.T) {
 	// Raw ESC (0x1B) is illegal in XML 1.0 and would be rejected by the parser
 	// before sanitization; DEL (0x7F) is a legal XML character that the sanitizer
 	// strips, demonstrating the sanitizer is wired in to the fetcher.
+	//
+	// The body is the flat node stream the key-free certificate xpath returns
+	// (see certificateXPath), not a nested <certificate><entry> subtree.
 	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/xml")
-		fmt.Fprint(w, `<response status="success"><result>`+
-			`<certificate><entry name="test-cert">`+
+		fmt.Fprint(w, `<response status="success" code="19"><result>`+
+			`<entry name="test-cert"/>`+
 			`<subject>CN=`+"\x7f"+"evil"+`</subject>`+
 			`<issuer>O=`+"bold"+"\x7f"+"issuer"+`</issuer>`+
 			`<not-valid-before>Jan 01 00:00:00 2025 GMT</not-valid-before>`+
 			`<not-valid-after>Jan 01 00:00:00 2027 GMT</not-valid-after>`+
-			`<serial-number>DEADBEEF</serial-number>`+
 			`<algorithm>RSA</algorithm>`+
-			`</entry></certificate>`+
 			`</result></response>`)
 	})
 

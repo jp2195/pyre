@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"encoding/xml"
 	"log"
 	"slices"
 	"strconv"
@@ -415,83 +416,164 @@ func (c *Client) GetEnvironmentals(ctx context.Context, target string) ([]models
 	return envs, nil
 }
 
-// GetCertificates retrieves certificate information
+// certificateBases are the config locations that hold certificate entries on
+// a firewall: the shared store and the vsys store. Both are queried and the
+// results unioned, because a certificate expiring in a vsys store is exactly
+// as urgent as one expiring in shared, and the dashboard panel exists to
+// surface it.
+var certificateBases = []string{
+	"/config/shared/certificate",
+	"/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/certificate",
+}
+
+// certificateXPath selects a certificate entry's name and every child EXCEPT
+// the key material.
+//
+// pyre must never pull a private key off the device, so the exclusion happens
+// at the source rather than after parsing: the key bytes are never put on the
+// wire, never held in a response buffer, and never reach the PYRE_DEBUG
+// response preview (client.go logs the first 1000 bytes of every result).
+// Selecting the <entry> node itself would drag the whole subtree, private key
+// included, which is why the name is picked off as an attribute instead.
+//
+// PAN-OS returns matched nodes with no ancestor context, so the result is a
+// FLAT stream: a self-closing <entry name="..."/> followed by that entry's own
+// children, repeated per certificate. parseCertificateNodes relies on that
+// document order. Verified against a PA-440 on 11.2.10-h8.
+func certificateXPath(base string) string {
+	return base + "/entry/@name|" + base + "/entry/*[not(self::private-key or self::public-key)]"
+}
+
+// GetCertificates retrieves certificate information from the running config.
+//
+// This reads the config rather than an op command: PAN-OS 11.2.10-h8 rejects
+// <show><sslmgr-store><certificate><all> outright ("show -> sslmgr-store ->
+// certificate is unexpected"), and the <certificate><entry> shape parsed here
+// is the config tree's, not any op command's.
 func (c *Client) GetCertificates(ctx context.Context, target string) ([]models.Certificate, error) {
-	resp, err := c.Op(ctx, "<show><sslmgr-store><certificate><all></all></certificate></sslmgr-store></show>", target)
-	if err != nil {
-		return nil, err
-	}
-	if err := CheckResponse(resp); err != nil {
-		return nil, err
+	var (
+		certs    []models.Certificate
+		seen     = make(map[string]bool)
+		firstErr error
+	)
+
+	for _, base := range certificateBases {
+		resp, err := c.Get(ctx, certificateXPath(base), target)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		// A firewall with no vsys certificate store answers success with
+		// code 7 and an empty result. That is "none here", not a failure.
+		if resp.NodeAbsent() {
+			continue
+		}
+		if err := CheckResponse(resp); err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		for _, cert := range c.parseCertificateNodes(resp.Result.Inner) {
+			if cert.Name == "" || seen[cert.Name] {
+				continue
+			}
+			seen[cert.Name] = true
+			certs = append(certs, cert)
+		}
 	}
 
-	if len(resp.Result.Inner) == 0 {
-		return []models.Certificate{}, nil
+	// Only surface an error when it cost us the whole list; one absent
+	// store alongside a populated one is a normal single-vsys firewall.
+	if len(certs) == 0 && firstErr != nil {
+		return nil, firstErr
+	}
+	return certs, nil
+}
+
+// parseCertificateNodes reads the flat node stream described on
+// certificateXPath. Each <entry> opens a certificate and every following
+// element binds to it until the next <entry>; an element arriving before the
+// first <entry> has no certificate to belong to and is dropped rather than
+// guessed at.
+func (c *Client) parseCertificateNodes(inner []byte) []models.Certificate {
+	if len(inner) == 0 {
+		return nil
 	}
 
 	var result struct {
-		Entry []struct {
-			Name           string `xml:"name,attr"`
-			Subject        string `xml:"subject"`
-			Issuer         string `xml:"issuer"`
-			NotValidBefore string `xml:"not-valid-before"`
-			NotValidAfter  string `xml:"not-valid-after"`
-			SerialNum      string `xml:"serial-number"`
-			Algorithm      string `xml:"algorithm"`
-		} `xml:"certificate>entry"`
+		Nodes []struct {
+			XMLName xml.Name
+			Name    string `xml:"name,attr"`
+			Value   string `xml:",chardata"`
+		} `xml:",any"`
+	}
+	if err := decodeXML(bytes.NewReader(WrapInner(inner)), &result); err != nil {
+		return nil
 	}
 
-	if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &result); err != nil {
-		// Try alternate structure
-		var alt struct {
-			Entry []struct {
-				Name           string `xml:"name,attr"`
-				Subject        string `xml:"subject"`
-				Issuer         string `xml:"issuer"`
-				NotValidBefore string `xml:"not-valid-before"`
-				NotValidAfter  string `xml:"not-valid-after"`
-				SerialNum      string `xml:"serial-number"`
-				Algorithm      string `xml:"algorithm"`
-			} `xml:"entry"`
-		}
-		if err := decodeXML(bytes.NewReader(WrapInner(resp.Result.Inner)), &alt); err != nil {
-			return []models.Certificate{}, nil
-		}
-		result.Entry = alt.Entry
-	}
+	certs := make([]models.Certificate, 0, len(result.Nodes))
+	// epochs is kept alongside certs so the authoritative expiry can be
+	// applied after the stream is read, without a second lookup.
+	epochs := make([]string, 0, len(result.Nodes))
+	idx := -1
 
-	certs := make([]models.Certificate, 0, len(result.Entry))
-	for _, e := range result.Entry {
-		cert := models.Certificate{
-			Name:         e.Name,
-			Subject:      e.Subject,
-			Issuer:       e.Issuer,
-			SerialNumber: e.SerialNum,
-			Algorithm:    e.Algorithm,
+	for _, n := range result.Nodes {
+		if n.XMLName.Local == "entry" {
+			certs = append(certs, models.Certificate{Name: n.Name})
+			epochs = append(epochs, "")
+			idx = len(certs) - 1
+			continue
 		}
-
-		// Parse dates
-		if t, err := c.parsePANTime(e.NotValidBefore); err == nil {
-			cert.NotBefore = t
+		if idx < 0 {
+			continue
 		}
-		if t, err := c.parsePANTime(e.NotValidAfter); err == nil {
-			cert.NotAfter = t
-		}
-
-		// Calculate days left and status
-		if !cert.NotAfter.IsZero() {
-			cert.DaysLeft = int(time.Until(cert.NotAfter).Hours() / 24)
-			if cert.DaysLeft < 0 {
-				cert.Status = "expired"
-			} else if cert.DaysLeft < 30 {
-				cert.Status = "expiring"
-			} else {
-				cert.Status = "valid"
+		cur := &certs[idx]
+		value := strings.TrimSpace(n.Value)
+		switch n.XMLName.Local {
+		case "subject":
+			cur.Subject = value
+		case "issuer":
+			cur.Issuer = value
+		case "algorithm":
+			cur.Algorithm = value
+		case "not-valid-before":
+			if t, err := c.parsePANTime(value); err == nil {
+				cur.NotBefore = t
 			}
+		case "not-valid-after":
+			if t, err := c.parsePANTime(value); err == nil {
+				cur.NotAfter = t
+			}
+		case "expiry-epoch":
+			epochs[idx] = value
 		}
-
-		certs = append(certs, cert)
+		// SerialNumber is deliberately not set: the certificate config
+		// carries subject-hash and issuer-hash but no serial number.
 	}
 
-	return certs, nil
+	for i := range certs {
+		// expiry-epoch is an absolute instant, so it needs none of the
+		// device-zone guesswork a bare PAN-OS wall clock does. Prefer it
+		// and fall back to the parsed not-valid-after text.
+		if sec, err := strconv.ParseInt(epochs[i], 10, 64); err == nil {
+			certs[i].NotAfter = time.Unix(sec, 0)
+		}
+		if certs[i].NotAfter.IsZero() {
+			continue
+		}
+		certs[i].DaysLeft = int(time.Until(certs[i].NotAfter).Hours() / 24)
+		switch {
+		case certs[i].DaysLeft < 0:
+			certs[i].Status = "expired"
+		case certs[i].DaysLeft < 30:
+			certs[i].Status = "expiring"
+		default:
+			certs[i].Status = "valid"
+		}
+	}
+
+	return certs
 }
