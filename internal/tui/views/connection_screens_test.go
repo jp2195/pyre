@@ -271,7 +271,7 @@ func TestModalInputs_ShrinkWithTheTerminal(t *testing.T) {
 		form := NewAddConnectionForm().SetSize(width, 30)
 
 		for name, view := range map[string]string{"login": login.View(), "form": form.View()} {
-			for _, line := range strings.Split(view, "\n") {
+			for line := range strings.SplitSeq(view, "\n") {
 				if got := lipglossWidth(line); got > width {
 					t.Errorf("%s at width %d: line is %d cells, %d over", name, width, got, got-width)
 					break

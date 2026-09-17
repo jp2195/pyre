@@ -245,7 +245,7 @@ func TestLoginFlow_FitsTheTerminal(t *testing.T) {
 		m.currentView = ViewLogin
 		m, _ = press(t, m, LoginErrorMsg{Err: errors.New("dial tcp 10.0.104.50:443: connect: connection refused")})
 
-		for _, line := range strings.Split(m.renderContent(), "\n") {
+		for line := range strings.SplitSeq(m.renderContent(), "\n") {
 			if got := lipgloss.Width(line); got > width {
 				t.Errorf("width %d: a line is %d cells, %d over:\n  %q", width, got, got-width, line)
 				break

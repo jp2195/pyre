@@ -138,7 +138,7 @@ func TestLogsModel_StatusLineFitsEveryWidth(t *testing.T) {
 		m, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
 
 		line := m.statusLine()
-		for _, rendered := range strings.Split(line, "\n") {
+		for rendered := range strings.SplitSeq(line, "\n") {
 			if got := lipgloss.Width(rendered); got > width {
 				t.Errorf("width %d: status line is %d cells wide: %q", width, got, rendered)
 			}

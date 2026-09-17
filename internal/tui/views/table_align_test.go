@@ -19,11 +19,11 @@ func plain(s string) string { return ansiRe.ReplaceAllString(s, "") }
 // the left edge of the rendered line. Lines begin with the panel border, so
 // counting leading spaces from index zero measures nothing.
 func displayColumnOf(line, token string) int {
-	i := strings.Index(line, token)
-	if i < 0 {
+	before, _, ok := strings.Cut(line, token)
+	if !ok {
 		return -1
 	}
-	return lipgloss.Width(line[:i])
+	return lipgloss.Width(before)
 }
 
 // TestRuleList_RowsShareOneLeftEdge covers a visible misalignment. Selected

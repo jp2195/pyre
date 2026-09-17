@@ -163,7 +163,7 @@ func TestDevicePicker_ViewMarksTheActiveTarget(t *testing.T) {
 	m := NewDevicePickerModel().SetDevices(devices, "001901000002", "panorama-1").SetSize(120, 40)
 	m = pressAll(m, "g") // move the cursor away from the target
 
-	for _, line := range strings.Split(m.View(), "\n") {
+	for line := range strings.SplitSeq(m.View(), "\n") {
 		if strings.Contains(line, "fw-edge-b") && !strings.Contains(line, "►") {
 			t.Errorf("active target is not marked:\n  %q", line)
 		}

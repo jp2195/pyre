@@ -23,7 +23,7 @@ func TestRuleListBanner_StaysOnOneLine(t *testing.T) {
 
 	for width := 60; width <= 200; width += 5 {
 		view := m.SetSize(width, 30).View()
-		for _, line := range strings.Split(view, "\n") {
+		for line := range strings.SplitSeq(view, "\n") {
 			if !strings.Contains(line, "Sort:") {
 				continue
 			}
@@ -60,7 +60,7 @@ func TestTabbedViews_TitleAndTabsShareALine(t *testing.T) {
 
 	for _, tc := range cases {
 		for width := 60; width <= 200; width += 5 {
-			for _, line := range strings.Split(tc.view(width), "\n") {
+			for line := range strings.SplitSeq(tc.view(width), "\n") {
 				if !strings.Contains(line, tc.title) {
 					continue
 				}
@@ -81,7 +81,7 @@ func TestRoutesBanner_StaysOnOneLine(t *testing.T) {
 		{Destination: "0.0.0.0/0", Nexthop: "10.0.0.1", Protocol: "static", Interface: "ethernet1/1"},
 	}, nil)
 	for width := 60; width <= 200; width += 5 {
-		for _, line := range strings.Split(m.SetSize(width, 30).View(), "\n") {
+		for line := range strings.SplitSeq(m.SetSize(width, 30).View(), "\n") {
 			if !strings.Contains(line, "routes |") {
 				continue
 			}
@@ -124,7 +124,7 @@ func TestListViews_RuleIsOneLine(t *testing.T) {
 	for _, v := range views {
 		for width := 60; width <= 200; width += 5 {
 			rules := 0
-			for _, line := range strings.Split(v.view(width), "\n") {
+			for line := range strings.SplitSeq(v.view(width), "\n") {
 				if strings.Contains(line, strings.Repeat("─", 4)) && !strings.Contains(line, "╭") && !strings.Contains(line, "╰") {
 					rules++
 				}

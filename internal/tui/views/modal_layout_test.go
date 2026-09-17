@@ -32,7 +32,7 @@ func modalBody(t *testing.T, view string) []string {
 	t.Helper()
 	var body []string
 	inBox := false
-	for _, line := range strings.Split(view, "\n") {
+	for line := range strings.SplitSeq(view, "\n") {
 		switch {
 		case strings.Contains(line, "╭"):
 			inBox = true
@@ -161,7 +161,7 @@ func TestModals_BoxFitsTheTerminal(t *testing.T) {
 			"connection hub": NewConnectionHubModel().SetConnections(cfg, state).SetSize(width, 30).View(),
 		}
 		for name, view := range views {
-			for _, line := range strings.Split(view, "\n") {
+			for line := range strings.SplitSeq(view, "\n") {
 				if got := lipgloss.Width(line); got > width {
 					t.Errorf("%s at width %d: line is %d cells, %d over", name, width, got, got-width)
 					break

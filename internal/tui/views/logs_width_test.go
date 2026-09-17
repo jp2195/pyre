@@ -52,7 +52,7 @@ func TestThreatLogTable_UsesTheAvailableWidth(t *testing.T) {
 	}
 
 	widest := 0
-	for _, l := range strings.Split(out, "\n") {
+	for l := range strings.SplitSeq(out, "\n") {
 		if w := lipgloss.Width(strings.TrimRight(l, " ")); w > widest {
 			widest = w
 		}

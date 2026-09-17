@@ -53,11 +53,11 @@ func newBoundClient(t *testing.T, srv *boundTestServer) *Client {
 func boundOf(t *testing.T, expr string) string {
 	t.Helper()
 	const prefix = "(receive_time geq '"
-	i := strings.Index(expr, prefix)
-	if i < 0 {
+	_, after, ok := strings.Cut(expr, prefix)
+	if !ok {
 		t.Fatalf("no time bound in %q", expr)
 	}
-	rest := expr[i+len(prefix):]
+	rest := after
 	j := strings.Index(rest, "'")
 	if j < 0 {
 		t.Fatalf("unterminated time bound in %q", expr)

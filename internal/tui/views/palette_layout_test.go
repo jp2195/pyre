@@ -24,7 +24,7 @@ func TestCommandPalette_InputFitsTheModal(t *testing.T) {
 
 		out := m.View()
 		var shortest = -1
-		for _, line := range strings.Split(out, "\n") {
+		for line := range strings.SplitSeq(out, "\n") {
 			for _, run := range runs.FindAllString(line, -1) {
 				n := len([]rune(run))
 				if shortest < 0 || n < shortest {
