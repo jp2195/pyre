@@ -3,7 +3,7 @@
 ## Install
 
 Grab a binary from [Releases](https://github.com/jp2195/pyre/releases)
-or `go install github.com/jp2195/pyre/cmd/pyre@latest` (Go 1.26+).
+or `go install github.com/jp2195/pyre/cmd/pyre@latest` (Go 1.27+).
 The [README install section](../README.md#install) has the
 copy-paste shell snippet. Each release archive ships with an SPDX
 SBOM and `checksums.txt`.

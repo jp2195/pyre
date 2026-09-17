@@ -60,7 +60,7 @@ sudo mv pyre /usr/local/bin/pyre
 
 Windows: extract the `.zip`, drop `pyre.exe` on your `PATH`.
 
-Or build from source (Go 1.26+):
+Or build from source (Go 1.27+):
 
 ```bash
 go install github.com/jp2195/pyre/cmd/pyre@latest

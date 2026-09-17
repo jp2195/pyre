@@ -94,7 +94,7 @@ go fix ./...                  # Apply modernizers (safe, behavior-preserving)
 ## Code Style
 
 - Go standard: tabs for indentation
-- Use modern Go idioms (see Go 1.26 features below)
+- Use modern Go idioms (see Go 1.27 features below)
 - Prefer `for range N` over `for i := 0; i < N; i++` when index is unused
 - Prefer `for i := range N` over `for i := 0; i < N; i++` when index is used
 - Use `max()`/`min()` builtins instead of manual if/else clamping
@@ -146,13 +146,43 @@ logger at a file.
 - `maxResponseSize = 50MB` const in `client.go`, used with `io.LimitReader`
 - Log polling: `logPollMaxAttempts=30`, `logPollInterval=500ms` in `api/logs.go`
 
-## Go 1.26 (Current Version)
+## Go 1.27 (Current Version)
 
-`go.mod` is pinned to `go 1.26.6`; CI pins `go-version: '1.26.6'` (the
+`go.mod` is pinned to `go 1.27.1`; CI pins `go-version: '1.27.1'` (the
 `go-version` lines across `.github/workflows/` plus `go.mod` move together —
 verify the count with `grep -rc "go-version:" .github/workflows/` rather than
 trusting a number written here).
-The 1.26.x series has shipped these stdlib CVE patches:
+
+**1.26.6 -> 1.27.1 was NOT a security bump.** 1.27.0 (2026-08-19) is a major
+release; 1.27.1 (2026-09-01) fixes cgo, the compiler, the runtime, `go fix`,
+`database/sql`, `debug/elf`, `encoding/json`, `net/http`, `os` and `simd`.
+None is a security release and `govulncheck` was clean on both sides, so the
+reason to be here is toolchain currency, not a CVE.
+
+**1.27 gives this project almost nothing.** Checked against
+`$(go env GOROOT)/api/go1.27.txt` rather than release-note memory:
+`strings.CutLast`/`bytes.CutLast` have no site (the codebase has zero
+`LastIndex` calls); `net/url`'s new `Clone` methods have none either (request
+params are built fresh per call, never copied); `net/http`'s
+`MaxHeaderValueCount` is server-side and pyre is a client; and `crypto/tls`'s
+ML-DSA/ML-KEM post-quantum additions are moot because PAN-OS will not
+negotiate them. There are no language changes. The one thing worth
+remembering is that `unicode` moved to 17.0.0, which is live under
+`internal/api/sanitize.go` and the display-width wrapping.
+
+**Toolchain bumps break the security tools before they break the code.**
+gosec reads compiler export data, so a gosec older than the toolchain dies
+with `internal error: package "fmt" without types was imported from
+"command-line-arguments"` — which looks like a scan finding and is not one.
+v2.22.11 passes under 1.26.6 and fails under 1.27.1; v2.29.0 passes under
+both. These pins live in `go install <tool>@<version>` inside a `run:` step,
+where no built-in Renovate manager looks, so they silently rotted seven minor
+versions behind. `renovate.json` now carries a `customManagers` rule matching
+that line shape. **When bumping Go, check gosec and govulncheck against the
+new toolchain before assuming the failure is yours.**
+
+The 1.26.x series shipped these stdlib CVE patches (historical record; all
+are behind us now):
 
 - **1.26.2** — `crypto/tls` / `crypto/x509` issues from 1.26.0–1.26.1.
 - **1.26.3** — GO-2026-4971 (`net.Dial` / `LookupPort` NUL-byte panic on
@@ -176,7 +206,10 @@ and it catches things `go vet` does not — `prealloc`, for one. Install the
 pinned version and run `golangci-lint run ./...` before pushing; `go vet` +
 `go test` alone will not predict CI.
 
-**1.26 idioms this project uses:** the ones in Code Style above (`for range N`,
+**Idioms this project uses:** the ones in Code Style above (`for range N`,
 `for i := range N`, `max()`/`min()`, `wg.Go`), plus `reflect` `Value.Fields()`
-iteration (`internal/api/sanitize.go`) and `go fix ./...` modernizers
-(`go fix -diff ./...` to preview).
+iteration (`internal/api/sanitize.go`), `strings.SplitSeq` over
+`range strings.Split`, and `strings.Cut` over index-then-reslice. Keep
+`go fix ./...` applied (`go fix -diff ./...` to preview) — its output is the
+same under 1.26 and 1.27, so anything it reports is a modernizer nobody ran,
+not a new-toolchain requirement.

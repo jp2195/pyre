@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Go 1.26 or later
+- Go 1.27 or later
 - macOS 13+, modern Linux, or Windows 10+
 
 ## Setup
@@ -89,7 +89,7 @@ CI also runs security gates on every push: `govulncheck ./...`,
 - Conventional Commits (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`,
   `test:`, `perf:`, `ci:`, `build:`). Scope optional.
 - Tabs for Go indentation.
-- Prefer Go 1.26 idioms: `for range N`, `min`/`max` builtins,
+- Prefer Go 1.27 idioms: `for range N`, `min`/`max` builtins,
   `wg.Go(func(){...})`, `slices.SortFunc`.
 - Handle errors explicitly. Use `context.Context` for cancellation.
 
