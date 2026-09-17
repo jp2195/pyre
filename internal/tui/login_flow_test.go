@@ -260,7 +260,7 @@ func TestLoginFlow_FitsTheTerminal(t *testing.T) {
 // The request keeps running after escape, and its reply used to be acted on
 // regardless: the connection was added, made active, and the view jumped to
 // its dashboard, seconds after the operator had left the screen. Escape has
-// to mean cancelled.
+// to mean canceled.
 func TestLoginFlow_EscapeDuringLoginCancelsIt(t *testing.T) {
 	m := fillLogin(t, "10.0.104.50", "testuser", "test-password")
 	m, _ = press(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})

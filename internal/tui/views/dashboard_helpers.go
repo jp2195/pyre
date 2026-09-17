@@ -47,7 +47,7 @@ func (d DashboardBase) ScrollBy(delta, contentHeight int) DashboardBase {
 	return d
 }
 
-// ClampToHeight trims content to the visible height, honouring Offset, and
+// ClampToHeight trims content to the visible height, honoring Offset, and
 // appends a scroll indicator when part of the stack is off-screen. Content
 // that already fits is returned untouched so short dashboards are unaffected.
 func (d DashboardBase) ClampToHeight(content string) string {

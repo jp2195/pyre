@@ -33,7 +33,7 @@ func TestDashboardScrollKeysMatchTableNavigation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got, ok := m.dashboardScrollDelta(tc.key)
 			if !ok {
-				t.Fatalf("%s is not recognised as a scroll key", tc.name)
+				t.Fatalf("%s is not recognized as a scroll key", tc.name)
 			}
 			if got != tc.want {
 				t.Errorf("%s delta = %d, want %d", tc.name, got, tc.want)

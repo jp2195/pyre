@@ -163,7 +163,7 @@ func TestGetThreatSummary_ReportsItsSampleSize(t *testing.T) {
 // TestGetThreatLogs_ThreatIDIsNotNumeric covers a type mismatch that broke
 // the Threat tab outright on a real PA-440. PAN-OS reports threatid as a
 // name, not a number: "Proxy:mask.test-dns.net", "generic:example-threat.com",
-// "new:totracking.com". Modelling it as an int64 made the XML decode fail, so
+// "new:example-tracker.com". Modeling it as an int64 made the XML decode fail, so
 // GetThreatLogs returned an error for every fetch and the view showed no
 // threats at all rather than the ones the device had recorded.
 func TestGetThreatLogs_ThreatIDIsNotNumeric(t *testing.T) {
