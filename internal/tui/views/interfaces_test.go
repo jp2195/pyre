@@ -305,7 +305,7 @@ func TestInterfaceDetail_HeadingStaysWithItsFields(t *testing.T) {
 	InitStyles()
 	iface := models.Interface{
 		Name: "loopback.60", Type: "loopback", Zone: "dmz", State: "down",
-		IP: "10.0.105.1/32", MAC: "3c:fa:30:f7:34:03", VirtualRouter: "lr:default", Vsys: "1",
+		IP: "10.0.105.1/32", MAC: "aa:bb:cc:dd:ee:03", VirtualRouter: "lr:default", Vsys: "1",
 	}
 
 	// Wide enough to trigger the two-column layout.

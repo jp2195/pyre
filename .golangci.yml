@@ -36,9 +36,7 @@ linters:
         - G304 # File path provided as taint input (intentional for config files)
 
     misspell:
-      ignore-rules:
-        - licence
-        - colour
+      locale: US
 
   exclusions:
     rules:

@@ -464,7 +464,7 @@ func TestConfig_DoesNotPersistCredentials(t *testing.T) {
 	// resolves the destination via os.UserHomeDir() → ~/.pyre.yaml.
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
-	// macOS honours $HOME for UserHomeDir(); set USERPROFILE too so the
+	// macOS honors $HOME for UserHomeDir(); set USERPROFILE too so the
 	// same test works on Windows if the suite is ever cross-run.
 	t.Setenv("USERPROFILE", tmpDir)
 

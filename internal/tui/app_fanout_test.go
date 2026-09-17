@@ -4,7 +4,7 @@ package tui
 // in app.go (handleWindowSize, handleSpinnerTick, handleRefresh).
 //
 // These tests are written BEFORE the refactor so they pin the observable
-// behaviour of the fan-outs.
+// behavior of the fan-outs.
 //
 // Accessor notes (checked against current source):
 //   - PoliciesModel / NATPoliciesModel wrap an unexported list RuleListModel[T]
@@ -130,7 +130,7 @@ func TestFanout_Resize_RenderDoesNotPanic(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // spinnerTickMsg returns a spinner.TickMsg that will be accepted by a freshly
-// initialised spinner (tag=0 bypasses the tag guard; ID=0 bypasses the ID guard).
+// initialized spinner (tag=0 bypasses the tag guard; ID=0 bypasses the ID guard).
 func spinnerTickMsg() spinner.TickMsg {
 	return spinner.TickMsg{Time: time.Now()}
 }

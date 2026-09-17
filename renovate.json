@@ -28,5 +28,14 @@
   "vulnerabilityAlerts": {
     "labels": ["security"],
     "minimumReleaseAge": "0 days"
-  }
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track `go install <module>/cmd/<tool>@<version>` pins in workflow run steps, which no built-in manager sees.",
+      "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
+      "matchStrings": ["go install (?<depName>[^@\\s]+?)/cmd/[^@\\s]+@(?<currentValue>v\\S+)"],
+      "datasourceTemplate": "go"
+    }
+  ]
 }

@@ -8,14 +8,14 @@ import (
 // SanitizeForDisplay strips ANSI escape sequences and C0 control characters
 // from server-supplied strings before they are surfaced as Go errors.
 //
-// PAN-OS responses occasionally echo operator input or embed terminal colour
+// PAN-OS responses occasionally echo operator input or embed terminal color
 // codes in msg/line elements. Letting those bytes flow into error strings
 // means any downstream log writer, TUI pane, or stderr consumer can be
-// tricked into moving the cursor, changing colours, or (in rare cases)
-// issuing terminal commands via escape sequences. Neutralising them here
+// tricked into moving the cursor, changing colors, or (in rare cases)
+// issuing terminal commands via escape sequences. Neutralizing them here
 // keeps the API package the single choke point for untrusted display data.
 //
-// The state machine recognises the following ESC-introduced sequences:
+// The state machine recognizes the following ESC-introduced sequences:
 //
 //   - CSI (ESC '['): parameter/intermediate bytes consumed until a final
 //     byte in 0x40-0x7e ('@' through '~'). Matches "\x1b[31m", "\x1b[0m", …
