@@ -86,7 +86,7 @@ jobs:
           distribution: goreleaser
           # Pinned distribution version (the action itself is SHA-pinned
           # above). Review when Renovate bumps the action, or quarterly.
-          version: "v2.18.0"
+          version: "v2.18.1"
           args: release --clean
 
       - name: Attest build provenance
