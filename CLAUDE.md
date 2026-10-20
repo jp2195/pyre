@@ -148,10 +148,17 @@ logger at a file.
 
 ## Go 1.27 (Current Version)
 
-`go.mod` is pinned to `go 1.27.1`; CI pins `go-version: '1.27.1'` (the
+`go.mod` is pinned to `go 1.27.3`; CI pins `go-version: '1.27.3'` (the
 `go-version` lines across `.github/workflows/` plus `go.mod` move together —
 verify the count with `grep -rc "go-version:" .github/workflows/` rather than
 trusting a number written here).
+
+**1.27.1 -> 1.27.3 WAS a security bump.** `govulncheck` flagged ten stdlib
+advisories in 1.27.1 (GO-2026-6603, -6605, -6607 through -6613, -6617; one
+Critical), all fixed in 1.27.2, with reachable call sites through `net/http`
+(`api.Client.Close`, `auth.GenerateAPIKey`). The scheduled Security workflow
+went red on main and every open PR inherited the failure. 1.27.3 was the latest
+patch at the time of the bump.
 
 **1.26.6 -> 1.27.1 was NOT a security bump.** 1.27.0 (2026-08-19) is a major
 release; 1.27.1 (2026-09-01) fixes cgo, the compiler, the runtime, `go fix`,
