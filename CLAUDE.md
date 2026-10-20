@@ -188,6 +188,16 @@ versions behind. `renovate.json` now carries a `customManagers` rule matching
 that line shape. **When bumping Go, check gosec and govulncheck against the
 new toolchain before assuming the failure is yours.**
 
+1.27.2 bumped the compiler's export data to version 5, and anything reading it
+with `golang.org/x/tools` older than v0.52.0 dies with `cannot decode ...,
+export data version 5 is greater than maximum supported version 4`. Rebuilding
+the tool with the new Go doesn't help; only the bundled `x/tools` matters.
+golangci-lint v2.15.0 ships `x/tools` v0.52.0. No gosec release did at the time
+of the 1.27.3 bump (securego/gosec#1774), so `security.yml` pins the gosec commit
+`71577268350e` as a pseudo-version, the first one built against v0.52.0. Move it
+back to a tag once a gosec release after v2.29.0 ships; the Renovate regex
+manager will propose it.
+
 The 1.26.x series shipped these stdlib CVE patches (historical record; all
 are behind us now):
 
