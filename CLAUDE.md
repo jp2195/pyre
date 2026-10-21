@@ -148,10 +148,17 @@ logger at a file.
 
 ## Go 1.27 (Current Version)
 
-`go.mod` is pinned to `go 1.27.1`; CI pins `go-version: '1.27.1'` (the
+`go.mod` is pinned to `go 1.27.3`; CI pins `go-version: '1.27.3'` (the
 `go-version` lines across `.github/workflows/` plus `go.mod` move together —
 verify the count with `grep -rc "go-version:" .github/workflows/` rather than
 trusting a number written here).
+
+**1.27.1 -> 1.27.3 WAS a security bump.** `govulncheck` flagged ten stdlib
+advisories in 1.27.1 (GO-2026-6603, -6605, -6607 through -6613, -6617; one
+Critical), all fixed in 1.27.2, with reachable call sites through `net/http`
+(`api.Client.Close`, `auth.GenerateAPIKey`). The scheduled Security workflow
+went red on main and every open PR inherited the failure. 1.27.3 was the latest
+patch at the time of the bump.
 
 **1.26.6 -> 1.27.1 was NOT a security bump.** 1.27.0 (2026-08-19) is a major
 release; 1.27.1 (2026-09-01) fixes cgo, the compiler, the runtime, `go fix`,
@@ -180,6 +187,16 @@ where no built-in Renovate manager looks, so they silently rotted seven minor
 versions behind. `renovate.json` now carries a `customManagers` rule matching
 that line shape. **When bumping Go, check gosec and govulncheck against the
 new toolchain before assuming the failure is yours.**
+
+1.27.2 bumped the compiler's export data to version 5, and anything reading it
+with `golang.org/x/tools` older than v0.52.0 dies with `cannot decode ...,
+export data version 5 is greater than maximum supported version 4`. Rebuilding
+the tool with the new Go doesn't help; only the bundled `x/tools` matters.
+golangci-lint v2.15.0 ships `x/tools` v0.52.0. No gosec release did at the time
+of the 1.27.3 bump (securego/gosec#1774), so `security.yml` pins the gosec commit
+`71577268350e` as a pseudo-version, the first one built against v0.52.0. Move it
+back to a tag once a gosec release after v2.29.0 ships; the Renovate regex
+manager will propose it.
 
 The 1.26.x series shipped these stdlib CVE patches (historical record; all
 are behind us now):
