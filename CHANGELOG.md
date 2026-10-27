@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.6.1](https://github.com/jp2195/pyre/compare/v1.6.0...v1.6.1) (2026-10-27)
+
+
+### Bug Fixes
+
+* **deps:** bump Go to 1.27.3 for stdlib security fixes ([#70](https://github.com/jp2195/pyre/issues/70)) ([71287f6](https://github.com/jp2195/pyre/commit/71287f6cc3f0de87918ac7420e2620118850ae25))
+* **deps:** update module charm.land/bubbletea/v2 to v2.0.10 ([#69](https://github.com/jp2195/pyre/issues/69)) ([1b8455c](https://github.com/jp2195/pyre/commit/1b8455ca13df3e4586c3d543fbdd61160063d65d))
+* **deps:** update module charm.land/bubbletea/v2 to v2.1.0 ([#74](https://github.com/jp2195/pyre/issues/74)) ([086c47b](https://github.com/jp2195/pyre/commit/086c47be3b5461e1c2acb46c34cada8d2e94527a))
+
 ## [1.6.0](https://github.com/jp2195/pyre/compare/v1.5.4...v1.6.0) (2026-09-17)
 
 
