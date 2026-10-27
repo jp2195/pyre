@@ -29,7 +29,7 @@ jobs:
       # don't trigger other workflows, so the release PR would get no CI.
       - name: Mint app token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -78,7 +78,7 @@ jobs:
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_CURRENT_TAG: ${{ needs.release-please.outputs.tag_name }}
@@ -86,7 +86,7 @@ jobs:
           distribution: goreleaser
           # Pinned distribution version (the action itself is SHA-pinned
           # above). Review when Renovate bumps the action, or quarterly.
-          version: "v2.18.2"
+          version: "v2.18.3"
           args: release --clean
 
       - name: Attest build provenance
