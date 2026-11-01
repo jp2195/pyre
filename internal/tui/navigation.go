@@ -18,7 +18,7 @@ type navTarget struct {
 
 // navItemDef is one entry in navDefs: a navbar item plus its navigation
 // target. Embedding navTarget makes the navTargets derivation lossless by
-// construction.
+// construction, and since Go 1.27 a navDefs entry sets its fields directly.
 type navItemDef struct {
 	id    string
 	label string
@@ -40,69 +40,87 @@ var navDefs = []navGroupDef{
 		id:    "monitor",
 		label: "Monitor",
 		items: []navItemDef{
-			{id: "overview", label: "Overview", navTarget: navTarget{
+			{
+				id:        "overview",
+				label:     "Overview",
 				view:      ViewDashboard,
 				dashboard: views.DashboardMain,
 				hasData:   func(m *Model) bool { return m.dashboard.HasData() },
 				fetch:     func(m *Model) tea.Cmd { return m.fetchDashboardData() },
-			}},
-			{id: "network", label: "Network", navTarget: navTarget{
+			},
+			{
+				id:        "network",
+				label:     "Network",
 				view:      ViewDashboard,
 				dashboard: views.DashboardNetwork,
 				hasData:   func(m *Model) bool { return m.networkDashboard.HasData() },
 				fetch:     func(m *Model) tea.Cmd { return m.fetchNetworkDashboardData() },
-			}},
-			{id: "security", label: "Security", navTarget: navTarget{
+			},
+			{
+				id:        "security",
+				label:     "Security",
 				view:      ViewDashboard,
 				dashboard: views.DashboardSecurity,
 				hasData:   func(m *Model) bool { return m.securityDashboard.HasData() },
 				fetch:     func(m *Model) tea.Cmd { return m.fetchSecurityDashboardData() },
-			}},
-			{id: "vpn", label: "VPN", navTarget: navTarget{
+			},
+			{
+				id:        "vpn",
+				label:     "VPN",
 				view:      ViewDashboard,
 				dashboard: views.DashboardVPN,
 				hasData:   func(m *Model) bool { return m.vpnDashboard.HasData() },
 				fetch:     func(m *Model) tea.Cmd { return m.fetchVPNDashboardData() },
-			}},
+			},
 		},
 	},
 	{
 		id:    "analyze",
 		label: "Analyze",
 		items: []navItemDef{
-			{id: "policies", label: "Policies", navTarget: navTarget{
+			{
+				id:      "policies",
+				label:   "Policies",
 				view:    ViewPolicies,
 				hasData: func(m *Model) bool { return m.policies.HasData() },
 				fetch: func(m *Model) tea.Cmd {
 					m.policies = m.policies.SetLoading(true)
 					return m.fetchPolicies()
 				},
-			}},
-			{id: "nat", label: "NAT", navTarget: navTarget{
+			},
+			{
+				id:      "nat",
+				label:   "NAT",
 				view:    ViewNATPolicies,
 				hasData: func(m *Model) bool { return m.natPolicies.HasData() },
 				fetch: func(m *Model) tea.Cmd {
 					m.natPolicies = m.natPolicies.SetLoading(true)
 					return m.fetchNATPolicies()
 				},
-			}},
-			{id: "objects", label: "Objects", navTarget: navTarget{
+			},
+			{
+				id:      "objects",
+				label:   "Objects",
 				view:    ViewObjects,
 				hasData: func(m *Model) bool { return m.objects.HasData() },
 				fetch: func(m *Model) tea.Cmd {
 					m.objects = m.objects.SetLoading(true)
 					return m.fetchObjects()
 				},
-			}},
-			{id: "sessions", label: "Sessions", navTarget: navTarget{
+			},
+			{
+				id:      "sessions",
+				label:   "Sessions",
 				view:    ViewSessions,
 				hasData: func(m *Model) bool { return m.sessions.HasData() },
 				fetch: func(m *Model) tea.Cmd {
 					m.sessions = m.sessions.SetLoading(true)
 					return m.fetchSessions()
 				},
-			}},
-			{id: "interfaces", label: "Interfaces", navTarget: navTarget{
+			},
+			{
+				id:      "interfaces",
+				label:   "Interfaces",
 				view:    ViewInterfaces,
 				hasData: func(m *Model) bool { return m.interfaces.HasData() },
 				fetch: func(m *Model) tea.Cmd {
@@ -115,16 +133,20 @@ var navDefs = []navGroupDef{
 					}
 					return m.fetchInterfaces()
 				},
-			}},
-			{id: "routes", label: "Routes", navTarget: navTarget{
+			},
+			{
+				id:      "routes",
+				label:   "Routes",
 				view:    ViewRoutes,
 				hasData: func(m *Model) bool { return m.routes.HasData() },
 				fetch: func(m *Model) tea.Cmd {
 					m.routes = m.routes.SetLoading(true)
 					return m.fetchRoutesData()
 				},
-			}},
-			{id: "ipsec", label: "IPSec", navTarget: navTarget{
+			},
+			{
+				id:      "ipsec",
+				label:   "IPSec",
 				view:    ViewIPSecTunnels,
 				hasData: func(m *Model) bool { return m.ipsecTunnels.HasData() },
 				fetch: func(m *Model) tea.Cmd {
@@ -135,8 +157,10 @@ var navDefs = []navGroupDef{
 					}
 					return nil
 				},
-			}},
-			{id: "gpusers", label: "GP Users", navTarget: navTarget{
+			},
+			{
+				id:      "gpusers",
+				label:   "GP Users",
 				view:    ViewGPUsers,
 				hasData: func(m *Model) bool { return m.gpUsers.HasData() },
 				fetch: func(m *Model) tea.Cmd {
@@ -147,8 +171,10 @@ var navDefs = []navGroupDef{
 					}
 					return nil
 				},
-			}},
-			{id: "logs", label: "Logs", navTarget: navTarget{
+			},
+			{
+				id:      "logs",
+				label:   "Logs",
 				view:    ViewLogs,
 				hasData: func(m *Model) bool { return m.logs.HasData() },
 				fetch: func(m *Model) tea.Cmd {
@@ -159,19 +185,21 @@ var navDefs = []navGroupDef{
 					m.logs, cmd = m.logs.RefreshActiveTab()
 					return cmd
 				},
-			}},
+			},
 		},
 	},
 	{
 		id:    "tools",
 		label: "Tools",
 		items: []navItemDef{
-			{id: "config", label: "Config", navTarget: navTarget{
+			{
+				id:        "config",
+				label:     "Config",
 				view:      ViewDashboard,
 				dashboard: views.DashboardConfig,
 				hasData:   func(m *Model) bool { return m.configDashboard.HasData() },
 				fetch:     func(m *Model) tea.Cmd { return m.fetchConfigDashboardData() },
-			}},
+			},
 		},
 	},
 }

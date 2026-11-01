@@ -173,7 +173,12 @@ reason to be here is toolchain currency, not a CVE.
 params are built fresh per call, never copied); `net/http`'s
 `MaxHeaderValueCount` is server-side and pyre is a client; and `crypto/tls`'s
 ML-DSA/ML-KEM post-quantum additions are moot because PAN-OS will not
-negotiate them. There are no language changes. The one thing worth
+negotiate them. The language did change, though (an earlier version of this
+note said it had not): methods may declare their own type parameters, a
+struct-literal key may be any field selector rather than only a top-level
+field name, and function type inference reaches every assignment to a
+matching function type. The second is live here: it is what lets `navDefs`
+entries set `navTarget`'s fields directly. The one other thing worth
 remembering is that `unicode` moved to 17.0.0, which is live under
 `internal/api/sanitize.go` and the display-width wrapping.
 
@@ -227,6 +232,10 @@ pinned version and run `golangci-lint run ./...` before pushing; `go vet` +
 `for i := range N`, `max()`/`min()`, `wg.Go`), plus `reflect` `Value.Fields()`
 iteration (`internal/api/sanitize.go`), `strings.SplitSeq` over
 `range strings.Split`, and `strings.Cut` over index-then-reslice. Keep
-`go fix ./...` applied (`go fix -diff ./...` to preview) — its output is the
-same under 1.26 and 1.27, so anything it reports is a modernizer nobody ran,
-not a new-toolchain requirement.
+`go fix ./...` applied (`go fix -diff ./...` to preview). Its output depends
+on the `go` line in `go.mod`, not just the toolchain: modernizers that need a
+newer language version stay silent until `go.mod` allows it. Moving `go.mod`
+to 1.27 woke `embedlit`, which flattens `navTarget: navTarget{...}` in
+`navDefs` into promoted-field keys. Re-run `go fix -diff` after every `go`
+line bump. `go fix` reflows nothing, so tidy its output by hand: it leaves
+`}},` hanging off the last field.
