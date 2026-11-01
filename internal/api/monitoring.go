@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/xml"
 	"log"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -554,6 +555,7 @@ func (c *Client) parseCertificateNodes(inner []byte) []models.Certificate {
 		// carries subject-hash and issuer-hash but no serial number.
 	}
 
+	now := time.Now()
 	for i := range certs {
 		// expiry-epoch is an absolute instant, so it needs none of the
 		// device-zone guesswork a bare PAN-OS wall clock does. Prefer it
@@ -561,19 +563,32 @@ func (c *Client) parseCertificateNodes(inner []byte) []models.Certificate {
 		if sec, err := strconv.ParseInt(epochs[i], 10, 64); err == nil {
 			certs[i].NotAfter = time.Unix(sec, 0)
 		}
-		if certs[i].NotAfter.IsZero() {
-			continue
-		}
-		certs[i].DaysLeft = int(time.Until(certs[i].NotAfter).Hours() / 24)
-		switch {
-		case certs[i].DaysLeft < 0:
-			certs[i].Status = "expired"
-		case certs[i].DaysLeft < 30:
-			certs[i].Status = "expiring"
-		default:
-			certs[i].Status = "valid"
-		}
+		certs[i].DaysLeft, certs[i].Status = certificateStatus(certs[i].NotAfter, now)
 	}
 
 	return certs
+}
+
+// certExpiringWindow is how far ahead a certificate counts as expiring.
+const certExpiringWindow = 30 * 24 * time.Hour
+
+// certificateStatus classifies a certificate by its expiry. DaysLeft is
+// floored, so a certificate that expired an hour ago is -1, not 0. Truncating
+// toward zero used to make anything expired within the last day read as
+// "expiring, 0 days". A certificate whose expiry could not be read is
+// "unknown". It used to fall through to valid, which reported a validity the
+// device never stated.
+func certificateStatus(notAfter, now time.Time) (daysLeft int, status string) {
+	if notAfter.IsZero() {
+		return 0, models.CertStatusUnknown
+	}
+	left := notAfter.Sub(now)
+	daysLeft = int(math.Floor(left.Hours() / 24))
+	switch {
+	case !notAfter.After(now):
+		return daysLeft, models.CertStatusExpired
+	case left < certExpiringWindow:
+		return daysLeft, models.CertStatusExpiring
+	}
+	return daysLeft, models.CertStatusValid
 }
