@@ -66,5 +66,4 @@ type SecurityRule struct {
 	LastHit   time.Time
 	FirstHit  time.Time
 	LastReset time.Time
-	AppsSeen  int // number of unique apps seen
 }
