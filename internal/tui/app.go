@@ -202,6 +202,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Bracketing markers around a PasteMsg; nothing to do, but match them
 		// so they don't reach handleDataMsg's unhandled-message warning.
 		return m, nil
+	case tea.ColorProfileMsg, tea.EnvMsg, tea.CapabilityMsg,
+		tea.ModeReportMsg, tea.KeyboardEnhancementsMsg, tea.TerminalVersionMsg:
+		// Terminal and environment reports. Bubble Tea sends these on its
+		// own at startup and acts on them itself (color profile, sync
+		// output, width method). pyre has no use for them, so match them
+		// rather than log two warnings on every run. Mouse and focus
+		// messages deliberately still fall through: they arrive only once
+		// someone enables them, and the warning is how that gets noticed.
+		return m, nil
 	case spinner.TickMsg:
 		return m.handleSpinnerTick(msg)
 	case epochMsg:
