@@ -156,6 +156,7 @@ func (m Model) renderFooter() string {
 		{"  Tab/S-Tab", " next/prev"},
 		{"  r", " refresh"},
 		{"  R", " auto"},
+		{"  y", " copy"},
 		{"  :", " conn"},
 		{"  Ctrl+P", " commands"},
 		{"  ?", " help"},
@@ -166,7 +167,12 @@ func (m Model) renderFooter() string {
 	// Refresh status outranks the key hints: it describes the data on
 	// screen, and the hints are also in ? help. It still has to fit, so a
 	// narrow terminal gets the shorter form, or none.
-	for _, status := range m.refreshStatusForms(time.Now()) {
+	now := time.Now()
+	forms := m.refreshStatusForms(now)
+	if notice := m.activeNotice(now); notice != "" {
+		forms = []string{notice}
+	}
+	for _, status := range forms {
 		seg := "  " + status
 		if w := lipgloss.Width(seg); m.width == 0 || used+w+2 <= m.width {
 			help += views.HelpDescStyle.Render(seg)

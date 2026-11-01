@@ -81,6 +81,7 @@ Active only when a main view is displayed and no filter input is focused.
 | `d`              | Device picker (Panorama only; falls through to view on standalone firewall) |
 | `r`              | Refresh current view                                      |
 | `R`              | Toggle auto-refresh ([details](configuration.md#auto-refresh)) |
+| `y`              | Copy the selected row's name or ID ([details](#copying)) |
 | `?`              | Toggle help overlay                                       |
 | `q` / `Ctrl+C`   | Quit                                                      |
 
@@ -302,3 +303,25 @@ While authenticating, the form shows a spinner and
 > Enter while waiting on an MFA push burns through the failed-attempt
 > budget and locks the account out. Wait for the MFA prompt, or press
 > `Esc` to cancel.
+
+## Copying
+
+`y` (or "Copy selected" in `Ctrl+P`) puts the selected row's identifier on
+the clipboard, and the footer says what it copied:
+
+| View            | Copies                                                   |
+|-----------------|----------------------------------------------------------|
+| Policies, NAT   | Rule name                                                |
+| Sessions        | Session ID                                               |
+| Interfaces      | Interface name                                           |
+| Routes          | Route destination; on Neighbors, the BGP peer or OSPF neighbor ID |
+| IPSec           | Tunnel name                                              |
+| GP Users        | Username                                                 |
+| Objects         | Address or service object name                           |
+| Logs            | The entry as one line: time, source -> destination, app, action, rule |
+
+Copying uses OSC 52, so it works over SSH without a local clipboard tool,
+but only where the terminal supports it. Most current terminals do. Under
+tmux it also needs `set -g set-clipboard on`. A terminal never confirms an
+OSC 52 write, so pyre cannot tell when one was ignored: the footer says
+"copied" either way.

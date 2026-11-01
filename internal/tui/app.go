@@ -95,6 +95,11 @@ type Model struct {
 
 	// autoRefresh is the auto-refresh schedule; see autorefresh.go.
 	autoRefresh autoRefreshState
+	// notice is a short footer message ("copied rule name: allow-web") shown
+	// until noticeUntil; the app clock's re-render takes it down.
+	notice      string
+	noticeUntil time.Time
+
 	// updatedAt is when each screen's data arrived, for the footer's
 	// "updated 12s ago". Cleared with the data on a device switch.
 	updatedAt map[viewKey]time.Time
@@ -219,6 +224,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRefreshDone(msg)
 	case toggleAutoRefreshMsg:
 		return m.toggleAutoRefresh(), nil
+	case copySelectedMsg:
+		return m.copySelected(time.Now())
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
 	case tea.KeyPressMsg:
@@ -378,6 +385,9 @@ func (m Model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.AutoRefresh):
 		return m.toggleAutoRefresh(), nil
+
+	case key.Matches(msg, m.keys.Copy):
+		return m.copySelected(time.Now())
 
 	// Navigation group keys
 	case key.Matches(msg, m.keys.NavGroup1):

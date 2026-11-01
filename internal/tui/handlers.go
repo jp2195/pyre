@@ -301,6 +301,14 @@ func (m Model) buildCommandRegistry() []views.Command {
 			Shortcut:    "R",
 			Action:      func() tea.Msg { return toggleAutoRefreshMsg{} },
 		},
+		{
+			ID:          "copy",
+			Label:       "Copy selected",
+			Description: "Copy the selected row's name or ID",
+			Category:    "Actions",
+			Shortcut:    "y",
+			Action:      func() tea.Msg { return copySelectedMsg{} },
+		},
 
 		// System
 		{

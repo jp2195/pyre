@@ -9,6 +9,7 @@ type KeyMap struct {
 	DevicePicker key.Binding
 	Refresh      key.Binding
 	AutoRefresh  key.Binding
+	Copy         key.Binding
 	OpenPalette  key.Binding
 
 	// Navigation groups (1-3 for top-level groups)
@@ -53,6 +54,10 @@ func DefaultKeyMap() KeyMap {
 		AutoRefresh: key.NewBinding(
 			key.WithKeys("R"),
 			key.WithHelp("R", "auto-refresh"),
+		),
+		Copy: key.NewBinding(
+			key.WithKeys("y"),
+			key.WithHelp("y", "copy"),
 		),
 		OpenPalette: key.NewBinding(
 			key.WithKeys("ctrl+p"),
@@ -130,7 +135,7 @@ func (k KeyMap) ShortHelp() []key.Binding {
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.NavGroup1, k.NavGroup2, k.NavGroup3},
-		{k.Refresh, k.AutoRefresh, k.OpenPalette, k.Help, k.Quit},
+		{k.Refresh, k.AutoRefresh, k.Copy, k.OpenPalette, k.Help, k.Quit},
 		{k.Up, k.Down, k.PageUp, k.PageDown},
 		{k.Filter, k.Enter, k.Escape},
 	}
