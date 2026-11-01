@@ -267,7 +267,7 @@ func sessionRowParts(s models.Session, width int) (prefix, state, suffix string)
 		suffix += fmt.Sprintf(" %-15s", truncate(zoneFlow, 15))
 	}
 	if c.ageAndBytes {
-		suffix += fmt.Sprintf(" %-5s %-8s", formatDuration(s.StartTime), formatBytes(s.TotalBytes))
+		suffix += fmt.Sprintf(" %-5s %-8s", elapsedSince(s.StartTime), formatBytes(s.TotalBytes))
 	}
 	return prefix, state, suffix
 }
@@ -292,7 +292,10 @@ func styleSessionRow(s models.Session, width int) string {
 	}
 }
 
-func formatDuration(start time.Time) string {
+// elapsedSince renders how long ago start was, for a session's age. It is
+// named apart from api's formatDuration, which formats a duration the device
+// reported rather than one measured against our clock.
+func elapsedSince(start time.Time) string {
 	if start.IsZero() {
 		return "-"
 	}
@@ -350,7 +353,7 @@ func renderSessionDetail(s models.Session, detail *models.SessionDetail, detailL
 	b.WriteString(labelStyle.Render("Total Bytes:   ") + valueStyle.Render(formatBytes(s.TotalBytes)) + "\n")
 	if !s.StartTime.IsZero() {
 		b.WriteString(labelStyle.Render("Start Time:    ") + valueStyle.Render(s.StartTime.Format("2006-01-02 15:04:05")) + "\n")
-		b.WriteString(labelStyle.Render("Duration:      ") + valueStyle.Render(formatDuration(s.StartTime)) + "\n")
+		b.WriteString(labelStyle.Render("Duration:      ") + valueStyle.Render(elapsedSince(s.StartTime)) + "\n")
 	}
 
 	// Extended details (if fetched and for this session)
