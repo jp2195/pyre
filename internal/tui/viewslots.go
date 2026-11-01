@@ -12,6 +12,10 @@ import "github.com/jp2195/pyre/internal/tui/views"
 //   loading   – non-nil for the 9 refreshable views; called with true on refresh.
 //   reset     – non-nil for the 14 views that cache per-device data; called on
 //               a connection or Panorama-target switch (see resetViewData).
+//   isFiltering – non-nil for the 9 views with a filter input; drives
+//                 currentViewFiltering.
+//   isExpanded – non-nil for the auto-refreshed list views; holds auto-refresh
+//                while a detail panel is open.
 //   refreshFor – the ViewState that triggers a refresh for this slot; 0 when the
 //                slot is not refreshable.
 //
@@ -29,11 +33,31 @@ type viewSlot struct {
 	// flight; non-nil for the refreshable views. Used by anyLoading to gate
 	// the spinner tick chain so it stops when nothing is loading.
 	isLoading func(m *Model) bool
+	// isFiltering reports whether the view's filter (or, in logs, query)
+	// input has focus, so keys go to the input instead of global bindings.
+	// Non-nil for every view with a filter.
+	isFiltering func(m *Model) bool
+	// isExpanded reports whether a detail panel is open. Auto-refresh holds
+	// while it is, so the row being read does not change underneath it.
+	// Non-nil for the auto-refreshed list views; logs holds on its own rule.
+	isExpanded func(m *Model) bool
 	// refreshFor is the ViewState that triggers a refresh for this slot; 0 when the
 	// slot is not refreshable.
 	// NOTE: the zero value collides with ViewConnectionHub (= 0); this is only safe
 	// because no slot sets loading without an explicit refreshFor. Set both or neither.
 	refreshFor ViewState
+}
+
+// currentSlot is the slot for the view on screen, if that view has one.
+// Matching on isLoading as well as refreshFor keeps the zero refreshFor of
+// non-refreshable slots from matching ViewConnectionHub (also 0).
+func (m Model) currentSlot() (viewSlot, bool) {
+	for _, s := range viewSlots() {
+		if s.isLoading != nil && s.refreshFor == m.currentView {
+			return s, true
+		}
+	}
+	return viewSlot{}, false
 }
 
 // viewSlots returns the canonical ordered registration table.
@@ -140,8 +164,9 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.policies = m.policies.SetLoading(v)
 			},
-			isLoading:  func(m *Model) bool { return m.policies.IsLoading() },
-			refreshFor: ViewPolicies,
+			isLoading:   func(m *Model) bool { return m.policies.IsLoading() },
+			isFiltering: func(m *Model) bool { return m.policies.IsFilterMode() },
+			refreshFor:  ViewPolicies,
 		},
 		{
 			resize: func(m *Model, w, h, contentH int) {
@@ -156,8 +181,9 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.natPolicies = m.natPolicies.SetLoading(v)
 			},
-			isLoading:  func(m *Model) bool { return m.natPolicies.IsLoading() },
-			refreshFor: ViewNATPolicies,
+			isLoading:   func(m *Model) bool { return m.natPolicies.IsLoading() },
+			isFiltering: func(m *Model) bool { return m.natPolicies.IsFilterMode() },
+			refreshFor:  ViewNATPolicies,
 		},
 		{
 			resize: func(m *Model, w, h, contentH int) {
@@ -172,8 +198,10 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.sessions = m.sessions.SetLoading(v)
 			},
-			isLoading:  func(m *Model) bool { return m.sessions.IsLoading() },
-			refreshFor: ViewSessions,
+			isLoading:   func(m *Model) bool { return m.sessions.IsLoading() },
+			isFiltering: func(m *Model) bool { return m.sessions.IsFilterMode() },
+			isExpanded:  func(m *Model) bool { return m.sessions.IsExpanded() },
+			refreshFor:  ViewSessions,
 		},
 		{
 			resize: func(m *Model, w, h, contentH int) {
@@ -188,8 +216,10 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.interfaces = m.interfaces.SetLoading(v)
 			},
-			isLoading:  func(m *Model) bool { return m.interfaces.IsLoading() },
-			refreshFor: ViewInterfaces,
+			isLoading:   func(m *Model) bool { return m.interfaces.IsLoading() },
+			isFiltering: func(m *Model) bool { return m.interfaces.IsFilterMode() },
+			isExpanded:  func(m *Model) bool { return m.interfaces.IsExpanded() },
+			refreshFor:  ViewInterfaces,
 		},
 		{
 			resize: func(m *Model, w, h, contentH int) {
@@ -204,8 +234,10 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.routes = m.routes.SetLoading(v)
 			},
-			isLoading:  func(m *Model) bool { return m.routes.Loading },
-			refreshFor: ViewRoutes,
+			isLoading:   func(m *Model) bool { return m.routes.Loading },
+			isFiltering: func(m *Model) bool { return m.routes.IsFilterMode() },
+			isExpanded:  func(m *Model) bool { return m.routes.Expanded },
+			refreshFor:  ViewRoutes,
 		},
 		{
 			resize: func(m *Model, w, h, contentH int) {
@@ -220,8 +252,10 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.ipsecTunnels = m.ipsecTunnels.SetLoading(v)
 			},
-			isLoading:  func(m *Model) bool { return m.ipsecTunnels.IsLoading() },
-			refreshFor: ViewIPSecTunnels,
+			isLoading:   func(m *Model) bool { return m.ipsecTunnels.IsLoading() },
+			isFiltering: func(m *Model) bool { return m.ipsecTunnels.IsFilterMode() },
+			isExpanded:  func(m *Model) bool { return m.ipsecTunnels.IsExpanded() },
+			refreshFor:  ViewIPSecTunnels,
 		},
 		{
 			resize: func(m *Model, w, h, contentH int) {
@@ -236,8 +270,10 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.gpUsers = m.gpUsers.SetLoading(v)
 			},
-			isLoading:  func(m *Model) bool { return m.gpUsers.IsLoading() },
-			refreshFor: ViewGPUsers,
+			isLoading:   func(m *Model) bool { return m.gpUsers.IsLoading() },
+			isFiltering: func(m *Model) bool { return m.gpUsers.IsFilterMode() },
+			isExpanded:  func(m *Model) bool { return m.gpUsers.IsExpanded() },
+			refreshFor:  ViewGPUsers,
 		},
 		{
 			resize: func(m *Model, w, h, contentH int) {
@@ -252,8 +288,9 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.logs = m.logs.SetLoading(v)
 			},
-			isLoading:  func(m *Model) bool { return m.logs.Loading },
-			refreshFor: ViewLogs,
+			isLoading:   func(m *Model) bool { return m.logs.Loading },
+			isFiltering: func(m *Model) bool { return m.logs.IsFilterMode() || m.logs.IsQueryMode() },
+			refreshFor:  ViewLogs,
 		},
 		{
 			resize: func(m *Model, w, h, contentH int) {
@@ -268,8 +305,9 @@ func viewSlots() []viewSlot {
 			loading: func(m *Model, v bool) {
 				m.objects = m.objects.SetLoading(v)
 			},
-			isLoading:  func(m *Model) bool { return m.objects.IsLoading() },
-			refreshFor: ViewObjects,
+			isLoading:   func(m *Model) bool { return m.objects.IsLoading() },
+			isFiltering: func(m *Model) bool { return m.objects.IsFilterMode() },
+			refreshFor:  ViewObjects,
 		},
 
 		// --- Picker views (contentHeight; no spinner; not refreshable) ---

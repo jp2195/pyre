@@ -258,10 +258,8 @@ func (m Model) handleViewDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) handleNavigationMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case SwitchViewMsg:
-		// Restart the spinner tick alongside any fetch handleSwitchView
-		// dispatches; the tick self-stops next cycle if nothing is loading.
-		nm, cmd := m.handleSwitchView(msg)
-		return nm, tea.Batch(cmd, m.spinner.Tick)
+		// enterView starts the spinner tick alongside any fetch it issues.
+		return m.handleSwitchView(msg)
 
 	case SwitchDashboardMsg:
 		m.currentDashboard = msg.Dashboard
@@ -340,71 +338,19 @@ func (m Model) handleStatusMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// handleSwitchView switches to a new view and fetches data if needed.
+// handleSwitchView switches to a new view and fetches data if needed. It goes
+// through enterView like the navbar does, rather than repeating every navDefs
+// fetch closure in a switch of its own as it used to.
 func (m Model) handleSwitchView(msg SwitchViewMsg) (tea.Model, tea.Cmd) {
-	m.currentView = msg.View
-	m.syncNavbarToCurrentView()
-	switch msg.View {
-	case ViewDashboard:
-		return m, m.fetchCurrentDashboardData()
-	case ViewPolicies:
-		if !m.policies.HasData() {
-			m.policies = m.policies.SetLoading(true)
-			return m, m.fetchPolicies()
-		}
-	case ViewNATPolicies:
-		if !m.natPolicies.HasData() {
-			m.natPolicies = m.natPolicies.SetLoading(true)
-			return m, m.fetchNATPolicies()
-		}
-	case ViewSessions:
-		if !m.sessions.HasData() {
-			m.sessions = m.sessions.SetLoading(true)
-			return m, m.fetchSessions()
-		}
-	case ViewInterfaces:
-		if !m.interfaces.HasData() {
-			m.interfaces = m.interfaces.SetLoading(true)
-			conn := m.session.GetActiveConnection()
-			if conn != nil {
-				return m, tea.Batch(m.fetchInterfaces(), m.fetchARPTable(conn))
-			}
-			return m, m.fetchInterfaces()
-		}
-	case ViewRoutes:
-		if !m.routes.HasData() {
-			m.routes = m.routes.SetLoading(true)
-			return m, m.fetchRoutesData()
-		}
-	case ViewIPSecTunnels:
-		if !m.ipsecTunnels.HasData() {
-			m.ipsecTunnels = m.ipsecTunnels.SetLoading(true)
-			conn := m.session.GetActiveConnection()
-			if conn != nil {
-				return m, m.fetchIPSecTunnels(conn)
-			}
-		}
-	case ViewGPUsers:
-		if !m.gpUsers.HasData() {
-			m.gpUsers = m.gpUsers.SetLoading(true)
-			conn := m.session.GetActiveConnection()
-			if conn != nil {
-				return m, m.fetchGlobalProtectUsers(conn)
-			}
-		}
-	case ViewLogs:
-		if !m.logs.HasData() {
-			var cmd tea.Cmd
-			m.logs, cmd = m.logs.RefreshActiveTab()
-			return m, tea.Batch(cmd, m.spinner.Tick)
-		}
-	case ViewObjects:
-		if !m.objects.HasData() {
-			m.objects = m.objects.SetLoading(true)
-			return m, m.fetchObjects()
-		}
+	target, ok := targetFor(viewKey{view: msg.View, dashboard: m.currentDashboard})
+	if !ok {
+		m.currentView = msg.View
+		m.syncNavbarToCurrentView()
+		return m, nil
 	}
-	return m, nil
+	next, cmd := m.enterView(target)
+	next.syncNavbarToCurrentView()
+	return next, cmd
 }
 
 // handleShowConnectionForm opens the connection form in the appropriate mode.

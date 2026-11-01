@@ -91,31 +91,11 @@ func (m Model) autoRefreshHold() string {
 	if m.currentViewFiltering() {
 		return "filtering"
 	}
-	switch m.currentView {
-	case ViewSessions:
-		if m.sessions.IsExpanded() {
-			return "detail open"
-		}
-	case ViewInterfaces:
-		if m.interfaces.IsExpanded() {
-			return "detail open"
-		}
-	case ViewRoutes:
-		if m.routes.Expanded {
-			return "detail open"
-		}
-	case ViewIPSecTunnels:
-		if m.ipsecTunnels.IsExpanded() {
-			return "detail open"
-		}
-	case ViewGPUsers:
-		if m.gpUsers.IsExpanded() {
-			return "detail open"
-		}
-	case ViewLogs:
-		if !m.logs.Following() {
-			return "not at newest"
-		}
+	if m.currentView == ViewLogs && !m.logs.Following() {
+		return "not at newest"
+	}
+	if s, ok := m.currentSlot(); ok && s.isExpanded != nil && s.isExpanded(&m) {
+		return "detail open"
 	}
 	return ""
 }
@@ -230,20 +210,6 @@ func (m Model) toggleAutoRefresh() Model {
 		m.autoRefresh.nextDue = time.Now().Add(m.autoRefresh.interval)
 	}
 	return m
-}
-
-// targetFor finds the navigation target for a screen, which knows how to
-// tell whether that screen has data.
-func targetFor(k viewKey) (navTarget, bool) {
-	for _, t := range navTargets {
-		if t.view != k.view {
-			continue
-		}
-		if k.view != ViewDashboard || t.dashboard == k.dashboard {
-			return t, true
-		}
-	}
-	return navTarget{}, false
 }
 
 // stampLoaded records when each screen's data first appeared, and forgets
