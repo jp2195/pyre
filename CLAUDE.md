@@ -89,6 +89,14 @@ go fix ./...                  # Apply modernizers (safe, behavior-preserving)
 - **`HasData()` gates the app-wide spinner** via `Model.anyLoading()`. It must report settled only when *every* source has produced data **or** an error; returning true early drops the tick chain and freezes other panels' spinners mid-frame.
 - **Table rows share one column grid.** `TableRowSelectedStyle`/`TableRowDisabledStyle` carry `Padding(0, 1)`; tables that render an unpadded header must use the `TableSelectedRowStyle()`/`TableDisabledRowStyle()` flush variants, or the selected row shifts a column and the table twitches as the cursor moves.
 - **Detail panels size to `contentWidth()`**, not `m.Width` — they render inside the view's bordered, padded panel, and the raw terminal width makes their border wrap.
+- **Terminal status is derived, never set.** `Model.View()` fills
+  `View.ProgressBar` (OSC 9;4) and `View.ProgramStatus` (OSC 7501) from
+  `anyLoading()`, `m.err`, and the login screen, in `terminal_status.go`.
+  `ProgramStatus` carries only working and blocked: Bubble Tea leaves the last
+  status in place after exit, and terminals drop only those two themselves,
+  so an error there would outlive a normal quit. Errors go on the progress
+  bar, which the renderer resets. Keep the text generic, with no host,
+  serial, or error detail; it leaves pyre for the terminal's own UI.
 - **Paste is routed explicitly.** `tea.PasteMsg` is not a `KeyPressMsg`; `handlePasteMsg` forwards it to the focused input. New text inputs need a case there or paste will silently do nothing.
 
 ## Code Style

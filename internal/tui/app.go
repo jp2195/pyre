@@ -450,6 +450,8 @@ func (m Model) handleSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
 func (m Model) View() tea.View {
 	v := tea.NewView(m.renderContent())
 	v.AltScreen = true
+	v.ProgressBar = m.terminalProgress()
+	v.ProgramStatus = m.programStatus()
 	return v
 }
 
