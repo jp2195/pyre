@@ -57,10 +57,34 @@ keys resume once `Enter` or `Esc` closes it.
 | `f`         | Device query — a raw PAN-OS expression              |
 | `t` / `T`   | Cycle the time range: 15m · 1h · 24h · 7d · all     |
 | `m`         | Load the next page (ignored while one is in flight) |
+| `e`         | Export the rows on screen: `c` CSV, `j` JSON ([details](#exporting-logs)) |
 | `s` / `S`   | Sort field / direction                              |
 
 `/` and `f` compose: `f` narrows what the firewall sends, `/` narrows what
 is on screen. The query bar is `f` because `q` quits.
+
+### Exporting logs
+
+`e` opens a prompt in place of the status line: `c` writes CSV, `j` writes
+JSON, and any other key cancels. The export holds exactly the rows on
+screen: the active tab, with your `/` filter and sort applied, and every
+page loaded with `m`. It is written to your home directory as
+`pyre-<type>-logs-<YYYYMMDD-HHMMSS>.csv` (or `.json`), and the footer shows
+the path.
+
+- **Readable only by you (0600).** An export holds addresses, user names
+  and URLs from the device, the same reason `~/.pyre.yaml` is 0600.
+- **Never overwrites.** If the name is taken, a `-1`, `-2`, ... suffix is
+  added.
+- **Timestamps are RFC 3339 with an offset**, so the file still says when
+  something happened outside the device's time zone. JSON keeps numbers as
+  numbers and keys in column order.
+- **CSV defuses spreadsheet formulas.** Log fields such as URLs, user names
+  and threat names come from network traffic, so an attacker can choose
+  them. A text cell starting with `=`, `+`, `-`, `@`, a tab or a carriage
+  return gets a leading `'`, so Excel or Sheets shows it as text instead of
+  running it (the OWASP recommendation). Numbers are never altered. JSON
+  needs no defusing and carries every value as the device sent it.
 
 The status line never reports a total — PAN-OS returns no match count for a
 log query, so pyre shows "500 shown, more available" rather than inventing
@@ -196,6 +220,7 @@ Routes has no detail panel.
 | `t`     | Cycle time range forward: 15m → 1h → 24h → 7d → all |
 | `T`     | Cycle time range backward                           |
 | `m`     | Load the next page                                  |
+| `e`     | Export the rows on screen (`c` CSV, `j` JSON)       |
 | `s`     | Cycle sort field                                    |
 | `S`     | Toggle sort direction                               |
 | `Enter` | Toggle log detail panel                             |

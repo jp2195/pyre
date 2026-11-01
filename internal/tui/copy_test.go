@@ -26,6 +26,14 @@ func clipboardOf(t *testing.T, cmd tea.Cmd) string {
 	return fmt.Sprint(msg)
 }
 
+// noticeOf is the longest form of the footer notice, or "" when none is up.
+func noticeOf(m Model, now time.Time) string {
+	if forms := m.activeNotice(now); len(forms) > 0 {
+		return forms[0]
+	}
+	return ""
+}
+
 func TestCopy_SessionID(t *testing.T) {
 	m := connectedSessionsModel(t, 3)
 	m = pressKey(t, m, "j") // second row, ID 2
@@ -35,10 +43,10 @@ func TestCopy_SessionID(t *testing.T) {
 	if got := clipboardOf(t, cmd); got != "2" {
 		t.Errorf("clipboard = %q, want the selected session's ID %q", got, "2")
 	}
-	if n := next.activeNotice(now); n != "copied session ID: 2" {
+	if n := noticeOf(next, now); n != "copied session ID: 2" {
 		t.Errorf("notice = %q", n)
 	}
-	if n := next.activeNotice(now.Add(noticeTimeout)); n != "" {
+	if n := noticeOf(next, now.Add(noticeTimeout)); n != "" {
 		t.Errorf("notice still up after %v: %q", noticeTimeout, n)
 	}
 }
@@ -62,7 +70,7 @@ func TestCopy_LogLineIsPlainText(t *testing.T) {
 	if cmd != nil {
 		t.Error("copied with no row selected")
 	}
-	if n := next.activeNotice(time.Now()); n != "nothing selected to copy" {
+	if n := noticeOf(next, time.Now()); n != "nothing selected to copy" {
 		t.Errorf("notice = %q", n)
 	}
 }
@@ -73,7 +81,7 @@ func TestCopy_NothingToCopyOutsideTables(t *testing.T) {
 	if cmd != nil {
 		t.Error("copy on a dashboard issued a clipboard write")
 	}
-	if n := next.activeNotice(time.Now()); n != "nothing to copy here" {
+	if n := noticeOf(next, time.Now()); n != "nothing to copy here" {
 		t.Errorf("notice = %q", n)
 	}
 }
@@ -88,7 +96,7 @@ func TestCopy_LongValueIsNotEchoed(t *testing.T) {
 	if got := clipboardOf(t, cmd); got != long {
 		t.Errorf("clipboard truncated: %d chars", len(got))
 	}
-	if n := next.activeNotice(time.Now()); n != "copied rule name" {
+	if n := noticeOf(next, time.Now()); n != "copied rule name" {
 		t.Errorf("notice = %q, want the label alone", n)
 	}
 }
