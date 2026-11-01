@@ -232,20 +232,6 @@ func (m Model) toggleAutoRefresh() Model {
 	return m
 }
 
-// targetFor finds the navigation target for a screen, which knows how to
-// tell whether that screen has data.
-func targetFor(k viewKey) (navTarget, bool) {
-	for _, t := range navTargets {
-		if t.view != k.view {
-			continue
-		}
-		if k.view != ViewDashboard || t.dashboard == k.dashboard {
-			return t, true
-		}
-	}
-	return navTarget{}, false
-}
-
 // stampLoaded records when each screen's data first appeared, and forgets
 // screens whose data is gone. It runs after every Update, so the stamp lands
 // in the same Update as the response that filled the screen. Logs is skipped:

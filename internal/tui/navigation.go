@@ -299,19 +299,41 @@ func (m Model) navigateToCurrentItem() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
+	return m.enterView(target)
+}
 
+// enterView puts target on screen and fetches its data if it has none yet.
+// It is the one way into a view: the navbar and the command palette both
+// come through here, so they cannot disagree about when a view fetches or
+// forget the spinner tick that keeps its loading frame moving.
+func (m Model) enterView(target navTarget) (Model, tea.Cmd) {
 	m.currentView = target.view
 	if target.view == ViewDashboard {
 		m.currentDashboard = target.dashboard
 		m = m.resetDashboardScroll()
 	}
-
-	var cmd tea.Cmd
-	if target.fetch != nil && !target.hasData(&m) {
-		cmd = tea.Batch(target.fetch(&m), m.spinner.Tick)
+	if target.fetch == nil || target.hasData(&m) {
+		return m, nil
 	}
+	// Hoisted: fetch mutates m (the logs view records the request it
+	// mints), and Go does not order that against reading m.spinner in the
+	// same operand list.
+	cmd := target.fetch(&m)
+	return m, tea.Batch(cmd, m.spinner.Tick)
+}
 
-	return m, cmd
+// targetFor finds the navigation target for a screen, which knows how to
+// tell whether that screen has data.
+func targetFor(k viewKey) (navTarget, bool) {
+	for _, t := range navTargets {
+		if t.view != k.view {
+			continue
+		}
+		if k.view != ViewDashboard || t.dashboard == k.dashboard {
+			return t, true
+		}
+	}
+	return navTarget{}, false
 }
 
 // syncNavbarToCurrentView syncs the navbar state to match the current view
