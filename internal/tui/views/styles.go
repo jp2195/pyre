@@ -59,15 +59,11 @@ var (
 	// Message styles
 	ErrorMsgStyle   lipgloss.Style
 	WarningMsgStyle lipgloss.Style
-	SuccessMsgStyle lipgloss.Style
 	LoadingMsgStyle lipgloss.Style
 	EmptyMsgStyle   lipgloss.Style
 
 	// Banner style - for view headers with title and info
-	BannerStyle        lipgloss.Style
-	BannerTitleStyle   lipgloss.Style
-	BannerInfoStyle    lipgloss.Style
-	LoadingBannerStyle lipgloss.Style
+	BannerInfoStyle lipgloss.Style
 
 	// Tab styles - for tab bar navigation
 	TabActiveStyle   lipgloss.Style
@@ -76,11 +72,6 @@ var (
 	// Detail panel styles - for expanded log/session details
 	DetailPanelStyle  lipgloss.Style
 	FilterBorderStyle lipgloss.Style
-
-	// Card styles - for interface/item cards
-	CardStyle         lipgloss.Style
-	CardSelectedStyle lipgloss.Style
-	TextBoldStyle     lipgloss.Style
 
 	// Modal styles - for command palette and dialogs
 	ModalStyle         lipgloss.Style
@@ -94,7 +85,6 @@ var (
 
 	// Navbar styles - for navigation tabs
 	NavTabActiveStyle lipgloss.Style
-	NavKeyHintStyle   lipgloss.Style
 
 	// Special indicator styles
 	PanoramaStyle     lipgloss.Style
@@ -230,35 +220,14 @@ func InitStyles() {
 	WarningMsgStyle = lipgloss.NewStyle().
 		Foreground(c.Warning)
 
-	SuccessMsgStyle = lipgloss.NewStyle().
-		Foreground(c.Success)
-
 	LoadingMsgStyle = lipgloss.NewStyle().
 		Foreground(c.TextMuted)
 
 	EmptyMsgStyle = lipgloss.NewStyle().
 		Foreground(c.TextMuted)
 
-	// Banner style
-	BannerStyle = lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderBottom(true).
-		BorderForeground(c.Border).
-		Padding(0, 1).
-		MarginBottom(1)
-
-	BannerTitleStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(c.White)
-
 	BannerInfoStyle = lipgloss.NewStyle().
 		Foreground(c.TextMuted)
-
-	LoadingBannerStyle = lipgloss.NewStyle().
-		Background(c.Warning).
-		Foreground(c.Black).
-		Bold(true).
-		Padding(0, 2)
 
 	// Tab styles
 	TabActiveStyle = lipgloss.NewStyle().
@@ -282,21 +251,6 @@ func InitStyles() {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(c.Primary).
 		Padding(0, 1)
-
-	// Card styles
-	CardStyle = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(c.Border).
-		Padding(0, 1)
-
-	CardSelectedStyle = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(c.Primary).
-		Padding(0, 1)
-
-	TextBoldStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(c.Text)
 
 	// Modal styles
 	ModalStyle = lipgloss.NewStyle().
@@ -341,10 +295,6 @@ func InitStyles() {
 		Foreground(c.Primary).
 		Bold(true).
 		Padding(0, 1)
-
-	NavKeyHintStyle = lipgloss.NewStyle().
-		Foreground(c.TextMuted).
-		Padding(0, 0)
 
 	// Special indicator styles
 	PanoramaStyle = lipgloss.NewStyle().
