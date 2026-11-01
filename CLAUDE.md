@@ -97,6 +97,18 @@ go fix ./...                  # Apply modernizers (safe, behavior-preserving)
   so an error there would outlive a normal quit. Errors go on the progress
   bar, which the renderer resets. Keep the text generic, with no host,
   serial, or error detail; it leaves pyre for the terminal's own UI.
+- **Auto-refresh never sets a loading flag.** A loading flag blanks a rule
+  list (`rule_list.go` renders the loading line instead of the table), so a
+  timed refresh through it would blank the screen every interval.
+  `startTrackedRefresh` (in `autorefresh.go`) fetches without one, and
+  `trackRefresh` runs the whole `tea.Batch` tree and returns every message in
+  one `refreshDoneMsg`, because a Batch never says when it is done. Manual
+  `r` goes through the same path, so an auto tick cannot overlap it. One
+  refresh is in flight at a time: a result with a superseded token or an old
+  epoch is dropped whole. The 1s `clockTickMsg` chain starts in `Init`, and
+  only its own handler reschedules it. It also re-renders "updated Ns ago".
+  `SetItems` keeps the cursor (clamped) for the same reason; a device switch
+  builds fresh models, so that still starts at row 0.
 - **Paste is routed explicitly.** `tea.PasteMsg` is not a `KeyPressMsg`; `handlePasteMsg` forwards it to the focused input. New text inputs need a case there or paste will silently do nothing.
 
 ## Code Style

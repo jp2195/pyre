@@ -178,3 +178,34 @@ func TestRuleList_ColumnsDoNotShiftWithCursor(t *testing.T) {
 		}
 	}
 }
+
+// TestRuleList_SetItemsKeepsTheCursor guards what auto-refresh depends on: a
+// list that jumped to the top on every refresh would be unusable on a timer.
+func TestRuleList_SetItemsKeepsTheCursor(t *testing.T) {
+	items := func(n int) []rlItem {
+		out := make([]rlItem, n)
+		for i := range out {
+			out[i] = rlItem{Name: string(rune('a' + i))}
+		}
+		return out
+	}
+	m := NewRuleListModel(testRuleListConfig())
+	m = m.SetSize(100, 30)
+	m = m.SetItems(items(5), nil)
+	m.Cursor, m.Offset = 2, 1
+
+	m = m.SetItems(items(5), nil)
+	if m.Cursor != 2 || m.Offset != 1 {
+		t.Errorf("cursor/offset = %d/%d after refresh, want 2/1 kept", m.Cursor, m.Offset)
+	}
+
+	m = m.SetItems(items(1), nil)
+	if m.Cursor != 0 || m.Offset != 0 {
+		t.Errorf("cursor/offset = %d/%d after shrinking to 1, want 0/0", m.Cursor, m.Offset)
+	}
+
+	m = m.SetItems(nil, nil)
+	if m.Cursor != 0 {
+		t.Errorf("cursor = %d on an empty list, want 0", m.Cursor)
+	}
+}

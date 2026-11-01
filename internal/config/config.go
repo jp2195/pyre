@@ -60,6 +60,10 @@ type ConnectionConfig struct {
 
 type Settings struct {
 	Theme string `yaml:"theme"`
+	// RefreshIntervalRaw is settings.refresh_interval as written, a Go
+	// duration such as "30s". Set, it turns auto-refresh on at startup;
+	// unset, auto-refresh starts off. Read it through RefreshInterval.
+	RefreshIntervalRaw string `yaml:"refresh_interval,omitempty"`
 }
 
 // warnOut receives startup warnings such as insecure file permissions.
@@ -339,6 +343,7 @@ func LoadWithFlags(flags CLIFlags) (*Config, error) {
 		}
 	}
 
+	cfg.Settings.warnRefreshInterval()
 	cfg.ApplyFlags(flags)
 	return cfg, nil
 }

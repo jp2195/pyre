@@ -80,6 +80,7 @@ Active only when a main view is displayed and no filter input is focused.
 | `:`              | Connection picker (switch between firewalls)              |
 | `d`              | Device picker (Panorama only; falls through to view on standalone firewall) |
 | `r`              | Refresh current view                                      |
+| `R`              | Toggle auto-refresh ([details](configuration.md#auto-refresh)) |
 | `?`              | Toggle help overlay                                       |
 | `q` / `Ctrl+C`   | Quit                                                      |
 

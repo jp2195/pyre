@@ -92,6 +92,12 @@ type Model struct {
 	// enough on its own: a request already in flight lands afterwards and
 	// looks exactly like a fresh one.
 	connEpoch int
+
+	// autoRefresh is the auto-refresh schedule; see autorefresh.go.
+	autoRefresh autoRefreshState
+	// updatedAt is when each screen's data arrived, for the footer's
+	// "updated 12s ago". Cleared with the data on a device switch.
+	updatedAt map[viewKey]time.Time
 }
 
 // epochMsg wraps a fetch result with the connection generation it was issued
@@ -117,6 +123,8 @@ func NewModel(cfg *config.Config, state *config.State, creds *auth.Credentials, 
 		state:       state,
 		session:     session,
 		keys:        DefaultKeyMap(),
+		autoRefresh: newAutoRefreshState(cfg),
+		updatedAt:   map[viewKey]time.Time{},
 		help:        help.New(),
 		spinner:     s,
 		currentView: startView,
@@ -177,7 +185,7 @@ func (m Model) setError(err error) (Model, tea.Cmd) {
 }
 
 func (m Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.spinner.Tick}
+	cmds := []tea.Cmd{m.spinner.Tick, clockTick()}
 
 	if m.currentView == ViewDashboard {
 		cmds = append(cmds, m.fetchCurrentDashboardData())
@@ -190,8 +198,27 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+// Update dispatches msg, then stamps any screen whose data just arrived.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.update(msg)
+	nm, ok := next.(Model)
+	if !ok {
+		// Every handler returns a Model; nothing here to stamp otherwise.
+		return next, cmd
+	}
+	nm.stampLoaded(time.Now())
+	return nm, cmd
+}
+
+func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case clockTickMsg:
+		next, cmd := m.handleClockTick(msg.now)
+		return next, tea.Batch(cmd, clockTick())
+	case refreshDoneMsg:
+		return m.handleRefreshDone(msg)
+	case toggleAutoRefreshMsg:
+		return m.toggleAutoRefresh(), nil
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
 	case tea.KeyPressMsg:
@@ -251,6 +278,10 @@ func (m *Model) resetViewData() {
 	// Invalidate everything already in flight for the previous connection or
 	// target; those responses are dropped when they arrive.
 	m.connEpoch++
+	// A tracked refresh in flight belongs to the old device; its result is
+	// dropped by the epoch check, so stop waiting on it here.
+	m.autoRefresh.pending = 0
+	clear(m.updatedAt)
 	for _, s := range viewSlots() {
 		if s.reset != nil {
 			s.reset(m)
@@ -336,6 +367,9 @@ func (m Model) handleKeyMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Refresh):
 		return m.handleRefresh()
 
+	case key.Matches(msg, m.keys.AutoRefresh):
+		return m.toggleAutoRefresh(), nil
+
 	// Navigation group keys
 	case key.Matches(msg, m.keys.NavGroup1):
 		return m.handleNavGroupKey(0)
@@ -376,14 +410,14 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			s.loading(&m, true)
 		}
 	}
-	// Hoisted out of the return statement on purpose. refreshCurrentView has
-	// a pointer receiver and mutates m -- it restarts the logs pagination and
-	// resets the cursor. Go does not specify when a plain operand like m is
-	// read relative to a call in the same operand list, so calling it inline
-	// leaves it open whether the model returned here is the one the refresh
-	// actually changed.
-	cmd := m.refreshCurrentView()
-	return m, tea.Batch(cmd, m.spinner.Tick)
+	// Tracked like an automatic refresh, so its completion is stamped and
+	// an auto-refresh tick cannot fire on top of it. Hoisted out of the
+	// return statement on purpose: startTrackedRefresh returns the model
+	// refreshCurrentView mutated (it restarts the logs pagination), and Go
+	// does not specify when a plain operand like m is read relative to a call
+	// in the same operand list.
+	next, cmd := m.startTrackedRefresh(time.Now())
+	return next, tea.Batch(cmd, next.spinner.Tick)
 }
 
 // anyLoading reports whether any visible work is in flight — the condition

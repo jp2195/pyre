@@ -122,6 +122,11 @@ type logTabState struct {
 	fetched int
 	// hasMore reports that the last page came back exactly full.
 	hasMore bool
+	// paged reports that the rows on screen include an appended page,
+	// meaning the operator has asked to read further back than the newest
+	// page. Auto-refresh holds while it is set: a refresh returns to the
+	// first page and would throw the older rows away.
+	paged bool
 	// sent is the assembled expression the device received for this tab.
 	sent string
 	// warning is the last non-fatal complaint about this tab's fetch. It
@@ -436,6 +441,7 @@ func (m LogsModel) finishPage(t models.LogType, meta LogPageMeta, err error, row
 		s.errQuery = ""
 		s.fetched = rows
 		s.hasMore = meta.HasMore
+		s.paged = meta.Req.Append
 		s.sent = meta.Sent
 		// Stamped from the request rather than from the current
 		// selection, so these rows are labeled with what actually
@@ -560,6 +566,14 @@ func (m LogsModel) onQueryChanged() (LogsModel, tea.Cmd) {
 	m.Expanded = false
 	cmd := m.fetchRequest(m.activeLogType, 0, false)
 	return m, cmd
+}
+
+// Following reports whether the operator is watching the newest rows: the
+// cursor is on the first row, no detail panel is open, and no older page has
+// been loaded. Auto-refresh only fires while this holds, so it never moves
+// the row someone is reading or discards the pages they paged back through.
+func (m LogsModel) Following() bool {
+	return m.Cursor == 0 && !m.Expanded && !m.tabState(m.activeLogType).paged
 }
 
 // RefreshActiveTab resets the tab on screen to its first page and asks for it
