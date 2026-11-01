@@ -141,8 +141,8 @@ logger at a file.
 
 ## Dependencies
 
-- TUI: Bubble Tea v2 (`charm.land/bubbletea/v2`), lipgloss v2 (`charm.land/lipgloss/v2`), bubbles v2 (`charm.land/bubbles/v2`). Migrated from `github.com/charmbracelet/{bubbletea,lipgloss,bubbles}` on 2026-04-18.
-- YAML: `go.yaml.in/yaml/v4` (not gopkg.in/yaml.v3). Pinned to `v4.0.0-rc.5` pending a stable `v4.Y.Z` release upstream; only release-candidate tags exist today. Revisit quarterly: `go list -m -versions go.yaml.in/yaml/v4`.
+- TUI: Bubble Tea v2 (`charm.land/bubbletea/v2`), lipgloss v2 (`charm.land/lipgloss/v2`), bubbles v2 (`charm.land/bubbles/v2`). Migrated from `github.com/charmbracelet/{bubbletea,lipgloss,bubbles}` on 2026-04-18. Bubble Tea >= 2.1.1 is required: it fixes GHSA-qc58-pfg9-7pph (forged window-size reports allocate unbounded screen buffers) and drops resize reports over 4096 columns/rows or 1<<20 cells.
+- YAML: `go.yaml.in/yaml/v4` (not gopkg.in/yaml.v3). Pinned to `v4.0.0-rc.7` pending a stable `v4.Y.Z` release upstream; only release-candidate tags exist today. Revisit quarterly: `go list -m -versions go.yaml.in/yaml/v4`.
 - `maxResponseSize = 50MB` const in `client.go`, used with `io.LimitReader`
 - Log polling: `logPollMaxAttempts=30`, `logPollInterval=500ms` in `api/logs.go`
 
