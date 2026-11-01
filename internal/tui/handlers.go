@@ -293,6 +293,14 @@ func (m Model) buildCommandRegistry() []views.Command {
 			Shortcut:    "r",
 			Action:      func() tea.Msg { return RefreshMsg{} },
 		},
+		{
+			ID:          "auto-refresh",
+			Label:       "Toggle auto-refresh",
+			Description: "Keep live views current on a timer",
+			Category:    "Actions",
+			Shortcut:    "R",
+			Action:      func() tea.Msg { return toggleAutoRefreshMsg{} },
+		},
 
 		// System
 		{

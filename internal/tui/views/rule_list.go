@@ -70,15 +70,23 @@ func (m RuleListModel[T]) IsFilterMode() bool {
 	return m.FilterMode
 }
 
-// SetItems replaces the item list, resets cursor, and re-applies filter/sort.
+// SetItems replaces the item list and re-applies filter/sort. The cursor and
+// scroll offset survive, clamped to the new length: a refresh, automatic or
+// not, should not throw the operator back to the top of a long table. A
+// change of device builds a fresh model instead, so it still starts at row 0.
 func (m RuleListModel[T]) SetItems(items []T, err error) RuleListModel[T] {
 	m.items = items
 	m.Err = err
 	m.Loading = false
-	m.Cursor = 0
-	m.Offset = 0
 	m.applyFilter()
+	m.Cursor = min(m.Cursor, max(len(m.filtered)-1, 0))
+	m.Offset = min(m.Offset, m.Cursor)
 	return m
+}
+
+// IsExpanded reports whether the detail panel is open.
+func (m RuleListModel[T]) IsExpanded() bool {
+	return m.Expanded
 }
 
 // Items returns the full (unfiltered) items slice.

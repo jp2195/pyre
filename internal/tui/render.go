@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"charm.land/lipgloss/v2"
 
@@ -154,6 +155,7 @@ func (m Model) renderFooter() string {
 	hints := []struct{ key, desc string }{
 		{"  Tab/S-Tab", " next/prev"},
 		{"  r", " refresh"},
+		{"  R", " auto"},
 		{"  :", " conn"},
 		{"  Ctrl+P", " commands"},
 		{"  ?", " help"},
@@ -161,6 +163,17 @@ func (m Model) renderFooter() string {
 	}
 	help := navHint + devicesHint
 	used := lipgloss.Width(help)
+	// Refresh status outranks the key hints: it describes the data on
+	// screen, and the hints are also in ? help. It still has to fit, so a
+	// narrow terminal gets the shorter form, or none.
+	for _, status := range m.refreshStatusForms(time.Now()) {
+		seg := "  " + status
+		if w := lipgloss.Width(seg); m.width == 0 || used+w+2 <= m.width {
+			help += views.HelpDescStyle.Render(seg)
+			used += w
+			break
+		}
+	}
 	for _, h := range hints {
 		w := lipgloss.Width(h.key) + lipgloss.Width(h.desc)
 		// FooterStyle adds a cell of padding either side.

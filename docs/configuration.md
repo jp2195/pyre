@@ -34,6 +34,7 @@ connections:
 # Global UI settings
 settings:
   theme: catppuccin
+  refresh_interval: 30s   # optional; omit to start with auto-refresh off
 ```
 
 ## Connection options
@@ -53,11 +54,42 @@ rather than silently falling back to system roots.
 
 ## Global settings
 
-| Option   | Type   | Default     | Description                 |
-|----------|--------|-------------|------------------------------|
-| `theme`  | string | `default`   | Color theme (see below)     |
+| Option             | Type     | Default   | Description                                   |
+|--------------------|----------|-----------|-----------------------------------------------|
+| `theme`            | string   | `default` | Color theme (see below)                       |
+| `refresh_interval` | duration | unset     | Start with auto-refresh on, at this interval  |
 
 The literal value `"default"` resolves to the dark theme at runtime.
+
+### Auto-refresh
+
+Auto-refresh is **off unless you turn it on**. Press `R` (or pick "Toggle
+auto-refresh" in `Ctrl+P`) to start or pause it for the session. Set
+`refresh_interval` to have it start on. The value is a Go duration: `30s`,
+`2m`, `90s`. A bare number is rejected because it has no unit.
+
+- **Interval:** 30s when you turn it on with `R` and nothing is configured.
+  The minimum is **10s**, and a shorter value is raised to 10s with a startup
+  warning. Every refresh is a burst of XML API calls against the firewall's
+  management plane, and faster polling slows the device's own UI for
+  everyone else using it.
+- **What refreshes:** only the screen you are looking at, and only live
+  device state: the Monitor dashboards, Sessions, Interfaces, Routes, IPSec,
+  GP Users and Logs. Configuration (Policies, NAT, Objects and the Config
+  dashboard) changes when someone commits, not every few seconds, so `r`
+  refreshes it on demand.
+- **It waits for you.** A refresh holds while you are typing a filter or
+  reading a detail panel. In Logs it also holds while the cursor is off the
+  newest row or you have paged back with `m`. Logs refresh only while you
+  are following the newest entries, like `tail -f`. A held refresh fires as
+  soon as the hold lifts.
+- **It keeps your place.** The table stays on screen while new rows load,
+  and the cursor stays on the same line.
+
+The footer shows how old the data on screen is (`updated 12s ago`) and the
+auto-refresh state: `auto 30s`, or `auto held (detail open)` with the
+reason. A `refresh_interval` that does not parse is reported at startup and
+leaves auto-refresh off, so a typo is never silent.
 Themes: `dark`, `light`, `nord`, `dracula`, `solarized`, `gruvbox`,
 `tokyonight`, `catppuccin`, `onedark`, `monokai`. Unrecognized names
 (including an empty or absent `theme:` key) fall back to `dark`.

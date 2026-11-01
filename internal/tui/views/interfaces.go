@@ -66,6 +66,12 @@ func (m InterfacesModel) HasData() bool {
 	return m.list.HasData()
 }
 
+// IsExpanded reports whether the detail panel is open. Auto-refresh holds
+// while it is, so the row being read does not change underneath it.
+func (m InterfacesModel) IsExpanded() bool {
+	return m.list.IsExpanded()
+}
+
 // IsFilterMode returns true while the filter text input is focused.
 func (m InterfacesModel) IsFilterMode() bool {
 	return m.list.IsFilterMode()

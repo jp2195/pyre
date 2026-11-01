@@ -107,9 +107,11 @@ func (m RoutesModel) SetRoutes(routes []models.RouteEntry, err error) RoutesMode
 	m.routeErr = err
 	m.Loading = false
 	m.lastRefresh = time.Now()
-	m.Cursor = 0
-	m.Offset = 0
 	m.applyFilter()
+	// Keep the operator's place across a refresh, as SetItems does for the
+	// rule lists; a device switch builds a fresh model, so it starts at 0.
+	m.Cursor = min(m.Cursor, max(len(m.filtered)-1, 0))
+	m.Offset = min(m.Offset, m.Cursor)
 	return m
 }
 
