@@ -42,3 +42,22 @@ func TestSwitchView_MatchesTheNavbar(t *testing.T) {
 		t.Errorf("navbar not synced to Sessions: %+v", item)
 	}
 }
+
+// TestViewSlots_CoverFilterAndDetail keeps the table complete: a refreshable
+// view without isFiltering would let global keys fire while someone types a
+// filter, and an auto-refreshed list without isExpanded would refresh under
+// an open detail panel.
+func TestViewSlots_CoverFilterAndDetail(t *testing.T) {
+	for _, s := range viewSlots() {
+		if s.isLoading == nil {
+			continue
+		}
+		if s.isFiltering == nil {
+			t.Errorf("view %d: refreshable slot has no isFiltering", s.refreshFor)
+		}
+		k := viewKey{view: s.refreshFor}
+		if k.autoRefreshes() && s.refreshFor != ViewLogs && s.isExpanded == nil {
+			t.Errorf("view %d: auto-refreshed list has no isExpanded", s.refreshFor)
+		}
+	}
+}

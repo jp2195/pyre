@@ -91,31 +91,11 @@ func (m Model) autoRefreshHold() string {
 	if m.currentViewFiltering() {
 		return "filtering"
 	}
-	switch m.currentView {
-	case ViewSessions:
-		if m.sessions.IsExpanded() {
-			return "detail open"
-		}
-	case ViewInterfaces:
-		if m.interfaces.IsExpanded() {
-			return "detail open"
-		}
-	case ViewRoutes:
-		if m.routes.Expanded {
-			return "detail open"
-		}
-	case ViewIPSecTunnels:
-		if m.ipsecTunnels.IsExpanded() {
-			return "detail open"
-		}
-	case ViewGPUsers:
-		if m.gpUsers.IsExpanded() {
-			return "detail open"
-		}
-	case ViewLogs:
-		if !m.logs.Following() {
-			return "not at newest"
-		}
+	if m.currentView == ViewLogs && !m.logs.Following() {
+		return "not at newest"
+	}
+	if s, ok := m.currentSlot(); ok && s.isExpanded != nil && s.isExpanded(&m) {
+		return "detail open"
 	}
 	return ""
 }
