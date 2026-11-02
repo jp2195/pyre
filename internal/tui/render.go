@@ -169,8 +169,8 @@ func (m Model) renderFooter() string {
 	// narrow terminal gets the shorter form, or none.
 	now := time.Now()
 	forms := m.refreshStatusForms(now)
-	if notice := m.activeNotice(now); notice != "" {
-		forms = []string{notice}
+	if notice := m.activeNotice(now); notice != nil {
+		forms = notice
 	}
 	for _, status := range forms {
 		seg := "  " + status

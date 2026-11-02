@@ -325,7 +325,7 @@ func viewSlots() []viewSlot {
 				m.logs = m.logs.SetLoading(v)
 			},
 			isLoading:   func(m *Model) bool { return m.logs.Loading },
-			isFiltering: func(m *Model) bool { return m.logs.IsFilterMode() || m.logs.IsQueryMode() },
+			isFiltering: func(m *Model) bool { return m.logs.IsFilterMode() || m.logs.IsQueryMode() || m.logs.IsExportPrompt() },
 			copyValue: func(m *Model) (string, string, bool) {
 				line, ok := m.logs.SelectedLine()
 				return "log entry", line, ok

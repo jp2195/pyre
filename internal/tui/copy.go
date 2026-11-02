@@ -17,17 +17,19 @@ const noticeValueMax = 40
 // copySelectedMsg copies the selected row, from the command palette.
 type copySelectedMsg struct{}
 
-// setNotice shows a short message in the footer until noticeTimeout passes.
-func (m Model) setNotice(text string, now time.Time) Model {
-	m.notice = text
+// setNotice shows a message in the footer until noticeTimeout passes. Give
+// it longest form first: the footer shows the first one that fits the
+// terminal, so a narrow screen still gets the short form instead of nothing.
+func (m Model) setNotice(now time.Time, forms ...string) Model {
+	m.notice = forms
 	m.noticeUntil = now.Add(noticeTimeout)
 	return m
 }
 
-// activeNotice is the footer notice, or "" once it has expired.
-func (m Model) activeNotice(now time.Time) string {
-	if m.notice == "" || !now.Before(m.noticeUntil) {
-		return ""
+// activeNotice is the footer notice's forms, or nil once it has expired.
+func (m Model) activeNotice(now time.Time) []string {
+	if len(m.notice) == 0 || !now.Before(m.noticeUntil) {
+		return nil
 	}
 	return m.notice
 }
@@ -39,15 +41,15 @@ func (m Model) activeNotice(now time.Time) string {
 func (m Model) copySelected(now time.Time) (Model, tea.Cmd) {
 	s, ok := m.currentSlot()
 	if !ok || s.copyValue == nil {
-		return m.setNotice("nothing to copy here", now), nil
+		return m.setNotice(now, "nothing to copy here"), nil
 	}
 	label, value, ok := s.copyValue(&m)
 	if !ok || value == "" {
-		return m.setNotice("nothing selected to copy", now), nil
+		return m.setNotice(now, "nothing selected to copy"), nil
 	}
-	text := "copied " + label
-	if len(value) <= noticeValueMax {
-		text += ": " + value
+	short := "copied " + label
+	if len(value) > noticeValueMax {
+		return m.setNotice(now, short), tea.SetClipboard(value)
 	}
-	return m.setNotice(text, now), tea.SetClipboard(value)
+	return m.setNotice(now, short+": "+value, short), tea.SetClipboard(value)
 }

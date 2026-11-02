@@ -103,6 +103,10 @@ type LogsModel struct {
 	queryMode  bool
 
 	sortBy LogSortField
+
+	// exportPrompt is whether the export format prompt (c CSV, j JSON) is
+	// up in place of the status line.
+	exportPrompt bool
 }
 
 // logTabState is everything the view knows about one tab that is not the rows
@@ -698,6 +702,9 @@ func (m LogsModel) statusLine() string {
 }
 
 func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
+	if m.exportPrompt {
+		return m.updateExportPrompt(msg)
+	}
 	if m.queryMode {
 		return m.updateQueryMode(msg)
 	}
@@ -729,6 +736,13 @@ func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
 		case "T":
 			m.rng = (m.rng + logRangeCount - 1) % logRangeCount
 			return m.onQueryChanged()
+		case "e":
+			// Nothing on screen means nothing to write; the prompt would
+			// only offer an empty file.
+			if m.filteredCount() > 0 {
+				m.exportPrompt = true
+			}
+			return m, nil
 		case "f":
 			m.queryMode = true
 			// Opened with the last committed text rather than the last
@@ -857,7 +871,11 @@ func (m LogsModel) View() string {
 
 	// Tab bar for log types
 	sections = append(sections, m.renderTabBar())
-	sections = append(sections, m.statusLine())
+	if m.exportPrompt {
+		sections = append(sections, m.exportPromptLine())
+	} else {
+		sections = append(sections, m.statusLine())
+	}
 
 	if warning := m.tabState(m.activeLogType).warning; warning != "" {
 		sections = append(sections, WarningMsgStyle.Render(
@@ -1021,6 +1039,7 @@ func (m LogsModel) renderHelp() string {
 		{"t", "range"},
 		{"f", "device query"},
 		{"m", "more"},
+		{"e", "export"},
 		{"s", "sort field"},
 		{"S", "sort dir"},
 		{"r", "refresh"},

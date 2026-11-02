@@ -97,7 +97,7 @@ type Model struct {
 	autoRefresh autoRefreshState
 	// notice is a short footer message ("copied rule name: allow-web") shown
 	// until noticeUntil; the app clock's re-render takes it down.
-	notice      string
+	notice      []string
 	noticeUntil time.Time
 
 	// updatedAt is when each screen's data arrived, for the footer's

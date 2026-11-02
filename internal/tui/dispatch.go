@@ -38,6 +38,12 @@ func (m Model) handleDataMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ConfigSavedMsg, StateSavedMsg, ErrorMsg, ErrorDismissMsg:
 		return m.handleStatusMsg(msg)
 
+	case views.ExportLogsCmd:
+		return m.exportLogs(msg)
+
+	case LogsExportedMsg:
+		return m.handleLogsExported(msg)
+
 	case views.FetchDetailCmd:
 		return m, m.fetchSessionDetail(msg.SessionID)
 
