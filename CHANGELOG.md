@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.7.0](https://github.com/jp2195/pyre/compare/v1.6.0...v1.7.0) (2026-11-02)
+
+
+### Features
+
+* **logs:** export the rows on screen to CSV or JSON ([#84](https://github.com/jp2195/pyre/issues/84)) ([830c072](https://github.com/jp2195/pyre/commit/830c0729d2e0cf30d21ba8e7ad5964a03264b99d))
+* **tui:** add opt-in auto-refresh and show how old each screen's data is ([#78](https://github.com/jp2195/pyre/issues/78)) ([ff1ae8c](https://github.com/jp2195/pyre/commit/ff1ae8cb882620e5e751cdd7049b7f1bb0fe4e8c))
+* **tui:** copy the selected row's name or ID with y ([#81](https://github.com/jp2195/pyre/issues/81)) ([4209bc9](https://github.com/jp2195/pyre/commit/4209bc9e3b52f8e10cdc7fc41ea69bbd87111312))
+* **tui:** report loading and errors to the terminal tab ([6387a4b](https://github.com/jp2195/pyre/commit/6387a4bc7ce0d81de506c88fceaa73e420b7cf34))
+
+
+### Bug Fixes
+
+* **dashboard:** report certificate expiry honestly and most urgent first ([#82](https://github.com/jp2195/pyre/issues/82)) ([8952107](https://github.com/jp2195/pyre/commit/8952107a16a27404c18499b58cfc2e4b3bf953c2))
+* **deps:** bump Go to 1.27.3 for stdlib security fixes ([#70](https://github.com/jp2195/pyre/issues/70)) ([71287f6](https://github.com/jp2195/pyre/commit/71287f6cc3f0de87918ac7420e2620118850ae25))
+* **deps:** update bubbletea to v2.1.1 (GHSA-qc58-pfg9-7pph) and go-yaml to v4.0.0-rc.7 ([6387a4b](https://github.com/jp2195/pyre/commit/6387a4bc7ce0d81de506c88fceaa73e420b7cf34))
+* **deps:** update module charm.land/bubbletea/v2 to v2.0.10 ([#69](https://github.com/jp2195/pyre/issues/69)) ([1b8455c](https://github.com/jp2195/pyre/commit/1b8455ca13df3e4586c3d543fbdd61160063d65d))
+* **deps:** update module charm.land/bubbletea/v2 to v2.1.0 ([#74](https://github.com/jp2195/pyre/issues/74)) ([086c47b](https://github.com/jp2195/pyre/commit/086c47be3b5461e1c2acb46c34cada8d2e94527a))
+* **tui:** stop logging Bubble Tea's startup reports as unhandled ([#77](https://github.com/jp2195/pyre/issues/77)) ([b3d4f49](https://github.com/jp2195/pyre/commit/b3d4f495873fe06cc6be8ae54b1dde21c86441cb))
+
 ## [1.6.0](https://github.com/jp2195/pyre/compare/v1.5.4...v1.6.0) (2026-09-17)
 
 
