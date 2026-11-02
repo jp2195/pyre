@@ -188,11 +188,20 @@ type Certificate struct {
 	Issuer       string    // Certificate issuer
 	NotBefore    time.Time // Valid from date
 	NotAfter     time.Time // Expiration date
-	DaysLeft     int       // Days until expiration
-	Status       string    // Status (valid, expiring, expired)
+	DaysLeft     int       // Whole days until expiration, floored; negative once expired
+	Status       string    // One of the CertStatus constants
 	SerialNumber string    // Certificate serial number
 	Algorithm    string    // Signature algorithm
 }
+
+// Certificate statuses. Unknown means the expiry could not be read, which is
+// not the same as valid and must not be counted as valid.
+const (
+	CertStatusValid    = "valid"
+	CertStatusExpiring = "expiring"
+	CertStatusExpired  = "expired"
+	CertStatusUnknown  = "unknown"
+)
 
 // ARPEntry represents an entry in the ARP table
 type ARPEntry struct {

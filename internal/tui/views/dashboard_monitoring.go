@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -361,16 +362,19 @@ func (m DashboardModel) renderCertificates(width int) string {
 		return panelStyle().Width(width).Render(b.String())
 	}
 
-	// Count by status
-	var expired, expiring, valid int
+	// Count by status. Unknown is its own count: a certificate whose expiry
+	// could not be read has not been shown to be valid.
+	var expired, expiring, valid, unknown int
 	for _, cert := range m.certificates {
 		switch cert.Status {
-		case "expired":
+		case models.CertStatusExpired:
 			expired++
-		case "expiring":
+		case models.CertStatusExpiring:
 			expiring++
-		default:
+		case models.CertStatusValid:
 			valid++
+		default:
+			unknown++
 		}
 	}
 
@@ -387,14 +391,22 @@ func (m DashboardModel) renderCertificates(width int) string {
 		b.WriteString(errorStyle().Render(strconv.Itoa(expired)))
 		b.WriteString(dimStyle().Render(" expired"))
 	}
+	if unknown > 0 {
+		b.WriteString(dimStyle().Render(fmt.Sprintf("  %d unknown expiry", unknown)))
+	}
 
-	// Show certs needing attention
+	// Certs needing attention, soonest (or longest expired) first, so the
+	// ones cut off by maxShow are the least urgent rather than whichever
+	// came last in the config.
 	var attention []models.Certificate
 	for _, cert := range m.certificates {
-		if cert.Status == "expired" || cert.Status == "expiring" {
+		if cert.Status == models.CertStatusExpired || cert.Status == models.CertStatusExpiring {
 			attention = append(attention, cert)
 		}
 	}
+	slices.SortStableFunc(attention, func(a, b models.Certificate) int {
+		return a.NotAfter.Compare(b.NotAfter)
+	})
 
 	if len(attention) > 0 {
 		b.WriteString("\n\n")
@@ -408,7 +420,7 @@ func (m DashboardModel) renderCertificates(width int) string {
 			var statusStyle lipgloss.Style
 			var days string
 
-			if cert.Status == "expired" {
+			if cert.Status == models.CertStatusExpired {
 				statusStyle = errorStyle()
 				days = "exp"
 			} else {
