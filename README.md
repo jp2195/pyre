@@ -173,7 +173,7 @@ Three levels, three sets of keys:
 `Ctrl+P` opens a fuzzy command palette that jumps anywhere.
 
 Inside a list view: `/` filter, `s` cycle sort, `Enter` open detail,
-`r` refresh, `R` auto-refresh, `?` help, `q` quit. Dashboards taller than your terminal
+`r` refresh, `R` auto-refresh, `y` copy, `?` help, `q` quit. Dashboards taller than your terminal
 scroll with `j`/`k`.
 
 New to pyre? The **"first 60 seconds"** section of

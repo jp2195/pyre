@@ -1,6 +1,10 @@
 package tui
 
-import "github.com/jp2195/pyre/internal/tui/views"
+import (
+	"strconv"
+
+	"github.com/jp2195/pyre/internal/tui/views"
+)
 
 // viewslots.go – single registration table that drives handleWindowSize,
 // handleSpinnerTick, handleRefresh, and resetViewData.
@@ -16,6 +20,7 @@ import "github.com/jp2195/pyre/internal/tui/views"
 //                 currentViewFiltering.
 //   isExpanded – non-nil for the auto-refreshed list views; holds auto-refresh
 //                while a detail panel is open.
+//   copyValue  – non-nil for the 9 table views; what y copies.
 //   refreshFor – the ViewState that triggers a refresh for this slot; 0 when the
 //                slot is not refreshable.
 //
@@ -41,6 +46,10 @@ type viewSlot struct {
 	// while it is, so the row being read does not change underneath it.
 	// Non-nil for the auto-refreshed list views; logs holds on its own rule.
 	isExpanded func(m *Model) bool
+	// copyValue returns what y puts on the clipboard for the selected row:
+	// a label for the footer notice, the value, and false when nothing is
+	// selected. Non-nil for every view with rows.
+	copyValue func(m *Model) (label, value string, ok bool)
 	// refreshFor is the ViewState that triggers a refresh for this slot; 0 when the
 	// slot is not refreshable.
 	// NOTE: the zero value collides with ViewConnectionHub (= 0); this is only safe
@@ -166,7 +175,11 @@ func viewSlots() []viewSlot {
 			},
 			isLoading:   func(m *Model) bool { return m.policies.IsLoading() },
 			isFiltering: func(m *Model) bool { return m.policies.IsFilterMode() },
-			refreshFor:  ViewPolicies,
+			copyValue: func(m *Model) (string, string, bool) {
+				r, ok := m.policies.Selected()
+				return "rule name", r.Name, ok
+			},
+			refreshFor: ViewPolicies,
 		},
 		{
 			resize: func(m *Model, w, h, contentH int) {
@@ -183,7 +196,11 @@ func viewSlots() []viewSlot {
 			},
 			isLoading:   func(m *Model) bool { return m.natPolicies.IsLoading() },
 			isFiltering: func(m *Model) bool { return m.natPolicies.IsFilterMode() },
-			refreshFor:  ViewNATPolicies,
+			copyValue: func(m *Model) (string, string, bool) {
+				r, ok := m.natPolicies.Selected()
+				return "NAT rule name", r.Name, ok
+			},
+			refreshFor: ViewNATPolicies,
 		},
 		{
 			resize: func(m *Model, w, h, contentH int) {
@@ -201,7 +218,11 @@ func viewSlots() []viewSlot {
 			isLoading:   func(m *Model) bool { return m.sessions.IsLoading() },
 			isFiltering: func(m *Model) bool { return m.sessions.IsFilterMode() },
 			isExpanded:  func(m *Model) bool { return m.sessions.IsExpanded() },
-			refreshFor:  ViewSessions,
+			copyValue: func(m *Model) (string, string, bool) {
+				s, ok := m.sessions.Selected()
+				return "session ID", strconv.FormatInt(s.ID, 10), ok
+			},
+			refreshFor: ViewSessions,
 		},
 		{
 			resize: func(m *Model, w, h, contentH int) {
@@ -219,7 +240,11 @@ func viewSlots() []viewSlot {
 			isLoading:   func(m *Model) bool { return m.interfaces.IsLoading() },
 			isFiltering: func(m *Model) bool { return m.interfaces.IsFilterMode() },
 			isExpanded:  func(m *Model) bool { return m.interfaces.IsExpanded() },
-			refreshFor:  ViewInterfaces,
+			copyValue: func(m *Model) (string, string, bool) {
+				i, ok := m.interfaces.Selected()
+				return "interface", i.Name, ok
+			},
+			refreshFor: ViewInterfaces,
 		},
 		{
 			resize: func(m *Model, w, h, contentH int) {
@@ -237,7 +262,10 @@ func viewSlots() []viewSlot {
 			isLoading:   func(m *Model) bool { return m.routes.Loading },
 			isFiltering: func(m *Model) bool { return m.routes.IsFilterMode() },
 			isExpanded:  func(m *Model) bool { return m.routes.Expanded },
-			refreshFor:  ViewRoutes,
+			copyValue: func(m *Model) (string, string, bool) {
+				return m.routes.SelectedPeer()
+			},
+			refreshFor: ViewRoutes,
 		},
 		{
 			resize: func(m *Model, w, h, contentH int) {
@@ -255,7 +283,11 @@ func viewSlots() []viewSlot {
 			isLoading:   func(m *Model) bool { return m.ipsecTunnels.IsLoading() },
 			isFiltering: func(m *Model) bool { return m.ipsecTunnels.IsFilterMode() },
 			isExpanded:  func(m *Model) bool { return m.ipsecTunnels.IsExpanded() },
-			refreshFor:  ViewIPSecTunnels,
+			copyValue: func(m *Model) (string, string, bool) {
+				t, ok := m.ipsecTunnels.Selected()
+				return "tunnel", t.Name, ok
+			},
+			refreshFor: ViewIPSecTunnels,
 		},
 		{
 			resize: func(m *Model, w, h, contentH int) {
@@ -273,7 +305,11 @@ func viewSlots() []viewSlot {
 			isLoading:   func(m *Model) bool { return m.gpUsers.IsLoading() },
 			isFiltering: func(m *Model) bool { return m.gpUsers.IsFilterMode() },
 			isExpanded:  func(m *Model) bool { return m.gpUsers.IsExpanded() },
-			refreshFor:  ViewGPUsers,
+			copyValue: func(m *Model) (string, string, bool) {
+				u, ok := m.gpUsers.Selected()
+				return "user", u.Username, ok
+			},
+			refreshFor: ViewGPUsers,
 		},
 		{
 			resize: func(m *Model, w, h, contentH int) {
@@ -290,7 +326,11 @@ func viewSlots() []viewSlot {
 			},
 			isLoading:   func(m *Model) bool { return m.logs.Loading },
 			isFiltering: func(m *Model) bool { return m.logs.IsFilterMode() || m.logs.IsQueryMode() },
-			refreshFor:  ViewLogs,
+			copyValue: func(m *Model) (string, string, bool) {
+				line, ok := m.logs.SelectedLine()
+				return "log entry", line, ok
+			},
+			refreshFor: ViewLogs,
 		},
 		{
 			resize: func(m *Model, w, h, contentH int) {
@@ -307,7 +347,10 @@ func viewSlots() []viewSlot {
 			},
 			isLoading:   func(m *Model) bool { return m.objects.IsLoading() },
 			isFiltering: func(m *Model) bool { return m.objects.IsFilterMode() },
-			refreshFor:  ViewObjects,
+			copyValue: func(m *Model) (string, string, bool) {
+				return m.objects.SelectedName()
+			},
+			refreshFor: ViewObjects,
 		},
 
 		// --- Picker views (contentHeight; no spinner; not refreshable) ---
