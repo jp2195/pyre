@@ -195,6 +195,23 @@ func (m Model) renderFooter() string {
 	return strings.Join(sections, "\n")
 }
 
+// renderHelp renders the ? overlay: the multi-column KeyMap.FullHelp, not the
+// one-line ShortHelp. m.help is copied so ShowAll never leaks into any other
+// caller of the shared help model. The result is clamped to the content area
+// between the header and footer (the same height applySize gives every other
+// view) so a short terminal does not push the footer off screen.
 func (m Model) renderHelp() string {
-	return m.help.View(m.keys)
+	h := m.help
+	h.ShowAll = true
+	out := h.View(m.keys)
+
+	contentH := m.height - 4
+	if contentH <= 0 {
+		return ""
+	}
+	lines := strings.Split(out, "\n")
+	if len(lines) > contentH {
+		lines = lines[:contentH]
+	}
+	return strings.Join(lines, "\n")
 }
