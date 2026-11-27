@@ -168,10 +168,14 @@ logger at a file.
 
 ## Go 1.27 (Current Version)
 
-`go.mod` is pinned to `go 1.27.3`; CI pins `go-version: '1.27.3'` (the
+`go.mod` is pinned to `go 1.27.4`; CI pins `go-version: '1.27.4'` (the
 `go-version` lines across `.github/workflows/` plus `go.mod` move together —
 verify the count with `grep -rc "go-version:" .github/workflows/` rather than
 trusting a number written here).
+
+**1.27.3 -> 1.27.4 WAS a security bump.** `govulncheck` flagged GO-2026-6859
+(`net/http`, fixed in 1.27.4), reachable through `auth.GenerateAPIKey` and the
+API client's response reads. It blocked the release-please PR's Security check.
 
 **1.27.1 -> 1.27.3 WAS a security bump.** `govulncheck` flagged ten stdlib
 advisories in 1.27.1 (GO-2026-6603, -6605, -6607 through -6613, -6617; one
